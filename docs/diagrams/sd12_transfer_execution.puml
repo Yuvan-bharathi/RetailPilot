@@ -1,6 +1,6 @@
 @startuml
 !include style.iuml
-title SD-12 v3  Transfer Workflow: Accept → Approve Release → Re-check → Dispatch → Receive → Ledger\n<size:11>TransferRouter · TransferService · InventoryLedgerService</size>
+title SD-12 v3.1  Transfer Workflow: Accept → Approve Release → Re-check → Dispatch → Receive → Ledger\n<size:11>TransferRouter · TransferService · InventoryLedgerService · v3.1 = D-03 (commitments, no carry-forward), D-06 (discrepancy), D-15 (donor declines)</size>
 autonumber "<b>00"
 actor "Destination Store\nSupervisor" as DST
 actor "Donor Store\nSupervisor" as DON
@@ -26,8 +26,9 @@ else user.store_id != t.to_store_id
 end
 TS -> AR : ApprovalRepo.insert(Approval(entity_type="TRANSFER", level="DEST", store_id=t.to_store_id, decision="APPROVED"))
 TS -> TR : set_status(id, "DEST_ACCEPTED", dest_accepted_by=user.user_id)
-opt destination rejects instead (POST /reject with reason)
-  TS -> TR : set_status(id, "REJECTED"); need re-evaluated next run
+TS -> IR : _apply_commitment(t, "ACCEPTED"): receiver incoming += t.qty ; donor reserved += t.qty  (soft reservation, D-03)
+opt destination rejects instead (POST /reject with reason, from PROPOSED)
+  TS -> TR : set_status(id, "REJECTED", status_reason=reason)  (nothing reserved yet; need recalculated next run)
 end
 
 == 2. Donor approves release of surplus  +  3. System re-checks ==
@@ -40,6 +41,14 @@ alt t.status != "DEST_ACCEPTED"
 else user.store_id != t.from_store_id
   TS --> API : 403
 end
+opt donor declines instead (POST /reject with reason, from DEST_ACCEPTED, D-15)
+  TS -> TS : require user.store_id == t.from_store_id (else 403) and reason (else 422)
+  TS -> AR : ApprovalRepo.insert(Approval(level="DONOR", store_id=t.from_store_id, decision="REJECTED", reason))
+  TS -> TR : set_status(id, "REJECTED", status_reason=reason)
+  TS -> IR : _apply_commitment(t, "RELEASED"): receiver incoming −= t.qty ; donor reserved −= t.qty
+  TS -> TS : NotificationService.notify(store_id=t.to_store_id, message="transfer declined by donor", link)
+  note right of TS : need recalculated by the next nightly run (no carry-forward)
+end
 TS -> IR : get_position_for_update(t.from_store_id, t.product_id) → pos
 alt t.is_expiry_aware
   TS -> IR : BatchRepo.get(t.batch_id) → batch
@@ -47,15 +56,15 @@ alt t.is_expiry_aware
 else surplus transfer
   TS -> RC : own_requirement(latest forecast, donor lead time, review period, safety days, min_display_qty) → req
   TS -> RC : surplus(available=RC.available(pos.shelf_qty, pos.backroom_qty, pos.incoming, pos.reserved), requirement=req) → sur
-  TS -> TS : valid = sur ≥ t.qty   (donor protection with today's stock)
+  TS -> TS : valid = sur ≥ 0   (pos.reserved already includes this transfer's soft reservation, so this is\n donor protection with today's stock: donor available after the transfer ≥ its own requirement)
 end
 alt valid
-  TS -> IR : reserve(t.from_store_id, t.product_id, qty=t.qty)
   TS -> AR : ApprovalRepo.insert(Approval(level="DONOR", store_id=t.from_store_id, decision="APPROVED"))
-  TS -> TR : set_status(id, "DONOR_APPROVED", donor_approved_by=user.user_id)
+  TS -> TR : set_status(id, "DONOR_APPROVED", donor_approved_by=user.user_id)  (reservation already held since DEST_ACCEPTED)
 else no longer valid
-  TS -> TR : set_status(id, "CANCELLED", reason="surplus no longer available")
-  TS -> AR : NeedRepo.carry_forward(store_id=t.to_store_id, product_id, qty=t.qty, reason="TRANSFER_CANCELLED")
+  TS -> TR : set_status(id, "CANCELLED", status_reason="surplus no longer available")
+  TS -> IR : _apply_commitment(t, "RELEASED"): receiver incoming −= t.qty ; donor reserved −= t.qty
+  note right of TS : no carry-forward (D-03): the next nightly run\nrecalculates the destination's need
 end
 
 == 4. Dispatch ==
@@ -64,7 +73,7 @@ UI -> API : POST /api/v1/transfers/{id}/dispatch
 API -> TS : dispatch(transfer_id: UUID, user: User) → TransferOrder
 TS -> TS : require t.status == "DONOR_APPROVED" (else 409) and user.store_id == t.from_store_id (else 403)
 TS -> LED : post([InventoryMovement(store=t.from_store_id, type="TRANSFER_OUT", qty=−t.qty,\n location="BACKROOM", batch_id=t.batch_id, reference_type="TRANSFER", reference_id=t.transfer_id, user_id)])
-TS -> IR : release_reserved(t.from_store_id, t.product_id, t.qty); in_transit_out += t.qty
+TS -> IR : _apply_commitment(t, "DISPATCHED"): donor reserved −= t.qty ; donor in_transit_out += t.qty\n(receiver incoming unchanged until receipt)
 TS -> TR : set_status(id, "DISPATCHED", dispatched_at=now())
 
 == 5. Receiving supervisor confirms quantity  +  6. Ledger update ==
@@ -73,14 +82,15 @@ UI -> API : POST /api/v1/transfers/{id}/receive {received_qty: int}
 API -> TS : receive(transfer_id: UUID, received_qty: int, user: User) → TransferOrder
 TS -> TS : require t.status == "DISPATCHED" (else 409) and user.store_id == t.to_store_id (else 403)
 TS -> LED : post([InventoryMovement(store=t.to_store_id, type="TRANSFER_IN", qty=+received_qty,\n location="BACKROOM", batch_id=t.batch_id, reference_type="TRANSFER", reference_id=t.transfer_id, user_id)])
+TS -> TR : set expected_qty = t.qty, received_qty = received_qty on the transfer
 opt received_qty < t.qty
-  TS -> TR : record_discrepancy(transfer_id, expected=t.qty, received=received_qty,\n loss_value=(t.qty − received_qty) × unit_cost) → discrepancy_id
+  TS -> TR : record_discrepancy(transfer_id, loss_value=(t.qty − received_qty) × unit_cost)\n(stored on transfer_order: expected_qty, received_qty, loss_value — D-06)
   note right of TR : stock is already correct on both sides\n(donor −qty sent, receiver +qty received);\nthe difference is flagged for review as transit loss
 end
 opt t.batch_id
   TS -> IR : BatchRepo.move(batch_id=t.batch_id, to_store=t.to_store_id, qty=received_qty)
 end
-TS -> IR : in_transit_out −= t.qty at donor
+TS -> IR : _apply_commitment(t, "RECEIVED"): donor in_transit_out −= t.qty ; receiver incoming −= t.qty
 TS -> TR : set_status(id, "RECEIVED", received_qty=received_qty, received_at=now())
 TS -> CS : invalidate_store_keys([t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"])
 TS --> API : TransferOrder

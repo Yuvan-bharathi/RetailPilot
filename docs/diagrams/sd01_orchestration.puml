@@ -23,6 +23,7 @@ O -> LOG : start_run(agent_name="nightly", parent_run_id=None,\n input_ref={"run
 O -> RUN : get_active_store_ids() → list[UUID]
 O -> ING : load_and_validate(run_date: date, store_ids: list[UUID]) → ValidationReport
 ref over ING : SD-02 Data Ingestion & Validation
+O -> O : RunSupersession.supersede_previous(run_id) → SupersedeSummary\n(previous runs' PENDING recommendations, PROPOSED transfers and PENDING_L1 POs\n with no decided line → SUPERSEDED; acted-on items kept — D-03)
 O -> O : ctx = RunContext(run_id, run_date, store_ids,\n stale_skus=report.stale_skus, params=RunParams.load(), logger=LOG)
 loop for agent in AGENT_SEQUENCE = [SalesAnalyticsAgent, DemandForecastingAgent,\n RelatedProductAgent, StockBalancingAgent, FreshnessAgent, PurchaseOrderAgent]
   O -> O : _run_agent(agent: BaseAgent, ctx: RunContext) → AgentResult

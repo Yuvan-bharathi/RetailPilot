@@ -1,16 +1,17 @@
 @startuml
 !include style.iuml
-title SD-07 v3  TransferDecisionEngine.decide(product_id, states, routes, cost_inputs) → TransferPlan\n<size:11>Only genuine surplus moves; incremental-cost comparison (v2.2); if every store needs the product, a PO is raised</size>
+title SD-07 v3.1  TransferDecisionEngine.decide(product_id, states, routes, cost_inputs) → TransferPlan\n<size:11>Only genuine surplus moves; incremental-cost comparison (v2.2); if every store needs the product, a PO is raised · v3.1 = D-04, D-10, D-17</size>
 autonumber "<b>00"
 participant "StockBalancing\nAgent" as SB
 participant "TransferDecision\nEngine" as TE
 participant "CostModel" as CM
 participant "Requirement\nCalculator" as RC
 
-SB -> TE : decide(product_id: UUID, states: list[StoreState], routes: dict[(UUID, UUID), TransferRoute],\n cost_inputs: CostInputs(terms_by_store, order_fixed_cost, holding_cost_rate_per_day, expiry_risk_pct))
+SB -> TE : decide(product_id: UUID, states: list[StoreState], routes: dict[(UUID, UUID), TransferRoute],\n cost_inputs: CostInputs(terms_by_store, order_fixed_cost, holding_cost_rate_per_day, expiry_risk_pct,\n is_perishable, days_to_sell_cap, planned_supplier_stores))
+note right of SB : states contain only HIGH-confidence store-SKUs;\nLOW-confidence ones were removed by SD-06 (D-04)
 TE -> TE : plan = TransferPlan(transfers=[], po_needs=[])
-TE -> TE : short_stores = [s for s in states if s.available < s.requirement]\nsorted by s.days_of_cover ascending (most urgent first)
-TE -> TE : donors = {s.store_id: s for s in states if s.surplus > 0 and not s.review_required}
+TE -> TE : short_stores = [s for s in states if s.available < s.requirement]\nsorted by (s.days_of_cover, s.store_id) ascending (most urgent first; deterministic, D-17)
+TE -> TE : donors = {s.store_id: s for s in states if s.surplus > 0}
 break short_stores is empty
   TE --> SB : plan (no action for this product)
 end
@@ -20,7 +21,7 @@ loop for short in short_stores
   alt donors is empty  (product sells high in every store)
     TE -> TE : plan.po_needs.append(PONeed(short.store_id, qty=need,\n priority=_priority(short, terms), reason="NO_SURPLUS_IN_ANY_STORE"))
   else donors available
-    TE -> TE : candidates = sorted(donors, key=lambda d: routes[(d, short.store_id)].per_unit_cost)
+    TE -> TE : candidates = sorted(donors, key=lambda d: (routes[(d, short.store_id)].per_unit_cost, d))\n(donors without a route sort last)
     loop for donor_id in candidates while need > 0
       TE -> TE : donor = donors[donor_id]; qty: int = min(donor.surplus, need)
       TE -> TE : route = routes.get((donor_id, short.store_id))
@@ -32,12 +33,15 @@ loop for short in short_stores
         fixed_cost + per_unit_cost × qty
         + handling_cost_per_unit × qty
       end note
-      TE -> CM : po_incremental_cost(qty, unit_cost=terms.unit_cost, donor=donor, terms=terms,\n order_fixed_share=cost_inputs.order_fixed_cost / expected_lines,\n holding_rate=cost_inputs.holding_cost_rate_per_day, expiry_risk_pct=cost_inputs.expiry_risk_pct) → Decimal
+      TE -> TE : marked = (terms.supplier_id, short.store_id) in cost_inputs.planned_supplier_stores\n(marked in pass 1 — no surplus anywhere — or by an earlier product in pass 2, D-17)\norder_fixed_share = 0 if marked else cost_inputs.order_fixed_cost\ndelivery_charge_share = 0 if marked else terms.delivery_charge   (marginal order cost, D-10)
+      TE -> CM : po_incremental_cost(qty, unit_cost=terms.unit_cost, donor=donor, terms=terms,\n order_fixed_share, delivery_charge_share,\n holding_rate=cost_inputs.holding_cost_rate_per_day, expiry_risk_pct=cost_inputs.expiry_risk_pct,\n is_perishable=cost_inputs.is_perishable, days_to_sell_cap=cost_inputs.days_to_sell_cap) → Decimal
       note right of CM
-        order_fixed_share + terms.delivery_charge share
+        order_fixed_share + delivery_charge_share
         + qty × unit_cost × holding_rate × days_to_sell_at_donor
-          (days_to_sell_at_donor = qty / donor.daily_demand)
-        + qty × unit_cost × expiry_risk_pct   (perishables only)
+          (days_to_sell_at_donor = min(qty / donor.daily_demand, cap);
+           = cap when donor.daily_demand == 0; cap = shelf_life_days or 90)
+        + qty × unit_cost × expiry_risk_pct   (only if is_perishable:
+           shelf_life_days ≤ perishable_max_shelf_life_days, default 30)
         purchase price itself is NOT included (paid either way)
       end note
       alt t_cost < p_cost AND route.transit_days ≤ terms.lead_time_days

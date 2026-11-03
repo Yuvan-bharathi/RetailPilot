@@ -1,17 +1,25 @@
 # RetailPilot AI — Technical Specification (implementation reference)
 
-Derived from business requirements v2.2 and diagrams v3 (`docs/diagrams/`). Use these names, formulas and
-states exactly. Values marked **(confirm)** are placeholder defaults stored in `BusinessRule` — never hard-code them.
+Derived from business requirements v2.2, diagrams v3 (`docs/diagrams/`) and the decision log
+(`docs/05-decision-log.md`, D-01 … D-17). Use these names, formulas and states exactly. Values marked
+**(confirm)** are placeholder defaults stored in `BusinessRule` — never hard-code them.
 
 ## 1. Core formulas
 
 ```
+serving supplier     = store_product.preferred_supplier_id                                   (D-07)
+lead_time_days       = SupplierStoreTerms.lead_time_days → SupplierProduct.lead_time_days
+                       → Supplier.default_lead_time_days   (first one defined, for the serving supplier)
 demand_window_days   = lead_time_days(store's supplier) + review_period_days
 own_requirement      = ceil(daily_demand × demand_window_days)
                        + ceil(daily_demand × safety_stock_days)
                        + min_display_qty
 on_hand              = shelf_qty + backroom_qty
 available            = shelf_qty + backroom_qty + incoming − reserved
+   in planning (nightly run) incoming = non-overdue incoming + on_order_pending   (D-14, D-16):
+     overdue incoming   = incoming whose expected date + incoming_overdue_grace_days < run_date — NOT counted
+                          (expected date: PO submitted date + lead time; transfer dispatched date + transit_days)
+     on_order_pending   = qty of PENDING / ESCALATED lines on PENDING_L1 POs kept from earlier runs
 surplus              = available − own_requirement          (≤ 0 → not a donor)
 need (short store)   = own_requirement − available          (> 0 → short)
 days_of_cover        = available / max(daily_demand, 0.01)
@@ -20,10 +28,32 @@ transfer_incremental_cost = fixed_cost + per_unit_cost × qty + handling_cost_pe
 po_incremental_cost       = order_fixed_share + delivery_charge_share
                           + qty × unit_cost × holding_cost_rate_per_day × days_to_sell_at_donor
                           + qty × unit_cost × expiry_risk_pct            (perishables only)
-   where days_to_sell_at_donor = qty / donor.daily_demand ; purchase price itself is NOT included
+   where purchase price itself is NOT included
+   order_fixed_share, delivery_charge_share (marginal, D-10, D-17)
+                          = 0 if (supplier, store) is marked as receiving a PO this cycle,
+                            else order_fixed_cost and SupplierStoreTerms.delivery_charge in full
+   marking is two-pass (D-17): pass 1 marks (serving supplier, short store) for every product where no store
+   has surplus; pass 2 decides the other products, short stores by days_of_cover ascending (ties: store_id),
+   products by their most urgent store, and marks each pair that gets a PO need — deterministic
+   days_to_sell_at_donor  = min(qty / donor.daily_demand, cap)  ; = cap when donor.daily_demand = 0
+                            cap = product.shelf_life_days, or 90 if the product has no shelf life
+   perishable             = shelf_life_days ≤ perishable_max_shelf_life_days (default 30)
 transfer chosen if  transfer_incremental_cost < po_incremental_cost
                 AND route.transit_days ≤ lead_time_days of the short store's supplier
                 AND donor stays ≥ own_requirement after the transfer (donor protection)
+low confidence (D-04): a store-SKU whose forecast confidence = LOW is neither donor nor receiver; if short it
+                gets Recommendation(REORDER, status NEEDS_REVIEW) and NO ReplenishmentNeed
+
+co-replenishment (D-02): complement C of reordered product P in store S qualifies when
+   available(C) − daily_demand(C) × review_period_days(C) < own_requirement(C)
+   AND C's serving supplier for S is already delivering to the SAME store S this cycle
+       (a SHORTFALL need exists for (supplier, S) — delivery charge is per store, D-13)
+   qty = max(1, ceil(own_requirement(C) − (available(C) − daily_demand(C) × review_period_days(C))))
+   if C already has a need in S this run → set linked_product_id = P and lift on it; never add a second need
+
+incoming  (D-03) = Σ qty of transfers to the store in DEST_ACCEPTED | DONOR_APPROVED | DISPATCHED
+                 + Σ open qty of PO lines APPROVED | EDITED on POs APPROVED | SUBMITTED (until goods receipt)
+reserved  (D-03) = Σ qty of transfers from the store in DEST_ACCEPTED | DONOR_APPROVED (soft reservation)
 
 lost_units   = demand rate on in-stock days × stockout_days
 lost_revenue = lost_units × selling_price
@@ -44,17 +74,36 @@ FEFO at-risk qty per batch (earliest expiry first): `sellable = daily_demand × 
 
 **PurchaseOrder.status**: `DRAFT → NEEDS_REVIEW | PENDING_L1 → (PENDING_L2 | APPROVED | REJECTED | SPLIT) ;
 PENDING_L2 → APPROVED | REJECTED ; APPROVED → SUBMITTED → RECEIVED`. `SPLIT` = parent closed, child PO continues.
+`NEEDS_REVIEW → PENDING_L1 | REJECTED` via `POST /purchase-orders/{po_id}/resolve` (Super Admin, D-08).
+`PENDING_L1 → SUPERSEDED` when the next nightly run replaces a PO none of whose lines were decided (D-03).
+`SUBMITTED → RECEIVED` when every continuing line is fully received (SD-16); partial receipts keep `SUBMITTED`.
+`SUBMITTED → RECEIVED` also by **close short** (Super Admin, `POST /purchase-orders/{po_id}/close-short`, Phase 6,
+D-16): undelivered qty stops counting as incoming; short qty recorded per line (`short_closed_qty`).
+A PO kept from an earlier run (some line decided) keeps its `PENDING`/`ESCALATED` lines; they count as
+`on_order_pending` in the next run (D-14).
 
-**POLine.line_status**: `PENDING → APPROVED | EDITED | REJECTED | ESCALATED | EXPIRED`.
-L1 is finalised when no line is PENDING (or at deadline, SD-14). Approved/edited lines continue; if any line is
-rejected/expired, approved lines move to a child PO (`parent_po_id`). L2 threshold uses the continuing PO's value.
+**POLine.line_status**: `PENDING → APPROVED | EDITED | REJECTED | ESCALATED | EXPIRED | SUPERSEDED`;
+`ESCALATED → APPROVED | EDITED | REJECTED` (Super Admin, recorded as L1 on behalf of the store, D-01).
+L1 is finalised when **no line is PENDING or ESCALATED** (D-01), or at the deadline with `deadline_action = EXPIRE`
+(SD-14). Approved/edited lines continue; if any line is rejected/expired, approved lines move to a child PO
+(`parent_po_id`). L2 threshold uses the continuing PO's value. `POLine.received_qty` tracks goods receipt.
 
 **TransferOrder.status**: `PROPOSED → DEST_ACCEPTED → DONOR_APPROVED → DISPATCHED → RECEIVED`;
-`PROPOSED → REJECTED` (destination declines); `DEST_ACCEPTED → CANCELLED` (surplus gone at re-check;
-need carried forward to next PO run).
+`PROPOSED → REJECTED` (destination declines); `DEST_ACCEPTED → REJECTED` (donor declines, reason required,
+destination notified, D-15); `DEST_ACCEPTED → CANCELLED` (surplus gone at re-check; the
+need is recalculated by the next nightly run — no carry-forward, D-03); `PROPOSED → SUPERSEDED` (next run, D-03).
+Stock effects (D-03): DEST_ACCEPTED → receiver `incoming += qty`, donor `reserved += qty`;
+REJECTED/CANCELLED after acceptance → both released; DISPATCHED → donor `reserved −= qty` + `TRANSFER_OUT`;
+RECEIVED → receiver `incoming −= qty` + `TRANSFER_IN(received_qty)`.
 
-**Recommendation.status**: `PENDING → ACCEPTED | EDITED | REJECTED | NEEDS_REVIEW`.
+**Recommendation.status**: `PENDING → ACCEPTED | EDITED | REJECTED | NEEDS_REVIEW | SUPERSEDED`
+(`SUPERSEDED` only from `PENDING`, by the next nightly run, D-03).
 **AgentRun.status**: `RUNNING → SUCCESS | PARTIAL | FAILED`.
+
+**Run supersession (D-03).** After ingestion and before the first agent, `WorkflowOrchestrator` calls
+`RunSupersession.supersede_previous(run_id)`: previous runs' `PENDING` recommendations, `PROPOSED` transfers and
+`PENDING_L1` POs with no decided line (and their `PENDING` lines) become `SUPERSEDED`. Items a person has acted on
+are kept and their effect on `incoming` / `reserved` is counted by the new run.
 
 ## 3. Inventory movement ledger
 All stock changes are `InventoryMovement` rows; `InventoryPosition` is a maintained projection.
@@ -62,22 +111,30 @@ All stock changes are `InventoryMovement` rows; `InventoryPosition` is a maintai
 | movement_type | qty sign | location | created by |
 |---|---|---|---|
 | SALE | − | SHELF | ingestion (SD-02) |
-| PO_RECEIPT | + | BACKROOM | goods receipt |
+| PO_RECEIPT | + | BACKROOM | goods receipt (SD-16) |
 | TRANSFER_OUT | − | BACKROOM | dispatch (SD-12) |
 | TRANSFER_IN | + | BACKROOM | receipt (SD-12) |
 | SHELF_REFILL | −backroom / +shelf (pair) | both | store task |
 | ADJUSTMENT | ± | either | reconciliation vs POS snapshot (SD-02) |
 | EXPIRY_WRITE_OFF | − | either | freshness / store action |
 
-Transit loss (received < sent) is recorded as a discrepancy on the transfer (no extra movement — both sides are already correct).
+Transit loss (received < sent) is recorded as a discrepancy on the transfer — `expected_qty`, `received_qty`,
+`loss_value` on `transfer_order` (D-06) — with no extra movement; both sides are already correct.
+`incoming` and `reserved` on `InventoryPosition` are commitments, not stock, so they are maintained by
+`TransferService` / `ApprovalService` / `GoodsReceiptService` as listed in §2, not by movements.
+Ingestion also writes `inventory_daily_snapshot` (closing stock per store-product-day, D-09); stockout day =
+`closing_on_hand = 0`.
 
 ## 4. Roles and permissions
 
 | Capability | Store Supervisor | Super Admin |
 |---|---|---|
 | Data scope | own store only | all stores |
-| PO lines L1 (own store) | ✓ | ✓ for escalated lines |
+| PO lines L1 (own store) | ✓ PENDING lines, before l1_deadline | ✓ ESCALATED lines (recorded as L1 for that store) |
 | PO L2 | – | ✓ |
+| Resolve NEEDS_REVIEW PO / close PO short | – | ✓ |
+| Transfer reject | ✓ destination (PROPOSED) · donor (DEST_ACCEPTED) | – |
+| Goods receipt (PO_RECEIPT) | ✓ own store's lines | view |
 | Transfer: accept incoming / approve release / dispatch / receive | ✓ for own store's side | view |
 | Business rules, suppliers, stores, users | – | ✓ |
 | Agent runs / system monitoring | – | ✓ |
@@ -88,13 +145,23 @@ Cross-store rule: a supervisor sees another store only as name + offered/request
 | Method & path | Handler → service | Diagram |
 |---|---|---|
 | POST /auth/login | issue JWT (seeded PoC users) | – |
+| GET /me | current user, role, store | – |
+| GET /stores | stores visible to the user (supervisor: own store only) | – |
 | GET /dashboard?store_id&period | DashboardService.get_summary | SD-11 |
-| GET /stores/{store_id}/inventory?category&status&aisle | StoreInventoryService.get_view | SD-15 |
+| GET /stores/{store_id}/inventory?category&status | StoreInventoryService.get_view (no aisle filter in PoC, D-10) | SD-15 |
+| GET /stores/{store_id}/inventory/movements?product_id&type&from&to | ledger tab | – |
+| GET /stores/{store_id}/inventory/batches?product_id | batches tab | – |
+| GET /stores/{store_id}/inventory/expiring?within_days | expiring-soon tab | – |
 | GET /recommendations?store_id&status&type | RecommendationService.list_inbox | – |
 | GET /recommendations/{rec_id} | RecommendationService.get_detail (evidence) | – |
 | GET /purchase-orders?status&store_id · GET /purchase-orders/{po_id} | PO queries | – |
+| POST /purchase-orders/{po_id}/resolve | PurchaseOrderService.resolve_needs_review (Super Admin) | – |
+| POST /purchase-orders/{po_id}/receipts | GoodsReceiptService.receive | SD-16 |
+| POST /purchase-orders/{po_id}/close-short | PurchaseOrderService.close_short (Super Admin, Phase 6) | – |
 | POST /approvals | ApprovalService.decide | SD-10 |
+| GET /transfers?store_id&status · GET /transfers/{id} | TransferService queries | – |
 | POST /transfers/{id}/accept · /approve-release · /reject · /dispatch · /receive | TransferService | SD-12 |
+| GET /notifications?unread · POST /notifications/{id}/read | NotificationService | SD-14 |
 | GET /agent-runs · GET /agent-runs/{run_id} | ObservabilityService | – |
 | POST /admin/runs (trigger nightly run manually, Super Admin) | nightly_run_task.delay | SD-01 |
 | GET/PUT /admin/business-rules | BusinessRuleRepo | – |
@@ -171,16 +238,29 @@ Critical agents (failure stops the run, no cache swap): DemandForecasting, Stock
 | MaterializedViewRefresher | refresh_dashboard_views() | None | SD-01 |
 | RequirementCalculator | demand_window(lead_time_days: int, review_period_days: int) | int | SD-04, SD-06 |
 | CostModel | transfer_incremental_cost(route: TransferRoute, qty: int) | Decimal | SD-07 |
-| CostModel | po_incremental_cost(qty, unit_cost, donor, terms, order_fixed_share, holding_rate, expiry_risk_pct) | Decimal | SD-07 |
+| CostModel | po_incremental_cost(qty, unit_cost, donor, terms, order_fixed_share, delivery_charge_share, holding_rate, expiry_risk_pct, is_perishable, days_to_sell_cap) | Decimal | SD-07 |
+| CostModel | days_to_sell(qty: int, daily_demand: float, cap_days: int) | Decimal | SD-07 |
+| RequirementCalculator | co_replenish_qty(available: int, daily_demand: float, review_period_days: int, requirement: int) | int (0 = does not qualify) | SD-06 |
+| RequirementCalculator | lead_time(terms_lead: int\|None, product_lead: int\|None, default_lead: int) | int | SD-04, SD-06 |
+| RunSupersession | supersede_previous(run_id: UUID) | SupersedeSummary | SD-01 |
+| DataIngestionService | backfill(start: date, end: date, store_ids: list[UUID]) | ValidationReport | SD-02 |
+| GoodsReceiptService | receive(po_id: UUID, lines: list[ReceiptLine], user: User) | PurchaseOrder | SD-16 |
+| PurchaseOrderService | resolve_needs_review(po_id: UUID, decision: ResolveRequest, user: User) | PurchaseOrder | – |
+| PurchaseOrderService | close_short(po_id: UUID, reason: str, user: User) (Phase 6) | PurchaseOrder | – |
+| RequirementCalculator | planning_incoming(incoming_items: list[IncomingItem], on_order_pending: int, run_date: date, grace_days: int) | int | SD-06 |
+| TransferDecisionEngine | mark_po_pairs(states_by_product: dict, terms) (pass 1) | set[tuple[UUID, UUID]] | SD-06, SD-07 |
+| NotificationService | notify(role: Role\|None, store_id: UUID\|None, message: str, link: str\|None) / list_for(user) / mark_read(id, user) | Notification / list / None | SD-14 |
 | BasketTools | clean_bills(lines: DataFrame, rules: BasketQualityRules) | DataFrame | SD-05 |
 | InventoryLedgerService | post(movements: list[InventoryMovement]) | None | SD-02, SD-12 |
 | InventoryLedgerService | reconcile(store_id: UUID, snapshot: list[StockRow]) | list[InventoryMovement] | SD-02 |
 | TransferService | reject(transfer_id: UUID, reason: str, user: User) | TransferOrder | SD-12 |
 | ApprovalService | expire_overdue(now: datetime) | int | SD-14 |
+| ApprovalService | _decide_escalated_lines(po, req, user) (Super Admin, L1 on behalf of store) | None | SD-10 |
 | ApprovalService | _finalise_l1(po: PurchaseOrder) | PurchaseOrder | SD-10, SD-14 |
 | POBuilder | split(po: PurchaseOrder, lines: list[POLine]) | PurchaseOrder (child) | SD-10, SD-14 |
 | Celery task | approval_deadline_task() | int | SD-14 |
 | StoreInventoryService | get_view(store_id: UUID, filters: InventoryFilter) | StoreInventoryDTO | SD-15 |
+| TransferService | _apply_commitment(t: TransferOrder, event: str) (incoming / reserved per §2) | None | SD-12 |
 
 ## 9. Default parameters (BusinessRule / RunParams)
 | Parameter | Default | Purpose |
@@ -196,7 +276,10 @@ Critical agents (failure stops the run, no cache swap): DemandForecasting, Stock
 | ADI threshold | 1.32 | Average demand interval separating smooth vs intermittent SKUs (SD-04) |
 | min_bills | 500 | Minimum bills per store before basket analysis (SD-05) |
 | min_support / min_confidence / min_lift | 0.005 / 0.2 / 1.0 | Association rule thresholds (SD-05) |
-| co-replenish min_lift / limit | 1.5 / 3 | Complements checked per reordered product (SD-06) |
+| co-replenish min_lift / limit | 1.5 / 3 | Complements checked per reordered product (SD-06, D-02) |
+| perishable_max_shelf_life_days | 30 | Products with shelf life ≤ this are perishable (expiry risk in SD-07, D-10) |
+| days_to_sell_default_cap | 90 | Cap on days to sell donor surplus when the product has no shelf life (SD-07, D-10) |
+| incoming_overdue_grace_days | 3 | Incoming past expected date + grace is flagged overdue and not counted in available (SD-06, D-16) |
 | expiry_window_days | 14 | Batches scanned for expiry risk (SD-08) |
 | po_l2_threshold | Business rule | PO value at or above which L2 approval is needed (SD-09, SD-10) |
 | weekly_budget | Business rule | Spend cap used by budget validation (SD-09) |
@@ -216,12 +299,28 @@ Placeholder defaults to confirm with the business: `holding_cost_rate_per_day = 
 `basket.max_qty_per_line = 24`, `basket.exclude_promo_days = true`.
 
 ## 10. Database notes
-- Primary keys UUID (uuid7 or gen_random_uuid()); all FKs indexed; `created_at/updated_at` on every table.
-- Partition `sales_line` and `inventory_movement` by month on date; index `(store_id, product_id, date)`.
+- Primary keys UUID (uuid7 or gen_random_uuid()) for entity tables; all FKs indexed; `created_at/updated_at`
+  on every table.
+- Composite primary keys (D-06): `store_product (store_id, product_id)`, `supplier_product (supplier_id, product_id)`,
+  `supplier_store_terms (supplier_id, store_id)`, `inventory_position (store_id, product_id)`,
+  `forecast (run_id, store_id, product_id)`, `kpi_snapshot (run_id, store_id, metric, product_key)` where
+  `product_key` = product_id or the nil UUID for store-level KPIs, `lost_sales_estimate (run_id, store_id, product_id)`,
+  `transfer_route (from_store_id, to_store_id)`, `inventory_daily_snapshot (store_id, product_id, snapshot_date)`.
+- Partition `sales_line` by month on `txn_date` (PK `(bill_id, line_no, txn_date)`; a bill line is identified by
+  `(bill_id, line_no)`) and `inventory_movement` by month on `created_at` (PK `(movement_id, created_at)`);
+  index `(store_id, product_id, date)` on both.
+- New columns (D-02, D-05, D-06, D-07, D-08): `store_product.preferred_supplier_id`;
+  `sales_line.txn_date`, `sales_line.line_no`, `sales_line.store_id` (denormalised for partition-local queries);
+  `replenishment_need.reason`, `.lift`, `.rec_id`; `transfer_order.expected_qty`, `.received_qty`, `.loss_value`;
+  `po_line.received_qty`, `po_line.short_closed_qty` (D-16); status value `SUPERSEDED` on recommendation,
+  transfer_order, purchase_order, po_line; `purchase_order.submitted_at` (expected date for overdue incoming, D-16).
+- New tables: `inventory_daily_snapshot` (D-09), `goods_receipt` + `goods_receipt_line` (D-08),
+  `notification` (D-08).
 - Materialized views: `mv_dashboard_store_day`, `mv_inbox_counts`; refreshed CONCURRENTLY after each run (needs unique index).
 - Row locks: `SELECT … FOR UPDATE` for PO approval and transfer transitions; `SKIP LOCKED` in the deadline job.
 - Tables (CD-1, CD-2): store, product, store_product, supplier, supplier_product, supplier_store_terms,
   supplier_scheme(ext), calendar_event, sales_transaction, sales_line, inventory_position, inventory_movement,
-  batch, forecast, association_rule, recommendation, replenishment_need, kpi_snapshot, lost_sales_estimate,
-  app_user, purchase_order, po_line, transfer_order, transfer_route, approval, business_rule,
-  agent_run, tool_call, decision_evidence, llm_usage, store_layout(ext), shelf_location(ext).
+  batch, inventory_daily_snapshot, forecast, association_rule, recommendation, replenishment_need, kpi_snapshot,
+  lost_sales_estimate, app_user, purchase_order, po_line, goods_receipt, goods_receipt_line, transfer_order,
+  transfer_route, approval, business_rule, notification, agent_run, tool_call, decision_evidence, llm_usage,
+  store_layout(ext), shelf_location(ext).

@@ -1,6 +1,6 @@
 @startuml
 !include style.iuml
-title SD-10 v3  Consolidated PO Review: Line-Level L1, L2, Split\n<size:11>POST /api/v1/approvals  ·  ApprovalService.decide(req: ApprovalRequest, user: User) → ApprovalResult</size>
+title SD-10 v3.1  Consolidated PO Review: Line-Level L1, Escalated Lines, L2, Split\n<size:11>POST /api/v1/approvals  ·  ApprovalService.decide(req: ApprovalRequest, user: User) → ApprovalResult · v3.1 = D-01, D-03, D-14</size>
 autonumber "<b>00"
 actor "Store Supervisor\n(L1, own store lines)" as SUP
 actor "Super Admin\n(L2)" as ADM
@@ -21,14 +21,23 @@ alt po.status not in ("PENDING_L1", "PENDING_L2")
   AS --> API : raise ConflictError → 409
 end
 alt po.status == "PENDING_L1"
-  AS -> AS : _decide_l1_lines(po, req, user)
-  alt user.role != "STORE_SUPERVISOR" OR req.store_id != user.store_id OR req.store_id not in po.store_ids()
-    AS --> API : raise PermissionDenied → 403
+  alt user.role == "STORE_SUPERVISOR"
+    AS -> AS : _decide_l1_lines(po, req, user)
+    alt req.store_id != user.store_id OR req.store_id not in po.store_ids()
+      AS --> API : raise PermissionDenied → 403
+    end
+    alt now() > po.l1_deadline
+      AS --> API : raise ConflictError("deadline passed; lines escalated") → 409
+    end
+    AS -> AS : lines = [l for l in po.lines if l.store_id == req.store_id and l.line_status == "PENDING"]
+  else user.role == "SUPER_ADMIN"  (D-01)
+    AS -> AS : _decide_escalated_lines(po, req, user)
+    AS -> AS : lines = [l for l in po.lines if l.store_id == req.store_id and l.line_status == "ESCALATED"]
+    alt lines is empty
+      AS --> API : raise ConflictError("no escalated lines for this store") → 409
+    end
+    note right of AS : recorded as L1 on behalf of req.store_id;\nno deadline check (deadline already passed)
   end
-  alt now() > po.l1_deadline
-    AS --> API : raise ConflictError("deadline passed; lines escalated") → 409
-  end
-  AS -> AS : lines = [l for l in po.lines if l.store_id == req.store_id and l.line_status == "PENDING"]
   alt req.decision == "APPROVED"
     AS -> POR : set_line_status(line_ids, "APPROVED")
   else req.decision == "EDITED"
@@ -45,7 +54,7 @@ alt po.status == "PENDING_L1"
     AS -> POR : set_line_status(line_ids, "REJECTED")
   end
   AS -> AR : insert(Approval(entity_type="PO", entity_id=po_id, level="L1", store_id=req.store_id,\n approver_id=user.user_id, decision=req.decision, reason=req.reason)) → approval_id
-  opt no line of po is PENDING  (every store has decided)
+  opt no line of po is PENDING or ESCALATED  (every store has decided, D-01)
     AS -> AS : _finalise_l1(po) → PurchaseOrder
     ref over AS, PB : _finalise_l1 (also used by SD-14 at the deadline)
     AS -> AS : ok_lines = lines with status APPROVED / EDITED
@@ -78,11 +87,17 @@ AS -> AS : RecommendationRepo.update_status(source_rec_ids of decided lines, ACC
 AS -> AS : commit()
 AS -> CS : invalidate_store_keys(store_ids=po.store_ids(), prefixes=["inbox", "dash", "inv", "twin"]) → int
 opt a PO became "APPROVED"
+  AS -> AS : InventoryRepo.add_incoming(store_id, product_id, qty) for each APPROVED / EDITED line\n(counts as incoming until goods receipt, SD-16, D-03)
   AS -> POS : submit(po_id) → SubmissionResult  (SimulatedSupplierGateway in PoC; status SUBMITTED)
 end
 AS --> API : ApprovalResult(po_id, new_status, child_po_id?, approval_id)
 API --> UI : 200 ApprovalResult
 UI -> UI : queryClient.invalidateQueries(["recommendations"], ["purchase-orders"], ["dashboard"])
+note over AS, CS
+  A PO with at least one decided line is never superseded by the next nightly run (D-03, D-14).
+  Its PENDING / ESCALATED lines count as on_order_pending for their store in that run,
+  so the run does not create a duplicate need or transfer for them.
+end note
 == L2 path ==
 ADM -> UI : GET /api/v1/purchase-orders?status=PENDING_L2 → Approve / Reject → POST /api/v1/approvals
 @enduml

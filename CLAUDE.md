@@ -9,7 +9,8 @@ and prepares purchase orders for human approval. Every agent decision is explain
 - Technical spec — formulas, functions, states, API, permissions: `docs/02-technical-spec.md`
 - Design system (frozen v1.0) + UI rules: `docs/03-design-system.md`
 - Demo scenarios and acceptance tests: `docs/04-demo-scenarios.md`
-- Class and sequence diagrams (PlantUML, code level): `docs/diagrams/` (cd1–cd4, sd01–sd15)
+- Class and sequence diagrams (PlantUML, code level): `docs/diagrams/` (cd1–cd4, sd01–sd16)
+- Decision log (Phase 0 review decisions D-01…, binding): `docs/05-decision-log.md`
 - Build order and phase prompts: `PROMPTS.md`
 If code and docs disagree, follow the docs and tell me. Never silently change a business rule.
 
@@ -18,7 +19,7 @@ If code and docs disagree, follow the docs and tell me. Never silently change a 
 - Jobs: Celery + Celery Beat, Redis as broker and cache
 - DB: PostgreSQL 16
 - Frontend: React + TypeScript (Vite), TanStack Query, TanStack Table, React Router,
-  Recharts, Tailwind mapped to CSS variables from `frontend/src/styles/tokens.css`
+  Recharts, Tailwind v4 with tokens mapped via `@theme` to CSS variables from `frontend/src/styles/tokens.css`
 - API types: generate TS types from FastAPI's OpenAPI spec (openapi-typescript); never hand-write DTO types
 - LLM (explanations only): Anthropic SDK, model name from env `LLM_MODEL`; deterministic template fallback
 - Local infra: docker-compose (postgres, redis)
@@ -33,12 +34,16 @@ backend/app/
   agents/           6 agents + orchestrator (modules, implement BaseAgent.run(ctx))
   tools/            deterministic, pure functions (requirement, cost model, transfer engine, PO builder,
                     forecast, basket, lost sales) — 100% unit-tested, no DB access
-  domain/models/    SQLAlchemy models   schemas/  Pydantic DTOs   repositories/  DB access
-  core/             config, security (JWT, roles), cache, logging, errors
+  domain/
+    models/         SQLAlchemy models
+    schemas/        Pydantic DTOs (request/response)
+    repositories/   DB access
+  core/             config, security (JWT via pyjwt, bcrypt passwords, roles), cache, logging, errors
   workers/          Celery app, beat schedule, tasks
 backend/alembic/  backend/tests/{unit,integration,scenarios}
 frontend/src/{app,components,features,pages,api,hooks,styles}
-data/synthetic/   synthetic data generator      infra/docker-compose.yml
+data/synthetic/   synthetic data generator (repo root; run with the backend environment)
+infra/docker-compose.yml
 ```
 
 ## Non-negotiable business rules (details and formulas in docs/02-technical-spec.md)
@@ -51,10 +56,16 @@ data/synthetic/   synthetic data generator      infra/docker-compose.yml
    + holding and expiry cost of donor surplus). Never compare against the full purchase price.
 5. Partial surplus → transfer the surplus AND a PO for the remainder; show both quantities separately.
 6. Transfer workflow: destination accepts → donor approves release → system re-checks surplus →
-   dispatch → receiving supervisor confirms qty → ledger update (discrepancy recorded).
-7. Consolidated PO: line-level L1 by each store's supervisor for its own lines; l1_deadline;
-   undecided lines escalate (default) or expire; approved lines split into a child PO;
-   L2 threshold checked on the PO that continues.
+   dispatch → receiving supervisor confirms qty → ledger update (discrepancy recorded on the transfer).
+   On acceptance: receiver incoming += qty, donor reserved += qty; released on reject/cancel.
+   A cancelled transfer is NOT carried forward — the next nightly run recalculates the need.
+   Each nightly run marks the previous run's untouched recommendations, PROPOSED transfers and
+   undecided PENDING_L1 POs as SUPERSEDED.
+7. Consolidated PO: line-level L1 by each store's supervisor for its own PENDING lines before l1_deadline;
+   undecided lines escalate (default) or expire; the Super Admin decides ESCALATED lines (recorded as L1
+   for that store); L1 finalises only when no line is PENDING or ESCALATED; approved lines split into a
+   child PO; L2 threshold checked on the PO that continues. Approved/submitted lines count as incoming
+   until goods receipt.
 8. Stock changes only through the inventory movement ledger. Never update quantities directly.
 9. Lost revenue and lost profit are separate KPIs.
 10. Store Supervisors see only their own store's data; in cross-store recommendations show only the
@@ -78,7 +89,7 @@ data/synthetic/   synthetic data generator      infra/docker-compose.yml
 - Backend: `cd backend && uv sync` · `uv run alembic upgrade head` · `uv run uvicorn app.main:app --reload`
 - Tests: `cd backend && uv run pytest -q` · lint: `uv run ruff check . && uv run mypy app`
 - Worker: `uv run celery -A app.workers.celery_app worker -B -l info`
-- Synthetic data: `uv run python -m data.synthetic.generate --scenarios all`
+- Synthetic data (from the repo root): `uv run --project backend python -m data.synthetic.generate --scenarios all`
 - Frontend: `cd frontend && npm install && npm run dev` · types: `npm run gen:api` · checks: `npm run lint && npm run typecheck`
 
 ## How to work with me

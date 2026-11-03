@@ -295,7 +295,7 @@ for store in short_stores (most urgent first):
 
 - **Donor protection:** a transfer never takes the donor below its own requirement, even if the destination’s shortage is larger. A transfer must not create a stockout elsewhere.
 
-- **Explain the decision:** the approval screen shows the reasoning, for example “Transferred 24 units from Store A (surplus 30 after its 15-day need + display min); PO for 16 units because no other store had surplus.”
+- **Explain the decision:** the approval screen shows the reasoning, for example “Transferred 24 units from Store A (surplus 24 after its 15-day need + display min); PO for 16 units because no other store had surplus.”
 
 ### Transfer approval workflow
 

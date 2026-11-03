@@ -1,0 +1,50 @@
+@startuml
+!include style.iuml
+autonumber
+title SD-16  Goods Receipt: PO Delivery → PO_RECEIPT Movements → Incoming Reduced → PO RECEIVED\n<size:11>POST /api/v1/purchase-orders/{po_id}/receipts  ·  GoodsReceiptService.receive(po_id, lines, user) → PurchaseOrder · D-08</size>
+actor "Store Supervisor\n(receiving store)" as SUP
+participant "React\nGoodsReceiptPage" as UI
+participant "PurchaseOrderRouter\n(FastAPI)" as API
+participant "GoodsReceiptService" as GR
+participant "PORepo" as POR
+participant "InventoryRepo /\nBatchRepo" as IR
+participant "InventoryLedger\nService" as LED
+participant "CacheService" as CS
+SUP -> UI : Record delivery for my store's lines (qty, batch no, expiry)
+UI -> API : POST /api/v1/purchase-orders/{po_id}/receipts\n{store_id, lines: list[ReceiptLine{po_line_id, qty, batch_no?, expiry_date?}], note?}
+API -> GR : receive(po_id: UUID, lines: list[ReceiptLine], user: User = Depends(get_current_user)) → PurchaseOrder
+GR -> POR : get_for_update(po_id) → PurchaseOrder  (SELECT … FOR UPDATE)
+alt po.status != "SUBMITTED"
+  GR --> API : raise ConflictError → 409
+end
+alt user.role != "STORE_SUPERVISOR" OR any line.store_id != user.store_id
+  GR --> API : raise PermissionDenied → 403
+end
+loop for r in lines
+  GR -> GR : pl = po line r.po_line_id ; require pl.line_status in (APPROVED, EDITED)\n and r.qty > 0 and pl.received_qty + r.qty ≤ pl.qty   (else 422)
+end
+GR -> POR : insert(GoodsReceipt(po_id, store_id=user.store_id, received_by=user.user_id, received_at=now(), note))\n + GoodsReceiptLine(receipt_id, po_line_id, qty, batch_no, expiry_date) per line → receipt_id
+loop for r in lines
+  opt r.batch_no
+    GR -> IR : BatchRepo.upsert(store_id, product_id, batch_no=r.batch_no, qty += r.qty, expiry_date=r.expiry_date) → batch_id
+  end
+  GR -> LED : post([InventoryMovement(store_id, product_id, batch_id, type="PO_RECEIPT", qty=+r.qty,\n location="BACKROOM", reference_type="PO", reference_id=po_id, reason="goods receipt", user_id)])
+  GR -> IR : add_incoming(store_id, product_id, −r.qty)   (approved PO qty counted as incoming until now, D-03)
+  GR -> POR : pl.received_qty += r.qty
+end
+alt every APPROVED / EDITED line has received_qty == qty
+  GR -> POR : set_status(po_id, "RECEIVED")
+else partial delivery
+  GR -> GR : status stays "SUBMITTED" (remaining qty still incoming)
+end
+GR -> CS : invalidate_store_keys([user.store_id], ["inbox", "dash", "inv", "twin"])
+GR --> API : PurchaseOrder
+API --> UI : 200 PurchaseOrderDTO
+UI -> UI : queryClient.invalidateQueries(["purchase-orders"], ["inv"], ["dashboard"])
+note over SUP, CS
+  Short delivery is not a discrepancy on the PO: the undelivered qty stays incoming until the line is
+  received in full or the Super Admin closes the PO short (POST /purchase-orders/{po_id}/close-short, D-16),
+  so the next nightly run does not re-order it. Once expected date (submitted_at + lead time) + incoming_overdue_grace_days
+  has passed, the remaining qty is flagged overdue and no longer counted in available (D-16).
+end note
+@enduml

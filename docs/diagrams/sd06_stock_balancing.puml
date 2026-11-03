@@ -1,6 +1,6 @@
 @startuml
 !include style.iuml
-title SD-06 v3  StockBalancingAgent.run(ctx: RunContext) → AgentResult\n<size:11>Own requirement, surplus, co-replenishment, transfer vs PO</size>
+title SD-06 v3.1  StockBalancingAgent.run(ctx: RunContext) → AgentResult\n<size:11>Own requirement, surplus, co-replenishment, transfer vs PO · v3.1 = D-02, D-04, D-05, D-07, D-10, D-13, D-14, D-16, D-17</size>
 autonumber "<b>00"
 participant "WorkflowOrchestrator" as O
 participant "StockBalancing\nAgent" as SB
@@ -19,26 +19,43 @@ O -> SB : run(ctx)
 SB -> FR : get_by_run(run_id: UUID) → dict[(store_id, product_id), Forecast]
 SB -> IR : get_positions(store_ids: list[UUID]) → dict[(store_id, product_id), InventoryPosition]
 SB -> SPR : get_rules(store_ids: list[UUID]) → dict[(store_id, product_id), StoreProduct]
-SB -> SUP : get_store_terms(store_ids, product_ids) → dict[(store_id, product_id), StoreSupplyTerms(\n lead_time_days, delivery_charge, unit_cost, supplier_id)]  (supplier serving that store)
-SB -> SB : cost_settings = BusinessRuleRepo.get_cost_settings() → (order_fixed_cost, holding_cost_rate_per_day, expiry_risk_pct)
-SB -> TRR : get_route_matrix() → dict[(from_store, to_store), TransferRoute(fixed_cost, per_unit_cost, transit_days)]
+SB -> SUP : get_store_terms(store_ids, product_ids) → dict[(store_id, product_id), StoreSupplyTerms(\n lead_time_days, delivery_charge, unit_cost, supplier_id)]\n(supplier = store_product.preferred_supplier_id; lead time = RC.lead_time(SupplierStoreTerms →\n SupplierProduct → Supplier.default_lead_time_days))  (D-07)
+SB -> SB : cost_settings = BusinessRuleRepo.get_cost_settings() → (order_fixed_cost, holding_cost_rate_per_day,\n expiry_risk_pct, perishable_max_shelf_life_days, days_to_sell_default_cap)
+SB -> TRR : get_route_matrix() → dict[(from_store, to_store), TransferRoute(fixed_cost, per_unit_cost,\n handling_cost_per_unit, transit_days)]
+SB -> IR : get_incoming_items(store_ids) → list[IncomingItem(store_id, product_id, qty, expected_date)]\n(approved/submitted PO lines not yet received + dispatched transfers)
+SB -> REPO : PORepo.get_on_order_pending(store_ids) → dict[(store_id, product_id), int]\n(PENDING / ESCALATED lines of PENDING_L1 POs kept from earlier runs, D-14)
+== Build store states (all products) ==
+SB -> SB : states_by_product: dict[product_id, list[StoreState]] = {}
 loop for product_id in products listed in any store
   SB -> SB : states: list[StoreState] = []
   loop for store_id in ctx.store_ids where product is listed
+    SB -> RC : planning_incoming(incoming_items for (store, product), on_order_pending[(store, product)],\n run_date, grace_days=params.incoming_overdue_grace_days) → int\n(overdue incoming — expected date + grace < run_date — is NOT counted, D-16)
     SB -> RC : own_requirement(daily_demand: float, lead_time_days=terms[store].lead_time_days,\n review_period_days: int, safety_stock_days: int, min_display_qty: int) → int
     note right of RC
       ceil(daily_demand × (lead_time_days + review_period_days))
       + ceil(daily_demand × safety_stock_days)
       + min_display_qty
     end note
-    SB -> RC : available(shelf_qty: int, backroom_qty: int, incoming: int, reserved: int) → int\n(shelf + backroom + incoming − reserved)
+    SB -> RC : available(shelf_qty: int, backroom_qty: int, incoming=planning_incoming, reserved: int) → int\n(shelf + backroom + incoming − reserved)
     SB -> RC : surplus(available: int, requirement: int) → int  (available − requirement; ≤ 0 → not a donor)
-    SB -> SB : states.append(StoreState(store_id, requirement, available, surplus,\n days_of_cover = available / max(daily_demand, 0.01), confidence))
+    alt forecast.confidence == "LOW"  (stale / insufficient data, D-04)
+      opt available < requirement
+        SB -> REPO : RecommendationRepo.insert(Recommendation(rec_type="REORDER", status="NEEDS_REVIEW",\n store_id, product_id, qty=requirement − available, evidence={requirement, available, "LOW_CONFIDENCE"})) → rec_id
+      end
+      SB -> SB : skip store (neither donor nor receiver; no ReplenishmentNeed)
+    else confidence HIGH
+      SB -> SB : states.append(StoreState(store_id, requirement, available, surplus, daily_demand,\n review_period_days, days_of_cover = available / max(daily_demand, 0.01)))
+    end
   end
-  opt any state.confidence == "LOW"
-    SB -> SB : mark those stores "review_required" (no automatic transfer out of them)
-  end
-  SB -> TE : decide(product_id: UUID, states: list[StoreState], routes: dict,\n cost_inputs=CostInputs(terms_by_store, order_fixed_cost, holding_cost_rate_per_day, expiry_risk_pct)) → TransferPlan
+  SB -> SB : states_by_product[product_id] = states
+end
+== Pass 1: mark (supplier, store) pairs that need a PO regardless (D-17) ==
+SB -> TE : mark_po_pairs(states_by_product, terms) → planned: set[(supplier_id, store_id)]\n(for every product with no surplus in any store: (serving supplier, short store) of each short store)
+== Pass 2: decide by urgency (D-17) ==
+SB -> SB : order = products sorted by min(days_of_cover of their short stores) ascending, then product_id\n(products with no short store are skipped)
+loop for product_id in order
+  SB -> SB : states = states_by_product[product_id]
+  SB -> TE : decide(product_id: UUID, states: list[StoreState], routes: dict,\n cost_inputs=CostInputs(terms_by_store, order_fixed_cost, holding_cost_rate_per_day, expiry_risk_pct,\n is_perishable = shelf_life_days ≤ perishable_max_shelf_life_days, days_to_sell_cap = shelf_life_days or 90,\n planned_supplier_stores = planned)) → TransferPlan\n(marked pair → marginal order cost 0; otherwise full cost)
   ref over TE : SD-07 TransferDecisionEngine.decide
   TE --> SB : TransferPlan(transfers: list[TransferProposal], po_needs: list[PONeed])
   loop for t in plan.transfers
@@ -46,18 +63,26 @@ loop for product_id in products listed in any store
     SB -> REPO : TransferRepo.insert(TransferOrder(from_store_id=t.from_store, to_store_id=t.to_store,\n product_id, qty=t.qty, transfer_cost=t.cost, transit_days=t.transit_days,\n is_expiry_aware=False, status="PROPOSED", source_rec_id=rec_id)) → transfer_id
   end
   loop for need in plan.po_needs
-    SB -> REPO : NeedRepo.insert(ReplenishmentNeed(run_id, need.store_id, product_id,\n qty=need.qty, source="SHORTFALL", priority=need.priority)) → need_id
+    SB -> REPO : RecommendationRepo.insert(Recommendation(rec_type="REORDER", store_id=need.store_id, product_id,\n qty=need.qty, evidence=need.evidence)) → rec_id   (every shortfall need has a recommendation, D-05)
+    SB -> REPO : NeedRepo.insert(ReplenishmentNeed(run_id, need.store_id, product_id, qty=need.qty,\n source="SHORTFALL", reason=need.reason, priority=need.priority, rec_id=rec_id)) → need_id
+    SB -> SB : planned.add((terms[need.store_id].supplier_id, need.store_id))   (mark pairs created in pass 2)
   end
   SB -> LOG : log_evidence(run_id, rec_id=None, data={"product_id", "states", "plan"}, validation_result="OK")
 end
-== Co-replenishment pass ==
+== Co-replenishment pass (D-02, D-13) ==
+SB -> SB : delivering = {(supplier_id, store_id) of every SHORTFALL need in this run}  (delivery charge is per store)
 loop for need in NeedRepo.get_by_run(run_id, source="SHORTFALL")
   SB -> RR : get_complements(store_id: UUID, product_id: UUID, min_lift: float = 1.5, limit: int = 3) → list[AssociationRule]
   loop for rule in complements
-    SB -> SB : comp_state = state of rule.consequent_id in need.store_id
-    opt comp_state.available < comp_state.requirement AND no need exists yet for (store, consequent)
-      SB -> REPO : NeedRepo.insert(ReplenishmentNeed(run_id, store_id, rule.consequent_id,\n qty=comp_state.requirement − comp_state.available, source="CO_REPLENISH",\n linked_product_id=product_id, lift=rule.lift)) → need_id
-      SB -> REPO : RecommendationRepo.insert(Recommendation(rec_type="CO_REPLENISH", …)) → rec_id
+    SB -> SB : comp = state of rule.consequent_id in need.store_id (skip if LOW confidence or not listed)
+    SB -> RC : co_replenish_qty(available=comp.available, daily_demand=comp.daily_demand,\n review_period_days=comp.review_period_days, requirement=comp.requirement) → qty\n(0 unless available − daily_demand × review_period_days < requirement)
+    opt qty > 0 AND (terms[(need.store_id, rule.consequent_id)].supplier_id, need.store_id) in delivering\n(complement's preferred supplier already delivers to the SAME store this cycle)
+      alt a need already exists for (need.store_id, rule.consequent_id) in this run
+        SB -> REPO : NeedRepo.link(existing_need_id, linked_product_id=product_id, lift=rule.lift)  (no second need)
+      else no need yet
+        SB -> REPO : RecommendationRepo.insert(Recommendation(rec_type="CO_REPLENISH", store_id, rule.consequent_id,\n qty, evidence={linked_product_id, rule: {support, confidence, lift}, available, requirement})) → rec_id
+        SB -> REPO : NeedRepo.insert(ReplenishmentNeed(run_id, store_id, rule.consequent_id, qty, source="CO_REPLENISH",\n reason="CO_REPLENISH", linked_product_id=product_id, lift=rule.lift, rec_id=rec_id)) → need_id
+      end
     end
   end
 end

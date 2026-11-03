@@ -1,7 +1,7 @@
 @startuml
 !include style.iuml
 skinparam linetype ortho
-title CD-2  Domain Model (2/2) v3: Purchasing, Transfers, Approvals, Users, Observability, Digital Twin
+title CD-2  Domain Model (2/2) v3.1: Purchasing, Transfers, Approvals, Users, Observability, Digital Twin\n<size:11>v3.1 = decision log D-01, D-03, D-06, D-08</size>
 hide empty methods
 
 package "Users & access" {
@@ -10,6 +10,16 @@ package "Users & access" {
     +name: str
     +role: STORE_SUPERVISOR|SUPER_ADMIN
     +store_id: UUID <<FK, nullable>>
+  }
+  class Notification {
+    +notification_id: UUID <<PK>>
+    +role: STORE_SUPERVISOR|SUPER_ADMIN <<nullable>>
+    +store_id: UUID <<FK, nullable>>
+    +user_id: UUID <<FK, nullable>>
+    +message: str
+    +link: str <<nullable>>
+    +read_at: datetime <<nullable>>
+    +created_at: datetime
   }
 }
 
@@ -22,10 +32,11 @@ package "Purchasing & transfers" {
     +required_level: L1|L2
     +parent_po_id: UUID <<FK, nullable>> (split PO)
     +l1_deadline: datetime
-    +status: DRAFT|NEEDS_REVIEW|PENDING_L1|PENDING_L2|APPROVED|REJECTED|SPLIT|SUBMITTED|RECEIVED
+    +status: DRAFT|NEEDS_REVIEW|PENDING_L1|PENDING_L2|APPROVED|REJECTED|SPLIT|SUBMITTED|RECEIVED|SUPERSEDED
     +flags: list[str]
     +explanation: text
     +supplier_ref: str <<nullable>>
+    +submitted_at: datetime <<nullable>> (expected date = submitted + lead time, D-16)
     +created_at: datetime
     --
     +store_ids(): list[UUID]
@@ -40,7 +51,24 @@ package "Purchasing & transfers" {
     +unit_price: Decimal
     +scheme_id: UUID <<FK, nullable>>
     +source_rec_id: UUID <<FK>>
-    +line_status: PENDING|APPROVED|EDITED|REJECTED|EXPIRED|ESCALATED
+    +line_status: PENDING|APPROVED|EDITED|REJECTED|EXPIRED|ESCALATED|SUPERSEDED
+    +received_qty: int (goods receipt, default 0)
+    +short_closed_qty: int (close short, default 0)
+  }
+  class GoodsReceipt {
+    +receipt_id: UUID <<PK>>
+    +po_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +received_by: UUID <<FK>>
+    +received_at: datetime
+    +note: text <<nullable>>
+  }
+  class GoodsReceiptLine {
+    +receipt_id: UUID <<PK,FK>>
+    +po_line_id: UUID <<PK,FK>>
+    +qty: int
+    +batch_no: str <<nullable>>
+    +expiry_date: date <<nullable>>
   }
   class TransferOrder {
     +transfer_id: UUID <<PK>>
@@ -53,11 +81,15 @@ package "Purchasing & transfers" {
     +transit_days: int
     +is_expiry_aware: bool
     +source_rec_id: UUID <<FK>>
-    +status: PROPOSED|DEST_ACCEPTED|DONOR_APPROVED|DISPATCHED|RECEIVED|REJECTED|CANCELLED
+    +status: PROPOSED|DEST_ACCEPTED|DONOR_APPROVED|DISPATCHED|RECEIVED|REJECTED|CANCELLED|SUPERSEDED
     +dest_accepted_by: UUID <<nullable>>
     +donor_approved_by: UUID <<nullable>>
     +dispatched_at / received_at: datetime
-    +received_qty: int
+    +status_reason: text <<nullable>>
+    .. discrepancy (D-06) ..
+    +expected_qty: int <<nullable>> (qty sent)
+    +received_qty: int <<nullable>>
+    +loss_value: Decimal <<nullable>> ((expected − received) × unit_cost)
   }
   class Approval {
     +approval_id: UUID <<PK>>
@@ -71,8 +103,8 @@ package "Purchasing & transfers" {
     +decided_at: datetime
   }
   class TransferRoute {
-    +from_store_id: UUID <<FK>>
-    +to_store_id: UUID <<FK>>
+    +from_store_id: UUID <<PK,FK>>
+    +to_store_id: UUID <<PK,FK>>
     +fixed_cost: Decimal
     +per_unit_cost: Decimal
     +handling_cost_per_unit: Decimal
@@ -85,7 +117,10 @@ package "Purchasing & transfers" {
     ..
     po_l2_threshold, weekly_budget, order_fixed_cost,
     holding_cost_rate_per_day, l1_deadline_hours,
-    basket thresholds, stale_days,
+    deadline_action, expiry_risk_pct,
+    perishable_max_shelf_life_days, days_to_sell_default_cap,
+    incoming_overdue_grace_days,
+    basket thresholds, co_replenish, stale_days,
     expiry_window_days, markdown_rules
   }
 }
@@ -164,6 +199,10 @@ package "Phase 2" {
 }
 
 PurchaseOrder "1" *-- "*" POLine
+PurchaseOrder "1" -- "*" GoodsReceipt
+GoodsReceipt "1" *-- "*" GoodsReceiptLine
+POLine "1" -- "*" GoodsReceiptLine
+User "1" -- "*" Notification
 User "1" -- "*" Approval : decides >
 PurchaseOrder "1" -- "0..2" Approval
 TransferOrder "1" -- "0..1" Approval
@@ -173,6 +212,6 @@ AgentRun "1" *-- "*" LLMUsage
 AgentRun "1" o-- "*" AgentRun : child runs
 AgentRun "1" -- "*" PurchaseOrder : produced >
 StoreLayout "1" *-- "*" ShelfLocation
-note bottom of POLine : line-level L1 per store; approved lines are split\ninto a child PO (parent_po_id) if any store rejects or expires
-note bottom of TransferOrder : destination accepts → donor approves →\nre-check → dispatch → receive (ledger)
+note bottom of POLine : line-level L1 per store; ESCALATED lines decided by Super Admin (as L1);\nL1 finalises when no line is PENDING or ESCALATED; approved lines are split\ninto a child PO (parent_po_id) if any store rejects or expires
+note bottom of TransferOrder : destination accepts (receiver incoming +, donor reserved +) → donor approves →\nre-check → dispatch → receive (ledger); donor may reject after acceptance (D-15);\nreject/cancel after acceptance releases both;\nPROPOSED → SUPERSEDED by the next nightly run
 @enduml

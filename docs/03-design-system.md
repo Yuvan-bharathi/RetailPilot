@@ -36,7 +36,8 @@ Reference inspiration: Heirloom dashboard (Dribbble) for overview screens; Odoo 
   --shadow-dropdown: 0 8px 24px rgba(51, 45, 48, 0.10);
 }
 ```
-Map these into `tailwind.config` (`colors: { brand: { DEFAULT: "var(--brand-primary)" … } }`). No other hex values anywhere.
+Map these into Tailwind v4 with an `@theme` block in CSS (e.g. `@theme { --color-brand: var(--brand-primary); … }`,
+giving utilities such as `bg-brand`), not a `tailwind.config` file (decision D-11). No other hex values anywhere.
 
 ## 2. Typography
 Page title 28/600 · Section title 18/600 · Card title 14/600 · Body 14/400 · Labels 500 · Metadata 12/400 ·

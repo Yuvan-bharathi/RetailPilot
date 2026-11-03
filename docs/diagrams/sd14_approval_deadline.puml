@@ -1,6 +1,6 @@
 @startuml
 !include style.iuml
-title SD-14  Approval Deadline Job: Escalate or Expire Undecided PO Lines, Split Approved Lines\n<size:11>tasks.approval_deadline_task · ApprovalService.expire_overdue(now: datetime) → int</size>
+title SD-14 v3.1  Approval Deadline Job: Escalate or Expire Undecided PO Lines, Split Approved Lines\n<size:11>tasks.approval_deadline_task · ApprovalService.expire_overdue(now: datetime) → int · v3.1 = D-01, D-03</size>
 autonumber "<b>00"
 participant "Celery Beat" as SCH
 participant "Celery Worker\ntasks.approval_deadline_task" as W
@@ -17,10 +17,12 @@ AS -> BRR : get_rules() → BusinessRules(deadline_action: "ESCALATE" | "EXPIRE"
 AS -> POR : find_overdue(status="PENDING_L1", l1_deadline < now) → list[PurchaseOrder]  (FOR UPDATE SKIP LOCKED)
 loop for po in overdue_pos
   AS -> AS : pending = [l for l in po.lines if l.line_status == "PENDING"]
-  alt rules.deadline_action == "ESCALATE"
+  alt pending is empty
+    AS -> AS : skip (already escalated earlier; waiting for Super Admin)
+  else rules.deadline_action == "ESCALATE"
     AS -> POR : set_line_status([l.id for l in pending], "ESCALATED")
-    AS -> N : notify(role="SUPER_ADMIN", message=f"PO {po.po_id}: {len(pending)} lines escalated")
-    note right of AS : Super Admin decides escalated lines\nthrough the same POST /approvals (as L1 on behalf of the store)
+    AS -> N : NotificationService.notify(role="SUPER_ADMIN", message=f"PO {po.po_id}: {len(pending)} lines escalated",\n link=f"/purchase-orders/{po.po_id}")
+    note right of AS : Super Admin decides escalated lines through the same\nPOST /approvals (Approval level L1, store_id of the line — SD-10, D-01).\nL1 finalises only when no line is PENDING or ESCALATED.
   else "EXPIRE"
     AS -> POR : set_line_status([l.id for l in pending], "EXPIRED")
     AS -> AS : _finalise_l1(po) → PurchaseOrder
@@ -33,9 +35,10 @@ loop for po in overdue_pos
         AS -> POR : set_status(child_po.po_id, "PENDING_L2")
       else
         AS -> POR : set_status(child_po.po_id, "APPROVED")
+        AS -> AS : add_incoming for its lines; PurchaseOrderService.submit(child_po.po_id)  (as SD-10, D-03)
       end
     end
-    AS -> AS : NeedRepo.reopen(expired lines) → needs re-evaluated in next nightly run
+    note right of AS : expired lines are not carried forward (D-03):\nthe next nightly run recalculates the need
   end
   AS -> CS : invalidate_store_keys(po.store_ids(), ["inbox", "dash"])
 end

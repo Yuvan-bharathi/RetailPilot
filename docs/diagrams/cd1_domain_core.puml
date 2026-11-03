@@ -1,7 +1,7 @@
 @startuml
 !include style.iuml
 skinparam linetype ortho
-title CD-1  Domain Model (1/2) v3: Master Data, Sales & Inventory, Planning Outputs\n<size:11>SQLAlchemy models mapped to PostgreSQL tables</size>
+title CD-1  Domain Model (1/2) v3.1: Master Data, Sales & Inventory, Planning Outputs\n<size:11>SQLAlchemy models mapped to PostgreSQL tables · v3.1 = decision log D-02 … D-09</size>
 hide empty methods
 
 package "Master data" {
@@ -25,8 +25,9 @@ package "Master data" {
     +shelf_life_days: int
   }
   class StoreProduct {
-    +store_id: UUID <<FK>>
-    +product_id: UUID <<FK>>
+    +store_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
+    +preferred_supplier_id: UUID <<FK>>
     +min_display_qty: int
     +safety_stock_days: int
     +review_period_days: int
@@ -40,16 +41,16 @@ package "Master data" {
     +default_lead_time_days: int
   }
   class SupplierProduct {
-    +supplier_id: UUID <<FK>>
-    +product_id: UUID <<FK>>
+    +supplier_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
     +price: Decimal
     +lead_time_days: int
     +moq: int
     +order_pack_size: int
   }
   class SupplierStoreTerms {
-    +supplier_id: UUID <<FK>>
-    +store_id: UUID <<FK>>
+    +supplier_id: UUID <<PK,FK>>
+    +store_id: UUID <<PK,FK>>
     +lead_time_days: int
     +delivery_charge: Decimal
   }
@@ -79,27 +80,39 @@ package "Sales & inventory" {
     +total_amount: Decimal
   }
   class SalesLine {
-    +bill_id: UUID <<FK>>
+    +bill_id: UUID <<PK,FK>>
+    +line_no: int <<PK>>
+    +txn_date: date <<PK>> (partition key, monthly)
+    +store_id: UUID <<FK>>
     +product_id: UUID <<FK>>
     +qty: int
     +unit_price: Decimal
     +discount: Decimal
   }
   class InventoryPosition {
-    +store_id: UUID <<FK>>
-    +product_id: UUID <<FK>>
+    +store_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
     +shelf_qty: int
     +backroom_qty: int
-    +reserved: int
-    +incoming: int
+    +reserved: int  (accepted outgoing transfers)
+    +incoming: int  (accepted incoming transfers + approved PO lines)
     +in_transit_out: int
     +updated_at: datetime
     --
     +on_hand(): int  (shelf + backroom)
     +available(): int  (on_hand + incoming − reserved)
   }
+  class InventoryDailySnapshot {
+    +store_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
+    +snapshot_date: date <<PK>>
+    +shelf_qty: int
+    +backroom_qty: int
+    +closing_on_hand: int
+  }
   class InventoryMovement {
     +movement_id: UUID <<PK>>
+    +created_at: datetime <<PK>> (partition key, monthly)
     +store_id: UUID <<FK>>
     +product_id: UUID <<FK>>
     +batch_id: UUID <<FK, nullable>>
@@ -110,7 +123,6 @@ package "Sales & inventory" {
     +reference_id: UUID
     +reason: str
     +user_id: UUID <<nullable>>
-    +created_at: datetime
   }
   class Batch {
     +batch_id: UUID <<PK>>
@@ -124,9 +136,9 @@ package "Sales & inventory" {
 
 package "Planning outputs (written by nightly run)" {
   class Forecast {
-    +run_id: UUID <<FK>>
-    +store_id: UUID <<FK>>
-    +product_id: UUID <<FK>>
+    +run_id: UUID <<PK,FK>>
+    +store_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
     +horizon_days: int
     +daily_demand: float
     +method: BASELINE|CROSTON|TSB|IMAPA|ETS
@@ -152,7 +164,7 @@ package "Planning outputs (written by nightly run)" {
     +lost_sales_value: Decimal
     +explanation: text
     +evidence: JSONB
-    +status: PENDING|ACCEPTED|EDITED|REJECTED|NEEDS_REVIEW
+    +status: PENDING|ACCEPTED|EDITED|REJECTED|NEEDS_REVIEW|SUPERSEDED
   }
   class ReplenishmentNeed {
     +need_id: UUID <<PK>>
@@ -160,22 +172,25 @@ package "Planning outputs (written by nightly run)" {
     +store_id: UUID <<FK>>
     +product_id: UUID <<FK>>
     +qty: int
-    +source: SHORTFALL|CO_REPLENISH|TRANSFER_CANCELLED
+    +source: SHORTFALL|CO_REPLENISH
+    +reason: NO_SURPLUS_IN_ANY_STORE|PARTIAL_SURPLUS|TRANSFER_NOT_VIABLE|CO_REPLENISH
     +priority: HIGH|NORMAL
     +linked_product_id: UUID <<nullable>>
+    +lift: float <<nullable>>
+    +rec_id: UUID <<FK>> (REORDER / CO_REPLENISH recommendation)
     +required_by: date
   }
   class KpiSnapshot {
-    +run_id: UUID <<FK>>
-    +store_id: UUID <<FK>>
-    +product_id: UUID <<nullable>>
-    +metric: str
+    +run_id: UUID <<PK,FK>>
+    +store_id: UUID <<PK,FK>>
+    +metric: str <<PK>>
+    +product_key: UUID <<PK>> (product_id, or nil UUID for store level)
     +value: Decimal
   }
   class LostSalesEstimate {
-    +run_id: UUID <<FK>>
-    +store_id: UUID <<FK>>
-    +product_id: UUID <<FK>>
+    +run_id: UUID <<PK,FK>>
+    +store_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
     +lost_units: float
     +lost_revenue: Decimal
     +lost_profit: Decimal
@@ -195,8 +210,10 @@ Store "1" -- "*" InventoryPosition
 Product "1" -- "*" InventoryPosition
 InventoryPosition "1" o-- "*" Batch : held as >
 InventoryPosition "1" -- "*" InventoryMovement : derived from >
+InventoryPosition "1" -- "*" InventoryDailySnapshot : closing stock per day >
 Supplier "1" -- "*" SupplierStoreTerms
 Store "1" -- "*" SupplierStoreTerms
+Supplier "1" -- "*" StoreProduct : preferred (serves store) >
 note "Every planning output references\nStore and Product by FK, and the\nAgentRun (run_id) that produced it." as N1
 N1 .. Recommendation
 CalendarEvent -[hidden]down- Recommendation
