@@ -9,3 +9,6 @@ dist/
 .ruff_cache/
 CLAUDE.local.md
 data/synthetic/output/
+*.tsbuildinfo
+.coverage
+htmlcov/

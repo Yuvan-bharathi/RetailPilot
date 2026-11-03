@@ -1,0 +1,23 @@
+# Install once with:  uvx pre-commit install
+# Local hooks use the project's own tool versions (backend uv env, frontend node_modules).
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (backend)
+        entry: uv run --project backend ruff check --fix --config backend/pyproject.toml
+        language: system
+        types: [python]
+        files: ^(backend|data)/
+      - id: ruff-format
+        name: ruff format (backend)
+        entry: uv run --project backend ruff format --config backend/pyproject.toml
+        language: system
+        types: [python]
+        files: ^(backend|data)/
+      - id: eslint
+        name: eslint (frontend)
+        entry: npm --prefix frontend run lint
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js)$
+        pass_filenames: false

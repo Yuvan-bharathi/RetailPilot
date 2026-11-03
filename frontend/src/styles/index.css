@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/*
+ * Phase 7 adds tokens.css (docs/03-design-system.md §1) and maps the tokens into Tailwind here with an
+ * @theme block, e.g.  @theme { --color-brand: var(--brand-primary); }  (decision D-11).
+ * No hex values outside tokens.css.
+ */
