@@ -1,0 +1,50 @@
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam class {
+  BackgroundColor #EAF1F8
+  BorderColor #1F4E79
+  ArrowColor #555555
+  HeaderBackgroundColor #D9E2EC
+}
+skinparam class<<Extension>> {
+  BackgroundColor #FFF4D6
+  BorderColor #B8860B
+}
+skinparam class<<Phase2>> {
+  BackgroundColor #F3E5F5
+  BorderColor #7B1FA2
+}
+skinparam package {
+  BorderColor #8EA9C1
+  FontColor #1F4E79
+}
+skinparam sequence {
+  ParticipantBackgroundColor #EAF1F8
+  ParticipantBorderColor #1F4E79
+  ActorBackgroundColor #FCE4D6
+  ActorBorderColor #C55A11
+  LifeLineBorderColor #8EA9C1
+  ArrowColor #333333
+  GroupBorderColor #8EA9C1
+  GroupBackgroundColor #F7F9FC
+  BoxBorderColor #8EA9C1
+}
+skinparam database {
+  BackgroundColor #D9E2EC
+  BorderColor #1F4E79
+}
+skinparam note {
+  BackgroundColor #FFFBE6
+  BorderColor #B8860B
+}
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 520
+skinparam sequence {
+  ParticipantFontStyle bold
+}

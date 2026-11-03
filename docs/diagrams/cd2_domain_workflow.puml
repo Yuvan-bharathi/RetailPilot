@@ -1,0 +1,178 @@
+@startuml
+!include style.iuml
+skinparam linetype ortho
+title CD-2  Domain Model (2/2) v3: Purchasing, Transfers, Approvals, Users, Observability, Digital Twin
+hide empty methods
+
+package "Users & access" {
+  class User {
+    +user_id: UUID <<PK>>
+    +name: str
+    +role: STORE_SUPERVISOR|SUPER_ADMIN
+    +store_id: UUID <<FK, nullable>>
+  }
+}
+
+package "Purchasing & transfers" {
+  class PurchaseOrder {
+    +po_id: UUID <<PK>>
+    +supplier_id: UUID <<FK>>
+    +run_id: UUID <<FK>>
+    +total_value: Decimal
+    +required_level: L1|L2
+    +parent_po_id: UUID <<FK, nullable>> (split PO)
+    +l1_deadline: datetime
+    +status: DRAFT|NEEDS_REVIEW|PENDING_L1|PENDING_L2|APPROVED|REJECTED|SPLIT|SUBMITTED|RECEIVED
+    +flags: list[str]
+    +explanation: text
+    +supplier_ref: str <<nullable>>
+    +created_at: datetime
+    --
+    +store_ids(): list[UUID]
+    +active_lines(): list[POLine]
+  }
+  class POLine {
+    +po_line_id: UUID <<PK>>
+    +po_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +qty: int
+    +unit_price: Decimal
+    +scheme_id: UUID <<FK, nullable>>
+    +source_rec_id: UUID <<FK>>
+    +line_status: PENDING|APPROVED|EDITED|REJECTED|EXPIRED|ESCALATED
+  }
+  class TransferOrder {
+    +transfer_id: UUID <<PK>>
+    +from_store_id: UUID <<FK>>
+    +to_store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +batch_id: UUID <<FK, nullable>>
+    +qty: int
+    +transfer_cost: Decimal
+    +transit_days: int
+    +is_expiry_aware: bool
+    +source_rec_id: UUID <<FK>>
+    +status: PROPOSED|DEST_ACCEPTED|DONOR_APPROVED|DISPATCHED|RECEIVED|REJECTED|CANCELLED
+    +dest_accepted_by: UUID <<nullable>>
+    +donor_approved_by: UUID <<nullable>>
+    +dispatched_at / received_at: datetime
+    +received_qty: int
+  }
+  class Approval {
+    +approval_id: UUID <<PK>>
+    +entity_type: PO|TRANSFER
+    +entity_id: UUID
+    +level: L1|L2|DEST|DONOR
+    +store_id: UUID <<FK, nullable>>
+    +approver_id: UUID <<FK>>
+    +decision: APPROVED|EDITED|REJECTED
+    +reason: text
+    +decided_at: datetime
+  }
+  class TransferRoute {
+    +from_store_id: UUID <<FK>>
+    +to_store_id: UUID <<FK>>
+    +fixed_cost: Decimal
+    +per_unit_cost: Decimal
+    +handling_cost_per_unit: Decimal
+    +transit_days: int
+  }
+  class BusinessRule {
+    +rule_key: str <<PK>>
+    +value: JSONB
+    +scope_store_id: UUID <<nullable>>
+    ..
+    po_l2_threshold, weekly_budget, order_fixed_cost,
+    holding_cost_rate_per_day, l1_deadline_hours,
+    basket thresholds, stale_days,
+    expiry_window_days, markdown_rules
+  }
+}
+
+package "Observability" {
+  class AgentRun {
+    +run_id: UUID <<PK>>
+    +parent_run_id: UUID <<nullable>>
+    +agent_name: str
+    +status: RUNNING|SUCCESS|FAILED|PARTIAL
+    +started_at: datetime
+    +ended_at: datetime
+    +input_ref: JSONB
+    +output_summary: text
+    +error: text
+    +step_count: int
+  }
+  class ToolCall {
+    +call_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +tool_name: str
+    +args: JSONB
+    +result_summary: text
+    +duration_ms: int
+    +retries: int
+    +status: OK|ERROR
+  }
+  class DecisionEvidence {
+    +evidence_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +rec_id: UUID <<FK>>
+    +data: JSONB
+    +validation_result: str
+  }
+  class LLMUsage {
+    +usage_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +provider: str
+    +model: str
+    +input_tokens: int
+    +output_tokens: int
+    +est_cost: Decimal
+  }
+}
+
+package "3D digital twin (later extension)" {
+  class StoreLayout <<Extension>> {
+    +layout_id: UUID <<PK>>
+    +store_id: UUID <<FK>>
+    +width_m: float
+    +depth_m: float
+    +version: int
+  }
+  class ShelfLocation <<Extension>> {
+    +shelf_id: UUID <<PK>>
+    +layout_id: UUID <<FK>>
+    +aisle: str
+    +x: float
+    +y: float
+    +z: float
+    +rotation: float
+    +product_id: UUID <<FK>>
+    +facings: int
+  }
+}
+
+package "Phase 2" {
+  class SupplierScore <<Phase2>> {
+    +supplier_id: UUID <<FK>>
+    +period: date
+    +fill_rate: float
+    +on_time_rate: float
+    +price_trend: float
+    +score: float
+  }
+}
+
+PurchaseOrder "1" *-- "*" POLine
+User "1" -- "*" Approval : decides >
+PurchaseOrder "1" -- "0..2" Approval
+TransferOrder "1" -- "0..1" Approval
+AgentRun "1" *-- "*" ToolCall
+AgentRun "1" *-- "*" DecisionEvidence
+AgentRun "1" *-- "*" LLMUsage
+AgentRun "1" o-- "*" AgentRun : child runs
+AgentRun "1" -- "*" PurchaseOrder : produced >
+StoreLayout "1" *-- "*" ShelfLocation
+note bottom of POLine : line-level L1 per store; approved lines are split\ninto a child PO (parent_po_id) if any store rejects or expires
+note bottom of TransferOrder : destination accepts → donor approves →\nre-check → dispatch → receive (ledger)
+@enduml

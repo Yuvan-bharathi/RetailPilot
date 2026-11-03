@@ -1,0 +1,204 @@
+@startuml
+!include style.iuml
+skinparam linetype ortho
+title CD-1  Domain Model (1/2) v3: Master Data, Sales & Inventory, Planning Outputs\n<size:11>SQLAlchemy models mapped to PostgreSQL tables</size>
+hide empty methods
+
+package "Master data" {
+  class Store {
+    +store_id: UUID <<PK>>
+    +name: str
+    +region: str
+    +store_type: str
+    +location_context: JSONB
+    +display_capacity: int
+  }
+  class Product {
+    +product_id: UUID <<PK>>
+    +sku: str
+    +name: str
+    +category: str
+    +brand: str
+    +cost_price: Decimal
+    +selling_price: Decimal
+    +pack_size: int
+    +shelf_life_days: int
+  }
+  class StoreProduct {
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +min_display_qty: int
+    +safety_stock_days: int
+    +review_period_days: int
+    +abc_class: str
+    +xyz_class: str
+    +is_listed: bool
+  }
+  class Supplier {
+    +supplier_id: UUID <<PK>>
+    +name: str
+    +default_lead_time_days: int
+  }
+  class SupplierProduct {
+    +supplier_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +price: Decimal
+    +lead_time_days: int
+    +moq: int
+    +order_pack_size: int
+  }
+  class SupplierStoreTerms {
+    +supplier_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +lead_time_days: int
+    +delivery_charge: Decimal
+  }
+  class SupplierScheme <<Extension>> {
+    +scheme_id: UUID <<PK>>
+    +supplier_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +slab_qty: int
+    +free_qty: int
+    +valid_from: date
+    +valid_to: date
+  }
+  class CalendarEvent {
+    +event_id: UUID <<PK>>
+    +event_date: date
+    +event_type: FESTIVAL|SALARY|PROMO|LOCAL
+    +region: str
+    +description: str
+  }
+}
+
+package "Sales & inventory" {
+  class SalesTransaction {
+    +bill_id: UUID <<PK>>
+    +store_id: UUID <<FK>>
+    +txn_datetime: datetime
+    +total_amount: Decimal
+  }
+  class SalesLine {
+    +bill_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +qty: int
+    +unit_price: Decimal
+    +discount: Decimal
+  }
+  class InventoryPosition {
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +shelf_qty: int
+    +backroom_qty: int
+    +reserved: int
+    +incoming: int
+    +in_transit_out: int
+    +updated_at: datetime
+    --
+    +on_hand(): int  (shelf + backroom)
+    +available(): int  (on_hand + incoming − reserved)
+  }
+  class InventoryMovement {
+    +movement_id: UUID <<PK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +batch_id: UUID <<FK, nullable>>
+    +movement_type: SALE|PO_RECEIPT|TRANSFER_OUT|TRANSFER_IN|ADJUSTMENT|EXPIRY_WRITE_OFF|SHELF_REFILL
+    +qty: int (+/−)
+    +location: SHELF|BACKROOM
+    +reference_type: BILL|PO|TRANSFER|RECON
+    +reference_id: UUID
+    +reason: str
+    +user_id: UUID <<nullable>>
+    +created_at: datetime
+  }
+  class Batch {
+    +batch_id: UUID <<PK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +batch_no: str
+    +qty: int
+    +expiry_date: date
+  }
+}
+
+package "Planning outputs (written by nightly run)" {
+  class Forecast {
+    +run_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +horizon_days: int
+    +daily_demand: float
+    +method: BASELINE|CROSTON|TSB|IMAPA|ETS
+    +confidence: HIGH|LOW
+  }
+  class AssociationRule {
+    +rule_id: UUID <<PK>>
+    +store_id: UUID <<FK>>
+    +antecedent_id: UUID
+    +consequent_id: UUID
+    +support: float
+    +confidence: float
+    +lift: float
+    +rule_type: COMPLEMENT|SUBSTITUTE
+  }
+  class Recommendation {
+    +rec_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +rec_type: REORDER|TRANSFER|CO_REPLENISH|MARKDOWN|EXPIRY_ALERT|ASSORTMENT_GAP
+    +qty: int
+    +lost_sales_value: Decimal
+    +explanation: text
+    +evidence: JSONB
+    +status: PENDING|ACCEPTED|EDITED|REJECTED|NEEDS_REVIEW
+  }
+  class ReplenishmentNeed {
+    +need_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +qty: int
+    +source: SHORTFALL|CO_REPLENISH|TRANSFER_CANCELLED
+    +priority: HIGH|NORMAL
+    +linked_product_id: UUID <<nullable>>
+    +required_by: date
+  }
+  class KpiSnapshot {
+    +run_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<nullable>>
+    +metric: str
+    +value: Decimal
+  }
+  class LostSalesEstimate {
+    +run_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +lost_units: float
+    +lost_revenue: Decimal
+    +lost_profit: Decimal
+    +confidence: HIGH|LOW
+  }
+}
+
+Store "1" -- "*" StoreProduct
+Product "1" -- "*" StoreProduct
+Supplier "1" -- "*" SupplierProduct
+Product "1" -- "*" SupplierProduct
+Supplier "1" -- "*" SupplierScheme
+Store "1" -- "*" SalesTransaction
+SalesTransaction "1" *-- "*" SalesLine
+Product "1" -- "*" SalesLine
+Store "1" -- "*" InventoryPosition
+Product "1" -- "*" InventoryPosition
+InventoryPosition "1" o-- "*" Batch : held as >
+InventoryPosition "1" -- "*" InventoryMovement : derived from >
+Supplier "1" -- "*" SupplierStoreTerms
+Store "1" -- "*" SupplierStoreTerms
+note "Every planning output references\nStore and Product by FK, and the\nAgentRun (run_id) that produced it." as N1
+N1 .. Recommendation
+CalendarEvent -[hidden]down- Recommendation
+CalendarEvent -[hidden]down- AssociationRule
+@enduml

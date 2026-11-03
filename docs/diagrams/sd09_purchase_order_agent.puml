@@ -1,0 +1,75 @@
+@startuml
+!include style.iuml
+title SD-09 v3  PurchaseOrderAgent.run(ctx: RunContext) → AgentResult\n<size:11>Supplier selection, consolidation, pack/MOQ, schemes (extension), budget, L1/L2 level, explanations</size>
+autonumber "<b>00"
+participant "WorkflowOrchestrator" as O
+participant "PurchaseOrder\nAgent" as PA
+participant "NeedRepo" as NR
+participant "SupplierRepo" as SR
+participant "POBuilder" as PB
+participant "BusinessRuleRepo" as BRR
+participant "PORepo" as POR
+participant "Explanation\nService" as EX
+participant "LLMClient" as LLM
+participant "AgentRunLogger" as LOG
+
+O -> PA : run(ctx)
+PA -> NR : get_by_run(run_id: UUID) → list[ReplenishmentNeed]  (SHORTFALL + CO_REPLENISH)
+PA -> SR : get_offers(product_ids: list[UUID]) → dict[product_id, list[SupplierOffer]]
+PA -> BRR : get_rules() → BusinessRules(po_l2_threshold: Decimal, weekly_budget: Decimal, order_fixed_cost: Decimal, …)
+PA -> POR : get_committed_spend(week_start: date) → Decimal
+PA -> PA : budget_remaining = rules.weekly_budget − committed_spend
+PA -> PA : assigned: list[tuple[ReplenishmentNeed, SupplierOffer]] = []
+loop for need in needs
+  PA -> PB : select_supplier(need: ReplenishmentNeed, offers: list[SupplierOffer],\n required_by: date, scores: Optional[dict] = None) → Optional[SupplierOffer]
+  note right of PB
+    eligible: offer.available AND lead_time_days ≤ days until required_by
+    choose: min(unit_price) ; tie → shorter lead time
+    (Phase 2: weight by SupplierScore)
+  end note
+  alt offer is None
+    PA -> PA : flag need "NO_ELIGIBLE_SUPPLIER" → Recommendation(rec_type="REORDER", status="NEEDS_REVIEW")
+  else offer found
+    PA -> PA : assigned.append((need, offer))
+  end
+end
+PA -> PB : consolidate(assigned: list[tuple]) → list[DraftPO]\n(group by supplier_id; one POLine per (store_id, product_id))
+loop for po in draft_pos
+  loop for line in po.lines
+    PA -> PB : round_to_pack(qty: int, order_pack_size: int, moq: int) → int\n(max(moq, ceil(qty / pack) × pack))
+    opt params.schemes_enabled (extension)
+      PA -> PB : apply_scheme(line: POLine, schemes: list[SupplierScheme], daily_demand: float,\n shelf_life_days: int, budget_remaining: Decimal) → POLine
+      note right of PB
+        target = next slab_qty ≥ line.qty
+        accept if (target + free_qty) / total daily_demand of line stores ≤ shelf_life_days
+        and extra cost ≤ budget_remaining; saving stored in evidence
+      end note
+    end
+  end
+  PA -> PB : validate(po: DraftPO, rules: BusinessRules, budget_remaining: Decimal) → ValidationResult(ok: bool, errors: list[str])
+  alt result.ok
+    PA -> PA : budget_remaining −= po.total_value
+  else budget exceeded
+    PA -> PB : prioritise_within_budget(po: DraftPO, budget: Decimal) → DraftPO\n(keep lines by priority HIGH first, then ABC class A→C)
+    PA -> PA : po.flags.append("BUDGET_TRIMMED"); budget_remaining −= po.total_value
+  else other rule violation (MOQ, pack size)
+    PA -> PA : po.status = "NEEDS_REVIEW"; po.errors = result.errors
+  end
+  PA -> PA : po.required_level = "L2" if po.total_value ≥ rules.po_l2_threshold else "L1"\npo.status = "PENDING_L1" (unless NEEDS_REVIEW)\npo.l1_deadline = now() + timedelta(hours=rules.l1_deadline_hours)\nfor line in po.lines: line.line_status = "PENDING"
+  PA -> POR : insert(po: DraftPO) → po_id  (PurchaseOrder + POLines with store_id per line)
+end
+== Explanations (LLM used only for wording) ==
+loop for rec in RecommendationRepo.get_by_run(run_id) + POs (batched, 20 per call)
+  PA -> EX : explain(items: list[ExplanationInput(kind, evidence: dict)]) → list[str]
+  EX -> LLM : complete(system=EXPLAIN_PROMPT, prompt=json(items), max_tokens=1000, temperature=0) → LLMResponse(text, input_tokens, output_tokens, model)
+  alt response OK and JSON parses
+    EX -> EX : validate numbers in text == evidence numbers
+    EX -> LOG : log_llm_usage(run_id, provider="anthropic", model, input_tokens, output_tokens)
+  else LLM error / invalid output
+    EX -> EX : fallback: render_template(kind, evidence)  (deterministic text)
+  end
+  EX --> PA : explanations
+  PA -> PA : RecommendationRepo.set_explanation(rec_id, text) / PORepo.set_explanation(po_id, text)
+end
+PA --> O : AgentResult(status=SUCCESS, outputs={"pos": n, "needs_review": k, "budget_trimmed": b}, step_count)
+@enduml

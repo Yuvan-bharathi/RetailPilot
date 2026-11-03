@@ -1,0 +1,88 @@
+@startuml
+!include style.iuml
+title SD-10 v3  Consolidated PO Review: Line-Level L1, L2, Split\n<size:11>POST /api/v1/approvals  ·  ApprovalService.decide(req: ApprovalRequest, user: User) → ApprovalResult</size>
+autonumber "<b>00"
+actor "Store Supervisor\n(L1, own store lines)" as SUP
+actor "Super Admin\n(L2)" as ADM
+participant "React\nApprovalPanel" as UI
+participant "ApprovalRouter\n(FastAPI)" as API
+participant "ApprovalService" as AS
+participant "PORepo" as POR
+participant "ApprovalRepo" as AR
+participant "POBuilder" as PB
+participant "PurchaseOrder\nService" as POS
+participant "CacheService" as CS
+
+SUP -> UI : Approve / Edit / Reject the lines of their store
+UI -> API : useApprove().mutate(ApprovalRequest{entity_type: "PO", entity_id: po_id, store_id,\n decision: "APPROVED" | "EDITED" | "REJECTED", line_edits?: list[POLineEdit], reason?: str})
+API -> AS : create_approval(req, user=Depends(get_current_user)) → decide(req, user)
+AS -> POR : get_for_update(po_id: UUID) → PurchaseOrder  (SELECT … FOR UPDATE)
+alt po.status not in ("PENDING_L1", "PENDING_L2")
+  AS --> API : raise ConflictError → 409
+end
+alt po.status == "PENDING_L1"
+  AS -> AS : _decide_l1_lines(po, req, user)
+  alt user.role != "STORE_SUPERVISOR" OR req.store_id != user.store_id OR req.store_id not in po.store_ids()
+    AS --> API : raise PermissionDenied → 403
+  end
+  alt now() > po.l1_deadline
+    AS --> API : raise ConflictError("deadline passed; lines escalated") → 409
+  end
+  AS -> AS : lines = [l for l in po.lines if l.store_id == req.store_id and l.line_status == "PENDING"]
+  alt req.decision == "APPROVED"
+    AS -> POR : set_line_status(line_ids, "APPROVED")
+  else req.decision == "EDITED"
+    AS -> PB : apply_edits(po, edits=req.line_edits, store_id=req.store_id) → PurchaseOrder
+    AS -> PB : validate(po, rules, budget_remaining) → ValidationResult
+    alt not result.ok
+      AS --> API : raise ValidationError(result.errors) → 422 (rollback)
+    end
+    AS -> POR : update_lines(po_id, lines); set_line_status(line_ids, "EDITED")
+  else req.decision == "REJECTED"
+    alt not req.reason
+      AS --> API : raise ValidationError("reason required") → 422
+    end
+    AS -> POR : set_line_status(line_ids, "REJECTED")
+  end
+  AS -> AR : insert(Approval(entity_type="PO", entity_id=po_id, level="L1", store_id=req.store_id,\n approver_id=user.user_id, decision=req.decision, reason=req.reason)) → approval_id
+  opt no line of po is PENDING  (every store has decided)
+    AS -> AS : _finalise_l1(po) → PurchaseOrder
+    ref over AS, PB : _finalise_l1 (also used by SD-14 at the deadline)
+    AS -> AS : ok_lines = lines with status APPROVED / EDITED
+    alt ok_lines is empty
+      AS -> POR : set_status(po_id, "REJECTED")
+    else some lines REJECTED / EXPIRED
+      AS -> PB : split(po, lines=ok_lines) → child_po (parent_po_id = po_id, new po_id)
+      AS -> POR : insert(child_po); set_status(po_id, "SPLIT")
+      AS -> AS : target = child_po
+    else all lines approved
+      AS -> AS : target = po
+    end
+    opt target exists
+      alt target.total_value ≥ rules.po_l2_threshold   (checked on the PO that continues)
+        AS -> POR : set_status(target.po_id, "PENDING_L2")
+      else
+        AS -> POR : set_status(target.po_id, "APPROVED")
+      end
+    end
+  end
+else po.status == "PENDING_L2"
+  AS -> AS : _decide_l2(po, req, user)
+  alt user.role != "SUPER_ADMIN"
+    AS --> API : raise PermissionDenied → 403
+  end
+  AS -> AR : insert(Approval(level="L2", decision=req.decision, reason=req.reason))
+  AS -> POR : set_status(po_id, "APPROVED" if req.decision == "APPROVED" else "REJECTED")
+end
+AS -> AS : RecommendationRepo.update_status(source_rec_ids of decided lines, ACCEPTED | EDITED | REJECTED)\n(rejection reasons kept; rejected needs re-evaluated next run)
+AS -> AS : commit()
+AS -> CS : invalidate_store_keys(store_ids=po.store_ids(), prefixes=["inbox", "dash", "inv", "twin"]) → int
+opt a PO became "APPROVED"
+  AS -> POS : submit(po_id) → SubmissionResult  (SimulatedSupplierGateway in PoC; status SUBMITTED)
+end
+AS --> API : ApprovalResult(po_id, new_status, child_po_id?, approval_id)
+API --> UI : 200 ApprovalResult
+UI -> UI : queryClient.invalidateQueries(["recommendations"], ["purchase-orders"], ["dashboard"])
+== L2 path ==
+ADM -> UI : GET /api/v1/purchase-orders?status=PENDING_L2 → Approve / Reject → POST /api/v1/approvals
+@enduml

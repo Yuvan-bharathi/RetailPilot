@@ -1,0 +1,261 @@
+@startuml
+!include style.iuml
+skinparam linetype ortho
+left to right direction
+title CD-3 v3  Backend Service Architecture (FastAPI · Celery worker · Redis · PostgreSQL)\n<size:11>method signatures match the sequence diagrams SD-01 … SD-13</size>
+hide empty fields
+
+package "API layer (FastAPI routers, /api/v1)" {
+  class DashboardRouter {
+    +get_dashboard(store_id: UUID?, period: Period, user: User): DashboardSummary
+  }
+  class RecommendationRouter {
+    +list_recommendations(store_id: UUID, status: str, user: User): list[RecommendationDTO]
+    +get_recommendation(rec_id: UUID, user: User): RecommendationDetailDTO
+  }
+  class PurchaseOrderRouter {
+    +list_purchase_orders(status: str?, store_id: UUID?, user: User): list[PurchaseOrderDTO]
+    +get_purchase_order(po_id: UUID, user: User): PurchaseOrderDTO
+  }
+  class ApprovalRouter {
+    +create_approval(req: ApprovalRequest, user: User): ApprovalResult
+  }
+  class TransferRouter {
+    +accept(transfer_id: UUID, user: User): TransferOrderDTO
+    +approve_release(transfer_id: UUID, user: User): TransferOrderDTO
+    +reject(transfer_id: UUID, body: RejectRequest, user: User): TransferOrderDTO
+    +dispatch(transfer_id: UUID, user: User): TransferOrderDTO
+    +receive(transfer_id: UUID, body: ReceiveRequest, user: User): TransferOrderDTO
+  }
+  class StoreInventoryRouter {
+    +get_store_inventory(store_id: UUID, filters: InventoryFilter, user: User): StoreInventoryDTO
+  }
+  class ObservabilityRouter {
+    +list_runs(filters: RunFilter): list[AgentRunDTO]
+    +get_run(run_id: UUID): AgentRunDetailDTO
+  }
+  class DigitalTwinRouter <<Extension>> {
+    +get_store_twin(store_id: UUID, user: User): StoreTwinDTO
+  }
+}
+
+package "Service layer" {
+  class DashboardService {
+    +get_summary(store_id: UUID?, period: Period): DashboardSummary
+  }
+  class RecommendationService {
+    +list_inbox(user: User, store_id: UUID, status: str): list[RecommendationDTO]
+    +get_detail(rec_id: UUID, user: User): RecommendationDetailDTO
+  }
+  class ApprovalService {
+    +decide(req: ApprovalRequest, user: User): ApprovalResult
+    +expire_overdue(now: datetime): int
+    -_decide_l1_lines(po, req, user): None
+    -_decide_l2(po, req, user): None
+    -_finalise_l1(po): PurchaseOrder
+    -_split_approved_lines(po): PurchaseOrder
+  }
+  class PurchaseOrderService {
+    +submit(po_id: UUID): SubmissionResult
+  }
+  class TransferService {
+    +accept(transfer_id: UUID, user: User): TransferOrder
+    +approve_release(transfer_id: UUID, user: User): TransferOrder
+    +reject(transfer_id: UUID, reason: str, user: User): TransferOrder
+    +dispatch(transfer_id: UUID, user: User): TransferOrder
+    +receive(transfer_id: UUID, received_qty: int, user: User): TransferOrder
+  }
+  class StoreInventoryService {
+    +get_view(store_id: UUID, filters: InventoryFilter): StoreInventoryDTO
+  }
+  class InventoryLedgerService {
+    +post(movements: list[InventoryMovement]): None
+    +reconcile(store_id: UUID, snapshot: list[StockRow]): list[InventoryMovement]
+  }
+  class ObservabilityService {
+    +list_runs(filters: RunFilter): list[AgentRun]
+    +get_trace(run_id: UUID): RunTrace
+  }
+  class DigitalTwinService <<Extension>> {
+    +get_shelf_states(store_id: UUID): StoreTwinDTO
+    -_shelf_status(pos, sp, near_expiry: bool): ShelfStatus
+  }
+  class DataIngestionService {
+    +load_and_validate(run_date: date, store_ids: list[UUID]): ValidationReport
+  }
+  interface SupplierGateway {
+    +submit(po: PurchaseOrder): SupplierAck
+  }
+  class SimulatedSupplierGateway
+}
+
+package "Orchestration" {
+  class "tasks.nightly_run_task" as Task {
+    +nightly_run_task(run_date: date): RunSummary
+  }
+  class "tasks.approval_deadline_task" as DTask {
+    +approval_deadline_task(): int
+  }
+  class WorkflowOrchestrator {
+    +AGENT_SEQUENCE: list[type[BaseAgent]]
+    +run_nightly(run_id: UUID, run_date: date): RunSummary
+    -_run_agent(agent: BaseAgent, ctx: RunContext): AgentResult
+  }
+  class RunContext {
+    +run_id: UUID
+    +run_date: date
+    +store_ids: list[UUID]
+    +stale_skus: list[tuple[UUID, UUID]]
+    +params: RunParams
+    +logger: AgentRunLogger
+  }
+  interface BaseAgent {
+    +name: str
+    +critical: bool
+    +run(ctx: RunContext): AgentResult
+  }
+  class SalesAnalyticsAgent
+  class DemandForecastingAgent
+  class RelatedProductAgent
+  class StockBalancingAgent
+  class FreshnessAgent
+  class PurchaseOrderAgent
+}
+
+package "Deterministic tools (unit-tested)" {
+  class LostSalesCalculator {
+    +estimate(daily_sales: DataFrame, stockout_days: DataFrame, margins: DataFrame): DataFrame
+  }
+  class ForecastTools {
+    +classify_abc_xyz(series: DataFrame, value_col: str, a_cut: float, b_cut: float, x_cv: float, y_cv: float): DataFrame
+    +baseline_avg_daily(df: DataFrame, window_days: int): DataFrame
+    +fit_statsforecast(df: DataFrame, models: list, horizon: int, n_windows: int): DataFrame <<ext>>
+    +select_best(cv_results: DataFrame, baseline: DataFrame): DataFrame <<ext>>
+    +apply_calendar_uplift(forecast: DataFrame, events: list, uplift_by_type: dict): DataFrame <<ext>>
+  }
+  class BasketTools {
+    +clean_bills(lines: DataFrame, rules: BasketQualityRules): DataFrame
+    +to_basket_matrix(lines: DataFrame): DataFrame
+    +mine_rules(basket: DataFrame, min_support: float, min_confidence: float, min_lift: float, max_len: int): DataFrame
+    +detect_substitutes(daily_sales: DataFrame, stockout_days: DataFrame, same_category_only: bool, uplift_threshold: float): DataFrame
+    +find_assortment_gaps(rules_by_store: dict, listings: DataFrame, min_lift: float, min_stores: int): list[GapSuggestion]
+  }
+  class RequirementCalculator {
+    +demand_window(lead_time_days: int, review_period_days: int): int
+    +own_requirement(daily_demand: float, lead_time_days: int, review_period_days: int, safety_stock_days: int, min_display_qty: int): int
+    +available(shelf_qty: int, backroom_qty: int, incoming: int, reserved: int): int
+    +surplus(available: int, requirement: int): int
+    +assert_donor_protected(donor: StoreState, qty: int): bool
+  }
+  class TransferDecisionEngine {
+    +decide(product_id: UUID, states: list[StoreState], routes: dict, cost_inputs: CostInputs): TransferPlan
+    +find_expiry_receivers(product_id: UUID, qty: int, days_left: int, from_store: UUID, states: list[StoreState], routes: dict): list[TransferProposal]
+    -_priority(state: StoreState): str
+  }
+  class CostModel {
+    +transfer_incremental_cost(route: TransferRoute, qty: int): Decimal
+    +po_incremental_cost(qty: int, unit_cost: Decimal, donor: StoreState, terms: SupplierStoreTerms, order_fixed_share: Decimal, holding_rate: Decimal, expiry_risk_pct: float): Decimal
+  }
+  class POBuilder {
+    +select_supplier(need: ReplenishmentNeed, offers: list[SupplierOffer], required_by: date, scores: dict?): SupplierOffer?
+    +consolidate(assigned: list[tuple]): list[DraftPO]
+    +round_to_pack(qty: int, order_pack_size: int, moq: int): int
+    +apply_scheme(line: POLine, schemes: list, daily_demand: float, shelf_life_days: int, budget_remaining: Decimal): POLine <<ext>>
+    +validate(po: DraftPO, rules: BusinessRules, budget_remaining: Decimal): ValidationResult
+    +prioritise_within_budget(po: DraftPO, budget: Decimal): DraftPO
+    +apply_edits(po: PurchaseOrder, edits: list[POLineEdit], store_id: UUID): PurchaseOrder
+    +split(po: PurchaseOrder, lines: list[POLine]): PurchaseOrder
+  }
+  class MarkdownRules <<Extension>> {
+    +recommend(days_left: int, at_risk: int, unit_margin: Decimal, rules: list): MarkdownAction
+  }
+}
+
+package "AI" {
+  class ExplanationService {
+    +explain(items: list[ExplanationInput]): list[str]
+    -render_template(kind: str, evidence: dict): str
+  }
+  class LLMClient {
+    +complete(system: str, prompt: str, max_tokens: int, temperature: float): LLMResponse
+  }
+}
+
+package "Infrastructure" {
+  class CacheService {
+    +get_latest_run_id(): UUID
+    +set_latest_run_id(run_id: UUID): None
+    +key(prefix: str, run_id: UUID, *parts): str
+    +get(key: str): str?
+    +set(key: str, value: str, ttl: int): bool
+    +warm(run_id: UUID, store_ids: list[UUID]): int
+    +invalidate_run(run_id: UUID): int
+    +invalidate_store_keys(store_ids: list[UUID], prefixes: list[str]): int
+  }
+  class AgentRunLogger {
+    +start_run(agent_name: str, parent_run_id: UUID?, input_ref: dict): UUID
+    +log_tool_call(run_id, tool_name, args, result_summary, duration_ms, status): None
+    +log_evidence(run_id, rec_id, data: dict, validation_result: str): None
+    +log_llm_usage(run_id, provider, model, input_tokens, output_tokens): None
+    +finish_run(run_id, status, output_summary, error): None
+  }
+  class MaterializedViewRefresher {
+    +refresh_dashboard_views(): None
+  }
+  class Repositories {
+    SalesRepo · InventoryRepo · BatchRepo · ProductRepo
+    StoreProductRepo · SupplierRepo · TransferRouteRepo
+    ForecastRepo · RuleRepo · CalendarRepo · KpiRepo
+    RecommendationRepo · NeedRepo · PORepo · TransferRepo
+    ApprovalRepo · BusinessRuleRepo · RunRepo · LayoutRepo
+  }
+}
+
+DashboardRouter --> DashboardService
+RecommendationRouter --> RecommendationService
+PurchaseOrderRouter --> RecommendationService
+ApprovalRouter --> ApprovalService
+StoreInventoryRouter --> StoreInventoryService
+StoreInventoryService --> CacheService
+TransferService --> InventoryLedgerService
+DataIngestionService --> InventoryLedgerService
+DTask --> ApprovalService
+TransferDecisionEngine --> CostModel
+TransferRouter --> TransferService
+ObservabilityRouter --> ObservabilityService
+DigitalTwinRouter --> DigitalTwinService
+ApprovalService --> POBuilder
+ApprovalService --> PurchaseOrderService
+PurchaseOrderService --> SupplierGateway
+SupplierGateway <|.. SimulatedSupplierGateway
+TransferService --> RequirementCalculator
+DashboardService --> CacheService
+RecommendationService --> CacheService
+DigitalTwinService --> CacheService
+ApprovalService --> CacheService
+TransferService --> CacheService
+Task --> WorkflowOrchestrator
+WorkflowOrchestrator --> DataIngestionService
+WorkflowOrchestrator --> BaseAgent
+WorkflowOrchestrator ..> RunContext
+WorkflowOrchestrator --> AgentRunLogger
+WorkflowOrchestrator --> MaterializedViewRefresher
+WorkflowOrchestrator --> CacheService
+BaseAgent <|.. SalesAnalyticsAgent
+BaseAgent <|.. DemandForecastingAgent
+BaseAgent <|.. RelatedProductAgent
+BaseAgent <|.. StockBalancingAgent
+BaseAgent <|.. FreshnessAgent
+BaseAgent <|.. PurchaseOrderAgent
+SalesAnalyticsAgent --> LostSalesCalculator
+DemandForecastingAgent --> ForecastTools
+RelatedProductAgent --> BasketTools
+StockBalancingAgent --> RequirementCalculator
+StockBalancingAgent --> TransferDecisionEngine
+FreshnessAgent --> TransferDecisionEngine
+FreshnessAgent --> MarkdownRules
+PurchaseOrderAgent --> POBuilder
+PurchaseOrderAgent --> ExplanationService
+ExplanationService --> LLMClient
+BaseAgent --> Repositories
+@enduml

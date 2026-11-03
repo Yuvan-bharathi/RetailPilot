@@ -1,0 +1,43 @@
+@startuml
+!include style.iuml
+title SD-14  Approval Deadline Job: Escalate or Expire Undecided PO Lines, Split Approved Lines\n<size:11>tasks.approval_deadline_task · ApprovalService.expire_overdue(now: datetime) → int</size>
+autonumber "<b>00"
+participant "Celery Beat" as SCH
+participant "Celery Worker\ntasks.approval_deadline_task" as W
+participant "ApprovalService" as AS
+participant "PORepo" as POR
+participant "BusinessRuleRepo" as BRR
+participant "POBuilder" as PB
+participant "Notifier\n(in-app)" as N
+participant "CacheService" as CS
+
+SCH -> W : beat_schedule["approval-deadlines"]: every 15 minutes → approval_deadline_task.delay()
+W -> AS : expire_overdue(now: datetime = now()) → int (POs processed)
+AS -> BRR : get_rules() → BusinessRules(deadline_action: "ESCALATE" | "EXPIRE", po_l2_threshold, …)
+AS -> POR : find_overdue(status="PENDING_L1", l1_deadline < now) → list[PurchaseOrder]  (FOR UPDATE SKIP LOCKED)
+loop for po in overdue_pos
+  AS -> AS : pending = [l for l in po.lines if l.line_status == "PENDING"]
+  alt rules.deadline_action == "ESCALATE"
+    AS -> POR : set_line_status([l.id for l in pending], "ESCALATED")
+    AS -> N : notify(role="SUPER_ADMIN", message=f"PO {po.po_id}: {len(pending)} lines escalated")
+    note right of AS : Super Admin decides escalated lines\nthrough the same POST /approvals (as L1 on behalf of the store)
+  else "EXPIRE"
+    AS -> POR : set_line_status([l.id for l in pending], "EXPIRED")
+    AS -> AS : _finalise_l1(po) → PurchaseOrder
+    alt no APPROVED / EDITED lines
+      AS -> POR : set_status(po.po_id, "REJECTED")
+    else some approved lines
+      AS -> PB : split(po, lines=approved_lines) → child_po (parent_po_id = po.po_id)
+      AS -> POR : insert(child_po); set_status(po.po_id, "SPLIT")
+      alt child_po.total_value ≥ rules.po_l2_threshold
+        AS -> POR : set_status(child_po.po_id, "PENDING_L2")
+      else
+        AS -> POR : set_status(child_po.po_id, "APPROVED")
+      end
+    end
+    AS -> AS : NeedRepo.reopen(expired lines) → needs re-evaluated in next nightly run
+  end
+  AS -> CS : invalidate_store_keys(po.store_ids(), ["inbox", "dash"])
+end
+AS --> W : count
+@enduml

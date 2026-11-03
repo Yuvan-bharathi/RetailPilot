@@ -1,0 +1,51 @@
+@startuml
+!include style.iuml
+title SD-11 v3  Dashboard Read with Cache Layer\n<size:11>GET /api/v1/dashboard?store_id=&period=  ·  cache-aside, fail-open</size>
+autonumber "<b>00"
+actor "User" as U
+participant "DashboardPage\n(React Query)" as UI
+participant "DashboardRouter\n(FastAPI)" as API
+participant "DashboardService" as DS
+participant "CacheService" as CS
+database "Redis" as R
+participant "DashboardRepo" as DR
+database "PostgreSQL\nmv_dashboard_store_day" as DB
+
+U -> UI : open Executive Dashboard
+UI -> UI : useDashboard(storeId?: string, period: Period) →\n useQuery({queryKey: ["dashboard", storeId, period],\n queryFn: () => apiClient.getDashboard({storeId, period}), staleTime: 300_000})
+alt client cache fresh (< 5 min)
+  UI --> U : render from client cache
+else stale or empty
+  UI -> API : GET /api/v1/dashboard?store_id={storeId}&period={period}
+  API -> API : get_dashboard(store_id: Optional[UUID], period: Period,\n user: User = Depends(get_current_user)) → DashboardSummary
+  alt user.role == "STORE_SUPERVISOR" AND store_id != user.store_id
+    API --> UI : 403 Forbidden
+  end
+  API -> DS : get_summary(store_id: Optional[UUID], period: Period) → DashboardSummary
+  DS -> CS : get_latest_run_id() → UUID
+  CS -> R : GET latest_run_id
+  alt miss
+    CS -> DR : get_latest_success_run_id() → UUID
+    CS -> R : SET latest_run_id
+  end
+  DS -> CS : key(prefix="dash", run_id: UUID, store_id or "all", period.value) → str\n e.g. "dash:{run_id}:{store_id}:{period}"
+  DS -> CS : get(key: str) → Optional[str]
+  CS -> R : GET key
+  alt RedisError (cache down)
+    CS -> CS : logger.warning("cache unavailable"); return None  (fail-open)
+  end
+  alt hit
+    DS -> DS : DashboardSummary.model_validate_json(cached)
+  else miss
+    DS -> DR : fetch_summary(store_id: Optional[UUID], start: date, end: date) → DashboardRow
+    DR -> DB : SELECT revenue, gross_profit, margin_pct, stockout_rate, lost_revenue, lost_profit,\n near_expiry_value, pending_recs, pending_pos FROM mv_dashboard_store_day\n WHERE (:store_id IS NULL OR store_id = :store_id) AND day BETWEEN :start AND :end
+    DB --> DR : rows
+    DS -> DS : summary = DashboardSummary.from_row(row, top_movers=DR.fetch_movers(...))
+    DS -> CS : set(key, summary.model_dump_json(), ttl=seconds_until_next_run()) → bool
+    CS -> R : SET key value EX ttl
+  end
+  DS --> API : DashboardSummary
+  API --> UI : 200 JSON (DashboardSummaryDTO, generated TS type)
+  UI --> U : render KpiCard × n, charts
+end
+@enduml

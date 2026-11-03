@@ -1,0 +1,69 @@
+@startuml
+!include style.iuml
+title SD-07 v3  TransferDecisionEngine.decide(product_id, states, routes, cost_inputs) → TransferPlan\n<size:11>Only genuine surplus moves; incremental-cost comparison (v2.2); if every store needs the product, a PO is raised</size>
+autonumber "<b>00"
+participant "StockBalancing\nAgent" as SB
+participant "TransferDecision\nEngine" as TE
+participant "CostModel" as CM
+participant "Requirement\nCalculator" as RC
+
+SB -> TE : decide(product_id: UUID, states: list[StoreState], routes: dict[(UUID, UUID), TransferRoute],\n cost_inputs: CostInputs(terms_by_store, order_fixed_cost, holding_cost_rate_per_day, expiry_risk_pct))
+TE -> TE : plan = TransferPlan(transfers=[], po_needs=[])
+TE -> TE : short_stores = [s for s in states if s.available < s.requirement]\nsorted by s.days_of_cover ascending (most urgent first)
+TE -> TE : donors = {s.store_id: s for s in states if s.surplus > 0 and not s.review_required}
+break short_stores is empty
+  TE --> SB : plan (no action for this product)
+end
+loop for short in short_stores
+  TE -> TE : need: int = short.requirement − short.available
+  TE -> TE : terms = cost_inputs.terms_by_store[short.store_id]\n(lead_time_days, delivery_charge, unit_cost of the supplier serving this store)
+  alt donors is empty  (product sells high in every store)
+    TE -> TE : plan.po_needs.append(PONeed(short.store_id, qty=need,\n priority=_priority(short, terms), reason="NO_SURPLUS_IN_ANY_STORE"))
+  else donors available
+    TE -> TE : candidates = sorted(donors, key=lambda d: routes[(d, short.store_id)].per_unit_cost)
+    loop for donor_id in candidates while need > 0
+      TE -> TE : donor = donors[donor_id]; qty: int = min(donor.surplus, need)
+      TE -> TE : route = routes.get((donor_id, short.store_id))
+      alt route is None
+        TE -> TE : continue  (no transfer route between these stores)
+      end
+      TE -> CM : transfer_incremental_cost(route: TransferRoute, qty: int) → Decimal
+      note right of CM
+        fixed_cost + per_unit_cost × qty
+        + handling_cost_per_unit × qty
+      end note
+      TE -> CM : po_incremental_cost(qty, unit_cost=terms.unit_cost, donor=donor, terms=terms,\n order_fixed_share=cost_inputs.order_fixed_cost / expected_lines,\n holding_rate=cost_inputs.holding_cost_rate_per_day, expiry_risk_pct=cost_inputs.expiry_risk_pct) → Decimal
+      note right of CM
+        order_fixed_share + terms.delivery_charge share
+        + qty × unit_cost × holding_rate × days_to_sell_at_donor
+          (days_to_sell_at_donor = qty / donor.daily_demand)
+        + qty × unit_cost × expiry_risk_pct   (perishables only)
+        purchase price itself is NOT included (paid either way)
+      end note
+      alt t_cost < p_cost AND route.transit_days ≤ terms.lead_time_days
+        TE -> RC : assert_donor_protected(donor, qty) → bool  (donor.available − qty ≥ donor.requirement)
+        alt protected == True
+          TE -> TE : plan.transfers.append(TransferProposal(from_store=donor_id, to_store=short.store_id,\n qty, transfer_cost=t_cost, po_cost_avoided=p_cost, transit_days=route.transit_days,\n evidence={donor.surplus, donor.requirement, need, t_cost, p_cost}))
+          TE -> TE : donor.surplus −= qty; donor.available −= qty; need −= qty
+          opt donor.surplus == 0
+            TE -> TE : del donors[donor_id]
+          end
+        else not protected
+          TE -> TE : del donors[donor_id]  (never take a donor below its own requirement)
+        end
+      else transfer costlier or slower than a PO
+        TE -> TE : continue (skip this donor)
+      end
+    end
+    opt need > 0
+      TE -> TE : plan.po_needs.append(PONeed(short.store_id, qty=need, priority=_priority(short, terms),\n reason="PARTIAL_SURPLUS" if any transfer for short else "TRANSFER_NOT_VIABLE"))
+    end
+  end
+end
+TE --> SB : TransferPlan(transfers: list[TransferProposal], po_needs: list[PONeed])
+note over SB, RC
+  _priority(s, terms) = "HIGH" if s.days_of_cover < terms.lead_time_days else "NORMAL"
+  Example: Store C need 40; Store A surplus 24; Store B surplus 0
+  → TransferProposal(A → C, 24) + PONeed(C, 16, "PARTIAL_SURPLUS")
+end note
+@enduml

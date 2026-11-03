@@ -1,0 +1,65 @@
+@startuml
+!include style.iuml
+title SD-06 v3  StockBalancingAgent.run(ctx: RunContext) → AgentResult\n<size:11>Own requirement, surplus, co-replenishment, transfer vs PO</size>
+autonumber "<b>00"
+participant "WorkflowOrchestrator" as O
+participant "StockBalancing\nAgent" as SB
+participant "ForecastRepo" as FR
+participant "InventoryRepo" as IR
+participant "StoreProductRepo" as SPR
+participant "SupplierRepo" as SUP
+participant "TransferRouteRepo" as TRR
+participant "RuleRepo" as RR
+participant "Requirement\nCalculator" as RC
+participant "TransferDecision\nEngine" as TE
+participant "RecommendationRepo\n/ TransferRepo / NeedRepo" as REPO
+participant "AgentRunLogger" as LOG
+
+O -> SB : run(ctx)
+SB -> FR : get_by_run(run_id: UUID) → dict[(store_id, product_id), Forecast]
+SB -> IR : get_positions(store_ids: list[UUID]) → dict[(store_id, product_id), InventoryPosition]
+SB -> SPR : get_rules(store_ids: list[UUID]) → dict[(store_id, product_id), StoreProduct]
+SB -> SUP : get_store_terms(store_ids, product_ids) → dict[(store_id, product_id), StoreSupplyTerms(\n lead_time_days, delivery_charge, unit_cost, supplier_id)]  (supplier serving that store)
+SB -> SB : cost_settings = BusinessRuleRepo.get_cost_settings() → (order_fixed_cost, holding_cost_rate_per_day, expiry_risk_pct)
+SB -> TRR : get_route_matrix() → dict[(from_store, to_store), TransferRoute(fixed_cost, per_unit_cost, transit_days)]
+loop for product_id in products listed in any store
+  SB -> SB : states: list[StoreState] = []
+  loop for store_id in ctx.store_ids where product is listed
+    SB -> RC : own_requirement(daily_demand: float, lead_time_days=terms[store].lead_time_days,\n review_period_days: int, safety_stock_days: int, min_display_qty: int) → int
+    note right of RC
+      ceil(daily_demand × (lead_time_days + review_period_days))
+      + ceil(daily_demand × safety_stock_days)
+      + min_display_qty
+    end note
+    SB -> RC : available(shelf_qty: int, backroom_qty: int, incoming: int, reserved: int) → int\n(shelf + backroom + incoming − reserved)
+    SB -> RC : surplus(available: int, requirement: int) → int  (available − requirement; ≤ 0 → not a donor)
+    SB -> SB : states.append(StoreState(store_id, requirement, available, surplus,\n days_of_cover = available / max(daily_demand, 0.01), confidence))
+  end
+  opt any state.confidence == "LOW"
+    SB -> SB : mark those stores "review_required" (no automatic transfer out of them)
+  end
+  SB -> TE : decide(product_id: UUID, states: list[StoreState], routes: dict,\n cost_inputs=CostInputs(terms_by_store, order_fixed_cost, holding_cost_rate_per_day, expiry_risk_pct)) → TransferPlan
+  ref over TE : SD-07 TransferDecisionEngine.decide
+  TE --> SB : TransferPlan(transfers: list[TransferProposal], po_needs: list[PONeed])
+  loop for t in plan.transfers
+    SB -> REPO : RecommendationRepo.insert(Recommendation(rec_type="TRANSFER", store_id=t.to_store,\n product_id, qty=t.qty, evidence=t.evidence)) → rec_id
+    SB -> REPO : TransferRepo.insert(TransferOrder(from_store_id=t.from_store, to_store_id=t.to_store,\n product_id, qty=t.qty, transfer_cost=t.cost, transit_days=t.transit_days,\n is_expiry_aware=False, status="PROPOSED", source_rec_id=rec_id)) → transfer_id
+  end
+  loop for need in plan.po_needs
+    SB -> REPO : NeedRepo.insert(ReplenishmentNeed(run_id, need.store_id, product_id,\n qty=need.qty, source="SHORTFALL", priority=need.priority)) → need_id
+  end
+  SB -> LOG : log_evidence(run_id, rec_id=None, data={"product_id", "states", "plan"}, validation_result="OK")
+end
+== Co-replenishment pass ==
+loop for need in NeedRepo.get_by_run(run_id, source="SHORTFALL")
+  SB -> RR : get_complements(store_id: UUID, product_id: UUID, min_lift: float = 1.5, limit: int = 3) → list[AssociationRule]
+  loop for rule in complements
+    SB -> SB : comp_state = state of rule.consequent_id in need.store_id
+    opt comp_state.available < comp_state.requirement AND no need exists yet for (store, consequent)
+      SB -> REPO : NeedRepo.insert(ReplenishmentNeed(run_id, store_id, rule.consequent_id,\n qty=comp_state.requirement − comp_state.available, source="CO_REPLENISH",\n linked_product_id=product_id, lift=rule.lift)) → need_id
+      SB -> REPO : RecommendationRepo.insert(Recommendation(rec_type="CO_REPLENISH", …)) → rec_id
+    end
+  end
+end
+SB --> O : AgentResult(status=SUCCESS, outputs={"transfers": t, "po_needs": n, "co_replenish": c}, step_count)
+@enduml

@@ -1,0 +1,44 @@
+@startuml
+!include style.iuml
+title SD-05 v3  RelatedProductAgent.run(ctx: RunContext) → AgentResult\n<size:11>Market basket rules, substitutes, assortment gaps</size>
+autonumber "<b>00"
+participant "WorkflowOrchestrator" as O
+participant "RelatedProduct\nAgent" as RP
+participant "SalesRepo" as SR
+participant "InventoryRepo" as IR
+participant "BasketTools" as BT
+participant "StoreProductRepo" as SPR
+participant "RuleRepo" as RR
+participant "RecommendationRepo" as REC
+participant "AgentRunLogger" as LOG
+
+O -> RP : run(ctx)
+RP -> RP : all_rules: dict[UUID, DataFrame] = {}
+loop for store_id in ctx.store_ids
+  RP -> SR : get_bill_lines(store_id: UUID, lookback_days: int = 90) → DataFrame[bill_id, product_id]
+  RP -> BT : clean_bills(lines: DataFrame, rules: BasketQualityRules(exclude_returns=True,\n exclude_voided=True, max_qty_per_line=params.basket.max_qty_per_line,\n exclude_promo_days=params.basket.exclude_promo_days)) → DataFrame
+  alt number of bills < params.basket.min_bills (default 500, configurable per store)
+    RP -> LOG : log_evidence(run_id, None, {"store_id": store_id, "bills": n}, "SKIPPED_INSUFFICIENT_DATA")
+  else enough bills
+    RP -> BT : to_basket_matrix(lines: DataFrame) → DataFrame[bool] (bills × products)
+    RP -> BT : mine_rules(basket: DataFrame, min_support=params.basket.min_support (0.005),\n min_confidence=params.basket.min_confidence (0.2), min_lift=params.basket.min_lift (1.0), max_len=2) → DataFrame[antecedent_id, consequent_id, support, confidence, lift]\n(mlxtend fpgrowth + association_rules)
+    RP -> IR : get_stockout_days(store_ids=[store_id], start, end) → DataFrame
+    RP -> SR : get_daily_sales(store_ids=[store_id], start, end) → DataFrame
+    RP -> BT : detect_substitutes(daily_sales: DataFrame, stockout_days: DataFrame,\n same_category_only: bool = True, uplift_threshold: float = 0.3) → DataFrame[product_a, product_b, uplift]
+    note right of BT
+      B is a substitute of A when, on A's stockout days,
+      B's sales rise ≥ 30% vs B's normal level,
+      within the same category
+    end note
+    RP -> RR : replace_rules(run_id: UUID, store_id: UUID, complements: DataFrame, substitutes: DataFrame) → int\n(stored with rule_type COMPLEMENT / SUBSTITUTE – separate analyses)
+    RP -> RP : all_rules[store_id] = complements
+  end
+end
+RP -> SPR : get_listings(store_ids: list[UUID]) → DataFrame[store_id, product_id, is_listed]
+RP -> BT : find_assortment_gaps(rules_by_store: dict[UUID, DataFrame], listings: DataFrame,\n min_lift: float = 1.5, min_stores: int = 1) → list[GapSuggestion(store_id, product_id, evidence)]
+loop for gap in gaps
+  RP -> REC : insert(Recommendation(run_id, gap.store_id, gap.product_id,\n rec_type="ASSORTMENT_GAP", qty=0, evidence=gap.evidence, status="PENDING")) → rec_id
+end
+RP -> LOG : log_tool_call(run_id, "mine_rules", {"stores": n}, f"{rules} rules, {subs} substitutes, {gaps} gaps", duration_ms, "OK")
+RP --> O : AgentResult(status=SUCCESS, outputs={"rules": r, "substitutes": s, "gaps": g}, step_count)
+@enduml

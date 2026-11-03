@@ -1,0 +1,56 @@
+@startuml
+!include style.iuml
+title SD-02 v3  Data Ingestion & Validation\n<size:11>DataIngestionService.load_and_validate(run_date: date, store_ids: list[UUID]) → ValidationReport</size>
+autonumber "<b>00"
+participant "WorkflowOrchestrator" as O
+participant "DataIngestionService" as ING
+participant "PosSource\n(CSV / synthetic in PoC)" as POS
+participant "Validator" as V
+participant "SalesRepo" as SR
+participant "InventoryRepo" as IR
+participant "BatchRepo" as BR
+participant "InventoryLedger\nService" as LED
+participant "AgentRunLogger" as LOG
+
+O -> ING : load_and_validate(run_date, store_ids)
+ING -> ING : report = ValidationReport(valid_rows=0, stale_skus=[], errors=[])
+loop for store_id in store_ids
+  ING -> POS : fetch_sales(store_id: UUID, day: date) → list[RawBillLine]
+  ING -> POS : fetch_stock_snapshot(store_id: UUID, day: date) → list[RawStockRow]
+  ING -> POS : fetch_batches(store_id: UUID) → list[RawBatchRow]
+  ING -> V : validate_sales(rows: list[RawBillLine]) → (valid: list[BillLine], rejected: list[RowError])
+  note right of V
+    checks: known product_id, qty > 0,
+    unit_price ≥ 0, discount ≤ unit_price × qty,
+    txn_datetime within run_date, no duplicate (bill_id, product_id)
+  end note
+  ING -> V : validate_stock(rows: list[RawStockRow]) → (valid: list[StockRow], rejected: list[RowError])
+  ING -> SR : bulk_insert_lines(store_id: UUID, lines: list[BillLine]) → inserted: list[BillLine]\n(ON CONFLICT (bill_id, product_id) DO NOTHING)
+  ING -> LED : post(movements=[InventoryMovement(type="SALE", qty=−line.qty, location="SHELF",\n reference_type="BILL", reference_id=line.bill_id) for line in inserted]) → None
+  alt stock snapshot missing for store_id
+    ING -> ING : report.errors.append(f"no snapshot: {store_id}")
+    ING -> LOG : log_evidence(run_id, rec_id=None, data={"store_id": store_id,\n "issue": "missing_snapshot"}, validation_result="FAILED")
+  else snapshot present
+    ING -> LED : reconcile(store_id: UUID, snapshot: list[StockRow]) → list[InventoryMovement]
+    note right of LED
+      for each (product, location):
+        diff = snapshot_qty − ledger_qty
+        if diff != 0 → post ADJUSTMENT movement (reason="RECON")
+        update InventoryPosition.shelf_qty / backroom_qty
+    end note
+    opt adjustments returned
+      ING -> LOG : log_evidence(run_id, None, {"store_id", "adjustments": n, "value": v}, "STOCK_MISMATCH")
+    end
+  end
+  ING -> BR : bulk_upsert(store_id: UUID, batches: list[BatchRow]) → int
+  ING -> SR : get_last_sale_dates(store_id: UUID) → dict[product_id, date]
+  loop for product_id, last_sale in last_sale_dates.items()
+    opt (run_date − last_sale).days > params.stale_days AND on_hand > 0
+      ING -> ING : report.stale_skus.append((store_id, product_id))
+    end
+  end
+  ING -> ING : report.valid_rows += len(valid lines)\nreport.errors += rejected rows
+end
+ING -> LOG : log_tool_call(run_id, tool_name="load_and_validate",\n args={"stores": len(store_ids)}, result_summary=report.summary(),\n duration_ms, status="OK" if not report.errors else "WARN")
+ING --> O : ValidationReport(valid_rows: int, stale_skus: list[tuple[UUID, UUID]], errors: list[str])
+@enduml

@@ -1,0 +1,52 @@
+@startuml
+!include style.iuml
+title SD-08 v3  FreshnessAgent.run(ctx: RunContext) → AgentResult\n<size:11>FEFO expiry risk, expiry-aware transfer, markdown (extension)</size>
+autonumber "<b>00"
+participant "WorkflowOrchestrator" as O
+participant "FreshnessAgent" as FA
+participant "BatchRepo" as BR
+participant "ForecastRepo" as FR
+participant "InventoryRepo /\nStoreProductRepo" as IR
+participant "TransferDecision\nEngine" as TE
+participant "MarkdownRules" as MR
+participant "RecommendationRepo\n/ TransferRepo" as REPO
+participant "AgentRunLogger" as LOG
+
+O -> FA : run(ctx)
+FA -> BR : get_expiring(store_ids: list[UUID], within_days: int = params.expiry_window_days (14))\n→ list[Batch] ordered by (store_id, product_id, expiry_date ASC)
+FA -> FR : get_by_run(run_id) → dict[(store_id, product_id), Forecast]
+loop for (store_id, product_id), batches in group_by_store_product(batches)
+  FA -> FA : qty_ahead: int = 0   (stock that sells first under FEFO)
+  loop for batch in batches (earliest expiry first)
+    FA -> FA : days_left = (batch.expiry_date − ctx.run_date).days
+    FA -> FA : sellable = forecast.daily_demand × days_left − qty_ahead
+    FA -> FA : at_risk = max(0, batch.qty − max(0, floor(sellable)))
+    FA -> FA : qty_ahead += batch.qty
+    opt at_risk > 0
+      FA -> IR : get_store_states(product_id, ctx.store_ids) → list[StoreState]
+      FA -> TE : find_expiry_receivers(product_id: UUID, qty: int = at_risk, days_left: int,\n from_store: UUID = store_id, states: list[StoreState], routes) → list[TransferProposal]
+      note right of TE
+        receiver must: have a route with transit_days < days_left,
+        and forecast_demand × (days_left − transit_days) ≥ qty
+        (it can sell the batch before expiry)
+      end note
+      alt receivers found
+        loop for t in receivers
+          FA -> REPO : RecommendationRepo.insert(Recommendation(rec_type="TRANSFER", store_id=t.to_store,\n qty=t.qty, evidence={batch_id, expiry_date, days_left, at_risk})) → rec_id
+          FA -> REPO : TransferRepo.insert(TransferOrder(from_store_id=store_id, to_store_id=t.to_store,\n batch_id=batch.batch_id, qty=t.qty, is_expiry_aware=True, status="PROPOSED")) → transfer_id
+          FA -> FA : at_risk −= t.qty
+        end
+      end
+      opt at_risk > 0 AND params.markdown_enabled (extension)
+        FA -> MR : recommend(days_left: int, at_risk: int, unit_margin: Decimal, rules: list[MarkdownRule]) → MarkdownAction(discount_pct: int, bundle_with: Optional[UUID])
+        FA -> REPO : RecommendationRepo.insert(Recommendation(rec_type="MARKDOWN", store_id, product_id,\n qty=at_risk, evidence={batch_id, days_left, discount_pct})) → rec_id
+      end
+      opt at_risk > 0 AND not markdown_enabled
+        FA -> REPO : RecommendationRepo.insert(Recommendation(rec_type="EXPIRY_ALERT", qty=at_risk, …)) → rec_id
+      end
+    end
+  end
+end
+FA -> LOG : log_tool_call(run_id, "expiry_scan", {"batches": n}, f"{transfers} transfers, {markdowns} markdowns", duration_ms, "OK")
+FA --> O : AgentResult(status=SUCCESS, outputs={…}, step_count)
+@enduml

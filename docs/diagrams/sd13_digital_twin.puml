@@ -1,0 +1,56 @@
+@startuml
+!include style.iuml
+title SD-13 v3  3D Digital Twin Load and Interaction (later extension – built after SD-15 2D view)\n<size:11>GET /api/v1/stores/{store_id}/twin  ·  react-three-fiber</size>
+autonumber "<b>00"
+actor "User" as U
+participant "DigitalTwinPage" as P
+participant "StoreScene /\nShelfInstances" as SC
+participant "DigitalTwinRouter\n(FastAPI)" as API
+participant "DigitalTwinService" as DT
+participant "CacheService" as CS
+participant "LayoutRepo /\nInventoryRepo /\nBatchRepo /\nRecommendationRepo" as REPO
+
+U -> P : open store in 3D
+P -> P : useStoreTwin(storeId: string) → useQuery({queryKey: ["twin", storeId],\n queryFn: () => apiClient.getStoreTwin({storeId}), staleTime: 300_000})
+P -> API : GET /api/v1/stores/{store_id}/twin
+API -> API : get_store_twin(store_id: UUID, user: User = Depends(get_current_user)) → StoreTwinDTO
+alt user.role == "STORE_SUPERVISOR" AND store_id != user.store_id
+  API --> P : 403
+end
+API -> DT : get_shelf_states(store_id: UUID) → StoreTwinDTO
+DT -> CS : get(key("twin", latest_run_id, store_id)) → Optional[str]
+alt hit
+  DT -> DT : StoreTwinDTO.model_validate_json(cached)
+else miss
+  DT -> REPO : LayoutRepo.get_active_layout(store_id) → StoreLayout + list[ShelfLocation]
+  alt no layout for store
+    DT --> API : raise NotFound → 404 "layout not configured"
+  end
+  DT -> REPO : InventoryRepo.get_positions([store_id]) → dict[product_id, InventoryPosition]
+  DT -> REPO : BatchRepo.get_expiring([store_id], within_days=7) → list[Batch]
+  DT -> REPO : RecommendationRepo.get_pending(store_id) → dict[product_id, rec_id]
+  loop for shelf in shelves
+    DT -> DT : status = _shelf_status(pos: InventoryPosition, sp: StoreProduct, near_expiry: bool) → ShelfStatus
+    note right of DT
+      OUT          if shelf_qty == 0
+      NEAR_EXPIRY  if a batch on this shelf expires ≤ 7 days
+      LOW          if shelf_qty < min_display_qty
+      IN_STOCK     otherwise
+    end note
+    DT -> DT : states.append(ShelfStateDTO(shelf_id, product_id, position=(x, y, z), rotation,\n status, on_hand, days_of_cover, rec_id=pending.get(product_id)))
+  end
+  DT -> CS : set(key, dto.model_dump_json(), ttl=seconds_until_next_run())
+end
+DT --> API : StoreTwinDTO(layout, shelves: list[ShelfStateDTO])
+API --> P : 200 JSON
+P -> SC : <StoreScene layout={layout}> <ShelfInstances shelves={shelves} onSelect={setSelected} />
+SC -> SC : group shelves by status → one InstancedMesh per status colour;\n setMatrixAt(i, matrix(position, rotation)); instanceMatrix.needsUpdate = true
+SC --> U : interactive 3D store (OrbitControls)
+U -> SC : click shelf
+SC -> P : onSelect(shelfId: string) → setSelected(shelf)
+P -> P : render <ShelfTooltip shelf={selected} /> (product, on_hand, days_of_cover, status)
+opt selected.recId
+  U -> P : "Open recommendation"
+  P -> P : navigate(`/recommendations/${selected.recId}`) → RecommendationDetailPage (approval as SD-10)
+end
+@enduml

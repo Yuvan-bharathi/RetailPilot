@@ -1,0 +1,114 @@
+@startuml
+!include style.iuml
+skinparam linetype ortho
+title CD-4 v3  Frontend Structure (React + TypeScript; Digital Twin with react-three-fiber / three.js)
+hide empty fields
+
+package "Core" {
+  class App {
+    routes, layout
+  }
+  class AuthProvider {
+    user: User
+    role: Role
+  }
+  class ApiClient {
+    generated from FastAPI OpenAPI spec
+  }
+  class QueryHooks {
+    useDashboard()
+    useRecommendations()
+    useRecommendation(id)
+    usePurchaseOrders()
+    useTransfers()
+    useAgentRuns()
+    useStoreInventory(storeId, filters)
+    useStoreTwin(storeId) <<ext>>
+    useApprove()
+  }
+}
+
+package "Pages" {
+  class DashboardPage
+  class StoreViewPage
+  class RecommendationsInboxPage
+  class RecommendationDetailPage
+  class StoreInventoryPage {
+    2D: available, shelf min, backroom,
+    near-expiry, stockout risk, pending transfers
+  }
+  class TrackingPage
+  class ObservabilityPage
+  class RunDetailPage
+  class SettingsPage
+  class DigitalTwinPage <<Extension>>
+}
+
+package "Shared components" {
+  class KpiCard
+  class EvidencePanel {
+    shows forecast, own requirement,
+    surplus, transfer-vs-PO comparison
+  }
+  class ApprovalPanel {
+    approve / edit qty / reject + reason
+  }
+  class RunTraceTimeline
+}
+
+package "3D digital twin components (later extension, after 2D view)" {
+  class StoreScene <<Extension>> {
+    R3F <Canvas>, camera, lights, OrbitControls
+  }
+  class ShelfInstances <<Extension>> {
+    InstancedMesh per status
+    color by ShelfStatus
+  }
+  class ShelfTooltip <<Extension>>
+  class TwinLegend <<Extension>>
+}
+
+package "TypeScript types (generated)" {
+  class RecommendationDTO
+  class PurchaseOrderDTO
+  class TransferOrderDTO
+  class AgentRunDTO
+  class ShelfStateDTO <<Extension>> {
+    shelfId, productId, position,
+    status: IN_STOCK|LOW|OUT|NEAR_EXPIRY,
+    recId?
+  }
+}
+
+App --> AuthProvider
+App --> DashboardPage
+App --> StoreViewPage
+App --> StoreInventoryPage
+App --> RecommendationsInboxPage
+App --> TrackingPage
+App --> ObservabilityPage
+App --> SettingsPage
+App --> DigitalTwinPage
+RecommendationsInboxPage --> RecommendationDetailPage
+RecommendationDetailPage --> EvidencePanel
+RecommendationDetailPage --> ApprovalPanel
+ObservabilityPage --> RunDetailPage
+RunDetailPage --> RunTraceTimeline
+DashboardPage --> KpiCard
+DigitalTwinPage --> StoreScene
+StoreScene --> ShelfInstances
+StoreScene --> ShelfTooltip
+DigitalTwinPage --> TwinLegend
+ShelfTooltip ..> RecommendationDetailPage : opens
+QueryHooks --> ApiClient
+DashboardPage ..> QueryHooks
+RecommendationsInboxPage ..> QueryHooks
+DigitalTwinPage ..> QueryHooks
+ApiClient ..> RecommendationDTO
+ApiClient ..> PurchaseOrderDTO
+ApiClient ..> TransferOrderDTO
+ApiClient ..> AgentRunDTO
+ApiClient ..> ShelfStateDTO
+App -[hidden]down- KpiCard
+AuthProvider -[hidden]down- StoreScene
+@enduml

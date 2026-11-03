@@ -1,0 +1,48 @@
+@startuml
+!include style.iuml
+title SD-04 v3  DemandForecastingAgent.run(ctx: RunContext) → AgentResult\n<size:11>ABC-XYZ classification, baseline forecast, statsforecast models (extension)</size>
+autonumber "<b>00"
+participant "WorkflowOrchestrator" as O
+participant "DemandForecasting\nAgent" as DF
+participant "SalesRepo" as SR
+participant "CalendarRepo" as CR
+participant "ForecastTools" as FT
+participant "StoreProductRepo" as SPR
+participant "ForecastRepo" as FR
+participant "AgentRunLogger" as LOG
+
+O -> DF : run(ctx)
+DF -> SR : get_daily_series(store_ids: list[UUID], lookback_days: int = 180) → DataFrame[unique_id, ds, y, revenue]\n(unique_id = f"{store_id}:{product_id}", zero-filled days)
+DF -> FT : classify_abc_xyz(series: DataFrame, value_col: str = "revenue",\n a_cut: float = 0.8, b_cut: float = 0.95, x_cv: float = 0.5, y_cv: float = 1.0) → DataFrame[unique_id, abc, xyz, cv, adi]
+note right of FT
+  ABC: cumulative revenue share per store (A ≤ 80%, B ≤ 95%, C rest)
+  XYZ: coefficient of variation of daily units (X < 0.5, Y < 1.0, Z ≥ 1.0)
+  ADI: average interval between non-zero sales days
+end note
+DF -> SPR : update_classes(classes: DataFrame) → int
+DF -> SPR : get_windows(store_ids) → DataFrame[store_id, product_id, lead_time_days, review_period_days, safety_stock_days]\n(lead time from SupplierStoreTerms of the supplier serving that store)
+DF -> DF : horizon = max(lead_time_days + review_period_days + safety_stock_days)\n (never below params.horizon_days)
+DF -> CR : get_events(regions: list[str], start: date = run_date, end: date = run_date + horizon) → list[CalendarEvent]
+DF -> DF : groups = split by pattern:\n smooth (adi < 1.32), intermittent (adi ≥ 1.32)
+loop for group_name, group_df in groups
+  alt ctx.params.use_statsforecast == True (extension) AND len(history) ≥ params.min_history_days (56)
+    alt group_name == "intermittent"
+      DF -> FT : fit_statsforecast(df=group_df, models=[CrostonOptimized(), TSB(alpha_d=0.2, alpha_p=0.2), IMAPA()],\n horizon=horizon, n_windows=3) → DataFrame[unique_id, model, daily_demand, wmape]
+    else "smooth"
+      DF -> FT : fit_statsforecast(df=group_df, models=[AutoETS(season_length=7)], horizon, n_windows=3) → DataFrame
+    end
+    DF -> FT : select_best(cv_results: DataFrame, baseline: DataFrame) → DataFrame\n(model replaces baseline only where wmape is lower)
+  else baseline (PoC default)
+    DF -> FT : baseline_avg_daily(df=group_df, window_days: int = 28) → DataFrame[unique_id, daily_demand]\n(method = "BASELINE")
+  end
+end
+opt ctx.params.use_calendar_uplift == True (extension)
+  DF -> FT : apply_calendar_uplift(forecast: DataFrame, events: list[CalendarEvent], uplift_by_type: dict[str, float]) → DataFrame
+end
+loop for (store_id, product_id) in ctx.stale_skus
+  DF -> DF : forecast.loc[(store_id, product_id), "confidence"] = "LOW"
+end
+DF -> FR : bulk_insert(run_id: UUID, rows: list[Forecast]) → int
+DF -> LOG : log_tool_call(run_id, "fit/baseline", {"series": n, "models": used}, "mean WMAPE by class", duration_ms, "OK")
+DF --> O : AgentResult(status=SUCCESS, outputs={"forecasts": n, "low_confidence": k}, step_count)
+@enduml

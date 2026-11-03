@@ -1,0 +1,58 @@
+@startuml
+!include style.iuml
+title SD-01 v3  Nightly Run Orchestration\n<size:11>tasks.py · orchestrator.py</size>
+autonumber "<b>00"
+participant "Celery Beat\n(scheduler)" as SCH
+participant "Celery Worker\ntasks.nightly_run_task" as W
+participant "WorkflowOrchestrator" as O
+participant "RunRepo" as RUN
+participant "AgentRunLogger" as LOG
+participant "DataIngestionService" as ING
+participant "agent: BaseAgent\n(6 agents in order)" as AG
+participant "MaterializedView\nRefresher" as MV
+participant "CacheService" as CS
+
+SCH -> W : beat_schedule["nightly-run"]: crontab(hour=23, minute=30)\n→ nightly_run_task.delay(run_date: date = today())
+W -> RUN : get_running(run_date: date) → Optional[RunRecord]
+break a run for run_date is already RUNNING
+  W --> SCH : skip (idempotency guard)
+end
+W -> W : run_id: UUID = uuid4()
+W -> O : run_nightly(run_id: UUID, run_date: date) → RunSummary
+O -> LOG : start_run(agent_name="nightly", parent_run_id=None,\n input_ref={"run_date": run_date}) → run_id
+O -> RUN : get_active_store_ids() → list[UUID]
+O -> ING : load_and_validate(run_date: date, store_ids: list[UUID]) → ValidationReport
+ref over ING : SD-02 Data Ingestion & Validation
+O -> O : ctx = RunContext(run_id, run_date, store_ids,\n stale_skus=report.stale_skus, params=RunParams.load(), logger=LOG)
+loop for agent in AGENT_SEQUENCE = [SalesAnalyticsAgent, DemandForecastingAgent,\n RelatedProductAgent, StockBalancingAgent, FreshnessAgent, PurchaseOrderAgent]
+  O -> O : _run_agent(agent: BaseAgent, ctx: RunContext) → AgentResult
+  O -> LOG : start_run(agent.name, parent_run_id=run_id, input_ref=ctx.summary()) → child_run_id: UUID
+  loop attempt in range(1, MAX_RETRIES + 1)   (MAX_RETRIES = 2)
+    O -> AG : run(ctx.with_run(child_run_id)) → AgentResult
+    ref over AG : SD-03 … SD-09
+    alt result.status == SUCCESS
+      O -> O : break retry loop
+    else raises TransientError (DB timeout, LLM 5xx)
+      O -> O : sleep(backoff_s * attempt); continue
+    else result.step_count > ctx.params.max_steps
+      O -> O : status = FAILED, error = "step limit exceeded"; break
+    end
+  end
+  O -> LOG : finish_run(child_run_id, status, output_summary=result.summary(),\n error=result.error) → None
+  alt status == FAILED and agent.critical == True\n(DemandForecasting, StockBalancing, PurchaseOrder)
+    O -> LOG : finish_run(run_id, status=FAILED, error=f"{agent.name} failed")
+    O --> W : RunSummary(status=FAILED)\n(no cache swap: users keep yesterday's results)
+  else status == FAILED and agent.critical == False
+    O -> O : overall_status = PARTIAL; continue with next agent
+  end
+end
+O -> MV : refresh_dashboard_views() → None\n(REFRESH MATERIALIZED VIEW CONCURRENTLY mv_dashboard_store_day, mv_inbox_counts)
+O -> RUN : set_latest_success(run_id: UUID) → prev_run_id: Optional[UUID]
+O -> CS : set_latest_run_id(run_id: UUID) → None
+O -> CS : warm(run_id: UUID, store_ids: list[UUID]) → int (keys written)
+opt prev_run_id is not None
+  O -> CS : invalidate_run(prev_run_id: UUID) → int (keys deleted, SCAN "*:{prev_run_id}:*")
+end
+O -> LOG : finish_run(run_id, status=overall_status, output_summary=summary)
+O --> W : RunSummary(run_id, status, recommendations_count, po_count, duration_s)
+@enduml

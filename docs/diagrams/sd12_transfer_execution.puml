@@ -1,0 +1,87 @@
+@startuml
+!include style.iuml
+title SD-12 v3  Transfer Workflow: Accept → Approve Release → Re-check → Dispatch → Receive → Ledger\n<size:11>TransferRouter · TransferService · InventoryLedgerService</size>
+autonumber "<b>00"
+actor "Destination Store\nSupervisor" as DST
+actor "Donor Store\nSupervisor" as DON
+participant "React UI" as UI
+participant "TransferRouter\n(FastAPI)" as API
+participant "TransferService" as TS
+participant "TransferRepo" as TR
+participant "Requirement\nCalculator" as RC
+participant "InventoryRepo /\nBatchRepo" as IR
+participant "InventoryLedger\nService" as LED
+participant "ApprovalRepo /\nNeedRepo" as AR
+participant "CacheService" as CS
+
+== 1. Destination accepts the proposed requirement ==
+DST -> UI : Accept incoming transfer
+UI -> API : POST /api/v1/transfers/{id}/accept
+API -> TS : accept(transfer_id: UUID, user: User) → TransferOrder
+TS -> TR : get_for_update(transfer_id) → t
+alt t.status != "PROPOSED"
+  TS --> API : 409
+else user.store_id != t.to_store_id
+  TS --> API : 403
+end
+TS -> AR : ApprovalRepo.insert(Approval(entity_type="TRANSFER", level="DEST", store_id=t.to_store_id, decision="APPROVED"))
+TS -> TR : set_status(id, "DEST_ACCEPTED", dest_accepted_by=user.user_id)
+opt destination rejects instead (POST /reject with reason)
+  TS -> TR : set_status(id, "REJECTED"); need re-evaluated next run
+end
+
+== 2. Donor approves release of surplus  +  3. System re-checks ==
+DON -> UI : Approve release
+UI -> API : POST /api/v1/transfers/{id}/approve-release
+API -> TS : approve_release(transfer_id: UUID, user: User) → TransferOrder
+TS -> TR : get_for_update(transfer_id) → t
+alt t.status != "DEST_ACCEPTED"
+  TS --> API : 409
+else user.store_id != t.from_store_id
+  TS --> API : 403
+end
+TS -> IR : get_position_for_update(t.from_store_id, t.product_id) → pos
+alt t.is_expiry_aware
+  TS -> IR : BatchRepo.get(t.batch_id) → batch
+  TS -> TS : valid = batch.qty ≥ t.qty AND batch.expiry_date > today + t.transit_days
+else surplus transfer
+  TS -> RC : own_requirement(latest forecast, donor lead time, review period, safety days, min_display_qty) → req
+  TS -> RC : surplus(available=RC.available(pos.shelf_qty, pos.backroom_qty, pos.incoming, pos.reserved), requirement=req) → sur
+  TS -> TS : valid = sur ≥ t.qty   (donor protection with today's stock)
+end
+alt valid
+  TS -> IR : reserve(t.from_store_id, t.product_id, qty=t.qty)
+  TS -> AR : ApprovalRepo.insert(Approval(level="DONOR", store_id=t.from_store_id, decision="APPROVED"))
+  TS -> TR : set_status(id, "DONOR_APPROVED", donor_approved_by=user.user_id)
+else no longer valid
+  TS -> TR : set_status(id, "CANCELLED", reason="surplus no longer available")
+  TS -> AR : NeedRepo.carry_forward(store_id=t.to_store_id, product_id, qty=t.qty, reason="TRANSFER_CANCELLED")
+end
+
+== 4. Dispatch ==
+DON -> UI : Mark dispatched
+UI -> API : POST /api/v1/transfers/{id}/dispatch
+API -> TS : dispatch(transfer_id: UUID, user: User) → TransferOrder
+TS -> TS : require t.status == "DONOR_APPROVED" (else 409) and user.store_id == t.from_store_id (else 403)
+TS -> LED : post([InventoryMovement(store=t.from_store_id, type="TRANSFER_OUT", qty=−t.qty,\n location="BACKROOM", batch_id=t.batch_id, reference_type="TRANSFER", reference_id=t.transfer_id, user_id)])
+TS -> IR : release_reserved(t.from_store_id, t.product_id, t.qty); in_transit_out += t.qty
+TS -> TR : set_status(id, "DISPATCHED", dispatched_at=now())
+
+== 5. Receiving supervisor confirms quantity  +  6. Ledger update ==
+DST -> UI : Enter received quantity
+UI -> API : POST /api/v1/transfers/{id}/receive {received_qty: int}
+API -> TS : receive(transfer_id: UUID, received_qty: int, user: User) → TransferOrder
+TS -> TS : require t.status == "DISPATCHED" (else 409) and user.store_id == t.to_store_id (else 403)
+TS -> LED : post([InventoryMovement(store=t.to_store_id, type="TRANSFER_IN", qty=+received_qty,\n location="BACKROOM", batch_id=t.batch_id, reference_type="TRANSFER", reference_id=t.transfer_id, user_id)])
+opt received_qty < t.qty
+  TS -> TR : record_discrepancy(transfer_id, expected=t.qty, received=received_qty,\n loss_value=(t.qty − received_qty) × unit_cost) → discrepancy_id
+  note right of TR : stock is already correct on both sides\n(donor −qty sent, receiver +qty received);\nthe difference is flagged for review as transit loss
+end
+opt t.batch_id
+  TS -> IR : BatchRepo.move(batch_id=t.batch_id, to_store=t.to_store_id, qty=received_qty)
+end
+TS -> IR : in_transit_out −= t.qty at donor
+TS -> TR : set_status(id, "RECEIVED", received_qty=received_qty, received_at=now())
+TS -> CS : invalidate_store_keys([t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"])
+TS --> API : TransferOrder
+@enduml

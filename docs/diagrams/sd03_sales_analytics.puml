@@ -1,0 +1,40 @@
+@startuml
+!include style.iuml
+title SD-03 v3  SalesAnalyticsAgent.run(ctx: RunContext) → AgentResult\n<size:11>KPIs and lost-sales estimation</size>
+autonumber "<b>00"
+participant "WorkflowOrchestrator" as O
+participant "SalesAnalyticsAgent" as SA
+participant "SalesRepo" as SR
+participant "InventoryRepo" as IR
+participant "ProductRepo" as PR
+participant "LostSalesCalculator" as LS
+participant "KpiRepo" as KR
+participant "AgentRunLogger" as LOG
+
+O -> SA : run(ctx)
+SA -> SA : start = ctx.run_date − timedelta(days=ctx.params.kpi_lookback_days)  (default 28)
+SA -> SR : get_daily_sales(store_ids: list[UUID], start: date, end: date) → DataFrame[store_id, product_id, day, units, revenue]
+SA -> IR : get_stockout_days(store_ids: list[UUID], start: date, end: date) → DataFrame[store_id, product_id, day]\n(day where closing on_hand == 0)
+SA -> PR : get_unit_margins(product_ids: list[UUID]) → DataFrame[product_id, unit_margin]\n(selling_price − cost_price)
+SA -> LS : estimate(daily_sales: DataFrame, stockout_days: DataFrame, margins: DataFrame) → DataFrame
+note right of LS
+  for each (store, product):
+    demand_rate = mean(units on in-stock days)
+    lost_units  = demand_rate × count(stockout days)
+    lost_revenue = lost_units × selling_price
+    lost_profit  = lost_units × unit_gross_margin
+    (two separate KPIs)
+  if in-stock days < 7 → confidence = "LOW"
+end note
+LS --> SA : DataFrame[store_id, product_id, lost_units, lost_revenue, lost_profit, confidence]
+SA -> SA : kpis = compute_kpis(daily_sales, stockout_days)\n→ revenue, gross_profit, margin_pct, stockout_rate, fast/slow movers (top/bottom 20% by units)
+loop for anomaly check per store
+  opt abs(today_revenue − mean_28d) > 3 × std_28d
+    SA -> LOG : log_evidence(run_id, None, {"store_id", "revenue", "z_score"}, "ANOMALY")
+  end
+end
+SA -> KR : save_kpis(run_id: UUID, kpis: list[KpiSnapshot]) → int
+SA -> KR : save_lost_sales(run_id: UUID, rows: DataFrame) → int
+SA -> LOG : log_tool_call(run_id, "LostSalesCalculator.estimate", {"rows": n}, summary, duration_ms, "OK")
+SA --> O : AgentResult(status=SUCCESS, outputs={"kpis": n_kpis, "lost_sales_rows": n}, step_count=5)
+@enduml

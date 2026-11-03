@@ -1,0 +1,42 @@
+@startuml
+!include style.iuml
+title SD-15  2D Store Inventory View (PoC core)\n<size:11>GET /api/v1/stores/{store_id}/inventory  ·  StoreInventoryService.get_view(store_id, filters) → StoreInventoryDTO</size>
+autonumber "<b>00"
+actor "Store Supervisor /\nSuper Admin" as U
+participant "StoreInventoryPage\n(React)" as P
+participant "StoreInventoryRouter\n(FastAPI)" as API
+participant "StoreInventoryService" as SIS
+participant "CacheService" as CS
+participant "InventoryRepo /\nStoreProductRepo /\nBatchRepo /\nTransferRepo /\nForecastRepo" as REPO
+
+U -> P : open Store Inventory (category, status, aisle filters)
+P -> P : useStoreInventory(storeId: string, filters: InventoryFilter) →\n useQuery({queryKey: ["inv", storeId, filters], queryFn: () => apiClient.getStoreInventory({storeId, ...filters}), staleTime: 60_000})
+P -> API : GET /api/v1/stores/{store_id}/inventory?category=&status=&aisle=
+API -> API : get_store_inventory(store_id: UUID, filters: InventoryFilter, user: User = Depends(get_current_user))
+alt user.role == "STORE_SUPERVISOR" AND store_id != user.store_id
+  API --> P : 403
+end
+API -> SIS : get_view(store_id: UUID, filters: InventoryFilter) → StoreInventoryDTO
+SIS -> CS : get(key("inv", latest_run_id, store_id)) → Optional[str]
+alt hit
+  SIS -> SIS : rows = StoreInventoryDTO.model_validate_json(cached).rows
+else miss
+  SIS -> REPO : InventoryRepo.get_positions([store_id]) → dict[product_id, InventoryPosition]
+  SIS -> REPO : StoreProductRepo.get_rules([store_id]) → dict[product_id, StoreProduct]
+  SIS -> REPO : ForecastRepo.get_latest(store_id) → dict[product_id, Forecast]
+  SIS -> REPO : BatchRepo.get_expiring([store_id], within_days=7) → list[Batch]
+  SIS -> REPO : TransferRepo.get_open(store_id) → list[TransferOrder]  (incoming and outgoing, not RECEIVED)
+  loop for product_id in positions
+    SIS -> SIS : available = shelf_qty + backroom_qty + incoming − reserved
+    SIS -> SIS : days_of_cover = available / max(daily_demand, 0.01)
+    SIS -> SIS : risk = "HIGH" if days_of_cover < lead_time_days else "MEDIUM" if < lead_time_days + review_period_days else "LOW"
+    SIS -> SIS : flags: shelf_below_min = shelf_qty < min_display_qty;\n refill_from_backroom = shelf_below_min and backroom_qty > 0
+    SIS -> SIS : rows.append(InventoryRowDTO(product_id, available, shelf_qty, min_display_qty, backroom_qty,\n near_expiry_qty, stockout_risk=risk, pending_transfer_in, pending_transfer_out, refill_from_backroom))
+  end
+  SIS -> CS : set(key, dto.model_dump_json(), ttl=seconds_until_next_run())
+end
+SIS -> SIS : apply filters (category, status, aisle) and sort by stockout_risk, days_of_cover
+SIS --> API : StoreInventoryDTO(rows: list[InventoryRowDTO], totals)
+API --> P : 200 JSON
+P --> U : table with status chips; row click → product detail (recommendations, transfers, batches)
+@enduml
