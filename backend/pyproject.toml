@@ -33,6 +33,7 @@ dev = [
     "factory-boy>=3.3",
     "pandas-stubs>=2.2",
     "celery-types>=0.22",
+    "hypothesis>=6.100",
 ]
 
 [build-system]

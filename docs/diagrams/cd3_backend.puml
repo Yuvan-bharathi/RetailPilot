@@ -150,7 +150,7 @@ package "Deterministic tools (unit-tested)" {
   class TransferDecisionEngine {
     +decide(product_id: UUID, states: list[StoreState], routes: dict, cost_inputs: CostInputs): TransferPlan
     +find_expiry_receivers(product_id: UUID, qty: int, days_left: int, from_store: UUID, states: list[StoreState], routes: dict): list[TransferProposal]
-    -_priority(state: StoreState): str
+    -_priority(state: StoreState, lead_time_days: int): str
   }
   class CostModel {
     +transfer_incremental_cost(route: TransferRoute, qty: int): Decimal

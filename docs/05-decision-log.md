@@ -9,6 +9,7 @@ choose silently.
 |---|---|---|
 | D-01 … D-12 | 2026-11-03 | Product owner (Phase 0 review) |
 | D-13 … D-17 | 2026-11-03 | Product owner (review of the D-01 … D-12 interpretations) |
+| D-18 … D-26 | 2026-11-03 | Product owner (Phase 1 acceptance, Phase 3 approval) |
 
 ---
 
@@ -175,3 +176,82 @@ passes:
    that get a PO need during pass 2 are marked too.
 Results are therefore deterministic for the same input.
 **Changed.** Spec §1; SD-06, SD-07.
+
+---
+
+## D-18 Additional error codes
+**Decision.** The standard error body (spec §5) also uses `UNAUTHORIZED` (401, missing/invalid credentials) and
+`INTERNAL` (500, unhandled error; no internal details are returned).
+**Changed.** Spec §5.
+
+## D-19 Tool inputs: protocols and DraftPO
+**Decision.** `app/tools` never imports ORM models. Parameters that the spec types as ORM models
+(`TransferRoute`, `SupplierStoreTerms`, `PurchaseOrder`, `POLine`, `Batch`) are typed as read-only
+`Protocol`s in `app/tools/types.py`, so ORM objects (Phase 2) and plain dataclasses both satisfy them.
+`POBuilder.apply_edits` and `POBuilder.split` operate on the tool dataclass `DraftPO`; services convert
+ORM ↔ `DraftPO`. Tool-side value types (`StoreState`, `CostInputs`, `TransferPlan`, …) are frozen dataclasses;
+`StoreState.surplus` and `.days_of_cover` are derived properties so they can never disagree with
+`available` / `requirement`.
+**Changed.** Spec §8 note.
+
+## D-20 FEFO helper
+**Decision.** New pure function `FreshnessTools.at_risk_by_batch(batches, daily_demand, run_date)` implementing the
+spec §1 FEFO formula; used by the Freshness Agent (SD-08).
+**Changed.** Spec §8.
+
+## D-21 Lost sales: censored demand
+**Decision.** A **stockout day** is a day with `closing_on_hand = 0` — this includes days that opened with stock
+> 0 and sold out (censored demand). Stockout days are **excluded** from the demand-rate average; in-stock days
+with zero sales are **included**. `lost_units = demand_rate × stockout_days`. Confidence is `LOW` when there are
+fewer than 7 in-stock days. `estimate()` expects `daily_sales` zero-filled for the window and `margins` with
+`selling_price` and `unit_margin` per product.
+**Changed.** Spec §1, §8.
+
+## D-22 Analytics defaults
+**Decision (approved).**
+- ABC is computed **per store**. XYZ uses the coefficient of variation of daily units over all days in the
+  window (population std; mean 0 → Z).
+- Substitutes: B's "normal level" is B's mean daily units on days A was in stock; A must have **≥ 3 stockout days**
+  (`min_stockout_days = 3`) before B can be flagged.
+- Assortment gap: a rule X→Y with lift ≥ `min_lift` that holds in ≥ `min_stores` stores suggests Y to every
+  store that lists X but not Y.
+
+**Implementation choices (Phase 3, to confirm).**
+- ABC: an item is A while the cumulative value share **before** it is < `a_cut` (so the top item is always A),
+  B while < `b_cut`, else C. Ties ordered by id.
+- ADI = days in window / days with non-zero sales (∞ when no sales).
+- `baseline_avg_daily`: mean of daily units over the last `window_days` days present in the zero-filled series.
+- `mine_rules` keeps rules with lift **>** `min_lift` (requirements §5.4 "lift greater than 1"); the
+  co-replenishment and assortment-gap filters use **≥** 1.5 (scenario 4 "lift ≥ 1.5").
+- `clean_bills` drops return and voided lines, **whole bills** containing a line above `max_qty_per_line`
+  (bulk/wholesale bills), and promotion-day lines when `exclude_promo_days`.
+- `find_expiry_receivers` allocates the at-risk qty greedily to receivers with the largest sell-before-expiry
+  capacity `floor(daily_demand × (days_left − transit_days))` (ties by store id), so a batch may be split.
+- `select_supplier`: eligibility uses days from the need's run date to `required_by`; the preferred supplier
+  wins if eligible (D-07), else lowest price → shorter lead time → supplier id.
+- `prioritise_within_budget`: lines ordered HIGH before NORMAL, then ABC A→B→C→unclassified, then store and
+  product id; greedily kept while they fit the budget (a line that does not fit is skipped, later smaller lines
+  may still fit).
+**Changed.** Spec §8 notes.
+
+## D-23 Numeric rules
+**Decision.** Products of demand and days are rounded to **6 decimals before `ceil()` / `floor()`**
+(e.g. `0.1 × 30 = 3.0000000000000004` must give 3, not 4). Money is `Decimal`, rounded `ROUND_HALF_UP` to
+0.01 **only at outputs** (evidence, DTOs, stored values); cost comparisons use unrounded values.
+**Changed.** Spec §1.
+
+## D-24 `_priority` signature
+**Decision.** `TransferDecisionEngine._priority(state, lead_time_days)` = `"HIGH"` if
+`state.days_of_cover < lead_time_days` else `"NORMAL"` (SD-07). CD-3 corrected to match.
+**Changed.** CD-3.
+
+## D-25 Property-based tests for the transfer engine
+**Decision.** `hypothesis` is a dev dependency. `TransferDecisionEngine.decide` is property-tested for:
+no donor ends below its own requirement; for each short store transferred qty + PO qty = need; transfers only
+from stores with surplus > 0; no transfers when no store has surplus; shuffled store order gives identical
+results (and, for the two-pass agent step, shuffled product order).
+**Changed.** CLAUDE.md test conventions unchanged; tests in `backend/tests/unit/tools/`.
+
+## D-26 pandas 3.1 with mlxtend
+**Finding.** mlxtend 0.25 `fpgrowth` + `association_rules(num_itemsets=…)` run on pandas 3.1 without warnings.
+No pin needed.

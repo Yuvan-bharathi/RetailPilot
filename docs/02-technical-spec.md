@@ -55,7 +55,12 @@ incoming  (D-03) = Σ qty of transfers to the store in DEST_ACCEPTED | DONOR_APP
                  + Σ open qty of PO lines APPROVED | EDITED on POs APPROVED | SUBMITTED (until goods receipt)
 reserved  (D-03) = Σ qty of transfers from the store in DEST_ACCEPTED | DONOR_APPROVED (soft reservation)
 
-lost_units   = demand rate on in-stock days × stockout_days
+numeric rules (D-23): demand × days is rounded to 6 decimals before ceil()/floor();
+   money is Decimal, ROUND_HALF_UP to 0.01 only at outputs; cost comparisons use unrounded values
+
+stockout day (D-21) = closing_on_hand = 0 (includes days that opened with stock and sold out — censored demand)
+demand rate          = mean daily units over in-stock days (zero-sale in-stock days included; stockout days excluded)
+lost_units   = demand rate on in-stock days × stockout_days     (confidence LOW if in-stock days < 7)
 lost_revenue = lost_units × selling_price
 lost_profit  = lost_units × (selling_price − cost_price)
 
@@ -167,7 +172,9 @@ Cross-store rule: a supervisor sees another store only as name + offered/request
 | GET/PUT /admin/business-rules | BusinessRuleRepo | – |
 | GET /stores/{store_id}/twin (later extension) | DigitalTwinService | SD-13 |
 
-Error body: `{"error": {"code": "CONFLICT|FORBIDDEN|NOT_FOUND|VALIDATION", "message": str, "details": []}}`.
+Error body: `{"error": {"code": "CONFLICT|FORBIDDEN|NOT_FOUND|VALIDATION|UNAUTHORIZED|INTERNAL", "message": str, "details": []}}`
+— 409 / 403 / 404 / 422 as listed, plus `UNAUTHORIZED` (401, missing or invalid token) and `INTERNAL`
+(500, unhandled error, no internal details) (D-18). `details` items are `{"field": str|null, "message": str}`.
 
 ## 6. Cache (Redis)
 Keys carry the run id: `{prefix}:{run_id}:{scope...}` with prefixes `dash`, `inbox`, `inv`, `twin`;
@@ -249,6 +256,14 @@ Critical agents (failure stops the run, no cache swap): DemandForecasting, Stock
 | PurchaseOrderService | close_short(po_id: UUID, reason: str, user: User) (Phase 6) | PurchaseOrder | – |
 | RequirementCalculator | planning_incoming(incoming_items: list[IncomingItem], on_order_pending: int, run_date: date, grace_days: int) | int | SD-06 |
 | TransferDecisionEngine | mark_po_pairs(states_by_product: dict, terms) (pass 1) | set[tuple[UUID, UUID]] | SD-06, SD-07 |
+| TransferDecisionEngine | _priority(state: StoreState, lead_time_days: int) | "HIGH" \| "NORMAL" | SD-07 |
+| FreshnessTools | at_risk_by_batch(batches: Sequence[BatchLike], daily_demand: float, run_date: date) (D-20) | list[BatchRisk] | SD-08 |
+| BasketTools | detect_substitutes(…, min_stockout_days: int = 3) — extra parameter (D-22) | DataFrame | SD-05 |
+
+Tool parameters typed as ORM models in this table (TransferRoute, SupplierStoreTerms, PurchaseOrder, POLine, Batch)
+are read-only `Protocol`s in `app/tools/types.py`; `apply_edits` and `split` take and return `DraftPO` (D-19).
+Defaults for ABC/XYZ, ADI, baseline, rule filtering, bill cleaning, expiry receivers, supplier choice and budget
+trimming are recorded in decision D-22.
 | NotificationService | notify(role: Role\|None, store_id: UUID\|None, message: str, link: str\|None) / list_for(user) / mark_read(id, user) | Notification / list / None | SD-14 |
 | BasketTools | clean_bills(lines: DataFrame, rules: BasketQualityRules) | DataFrame | SD-05 |
 | InventoryLedgerService | post(movements: list[InventoryMovement]) | None | SD-02, SD-12 |
