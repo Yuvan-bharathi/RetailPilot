@@ -60,6 +60,7 @@ numeric rules (D-23): demand × days is rounded to 6 decimals before ceil()/floo
 
 stockout day (D-21) = closing_on_hand = 0 (includes days that opened with stock and sold out — censored demand)
 demand rate          = mean daily units over in-stock days (zero-sale in-stock days included; stockout days excluded)
+baseline forecast (D-30) = mean daily units over the in-stock days of the last window_days (stockout days excluded)
 lost_units   = demand rate on in-stock days × stockout_days     (confidence LOW if in-stock days < 7)
 lost_revenue = lost_units × selling_price
 lost_profit  = lost_units × (selling_price − cost_price)
@@ -204,7 +205,7 @@ Critical agents (failure stops the run, no cache swap): DemandForecasting, Stock
 | AgentRunLogger | finish_run(run_id, status, output_summary, error) | None | SD-01 |
 | LostSalesCalculator | estimate(daily_sales, stockout_days, margins: DataFrame) → lost_revenue, lost_profit | DataFrame | SD-03 |
 | ForecastTools | classify_abc_xyz(series, value_col='revenue', a_cut=0.8, b_cut=0.95, x_cv=0.5, y_cv=1.0) | DataFrame | SD-04 |
-| ForecastTools | baseline_avg_daily(df: DataFrame, window_days: int = 28) | DataFrame | SD-04 |
+| ForecastTools | baseline_avg_daily(df: DataFrame, window_days: int = 28) — df may carry is_stockout; stockout days excluded (D-30) | DataFrame[unique_id, daily_demand, method, in_stock_days] | SD-04 |
 | ForecastTools | fit_statsforecast(df, models: list, horizon: int, n_windows: int = 3)  [ext] | DataFrame | SD-04 |
 | ForecastTools | select_best(cv_results: DataFrame, baseline: DataFrame)  [ext] | DataFrame | SD-04 |
 | ForecastTools | apply_calendar_uplift(forecast, events, uplift_by_type: dict)  [ext] | DataFrame | SD-04 |

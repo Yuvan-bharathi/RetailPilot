@@ -11,6 +11,7 @@ choose silently.
 | D-13 … D-17 | 2026-11-03 | Product owner (review of the D-01 … D-12 interpretations) |
 | D-18 … D-26 | 2026-11-03 | Product owner (Phase 1 acceptance, Phase 3 approval) |
 | D-27 … D-29 | 2026-11-03 | Product owner (Phase 3 acceptance) |
+| D-30 | 2026-11-03 | Product owner (Phase 4a approval) |
 
 ---
 
@@ -281,3 +282,16 @@ does not fit is **reduced** to the largest pack-rounded qty ≥ MOQ (or exactly 
 budget; if none fits it is **skipped**, and the PO Agent creates a `Recommendation(REORDER, status NEEDS_REVIEW)`
 with reason `BUDGET` for each skipped line. The PO is flagged `BUDGET_TRIMMED` when anything was reduced or skipped.
 **Changed.** Spec §8; SD-09.
+
+---
+
+## D-30 Baseline forecast excludes stockout days
+**Decision.** `ForecastTools.baseline_avg_daily` averages **in-stock days only** within the last `window_days`.
+Stockout days use the D-21 definition — closing on-hand = 0, whether the day opened with stock and sold out
+(censored demand) or was out of stock all day — and are excluded, so stockouts do not pull the forecast down.
+Input gains an optional boolean `is_stockout` column (absent → every day in stock); output gains `in_stock_days`.
+With no in-stock day in the window the demand is 0.0 (the agent marks such forecasts LOW confidence).
+In the synthetic data, scenario products have constant daily demand in their last 28 days and no stockout days,
+so the planted demand equals the baseline exactly (one documented exception: Store C in scenario 3 must hold 0,
+so its last day closes at 0 — a stockout day — and is excluded; the remaining 27 days give the same constant).
+**Changed.** Spec §1, §8; SD-04.

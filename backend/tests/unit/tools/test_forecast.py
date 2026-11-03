@@ -80,10 +80,38 @@ def test_baseline_avg_daily_uses_the_last_window_days() -> None:
     assert baseline.loc["A:long", "daily_demand"] == 2.0
     assert baseline.loc["A:new", "daily_demand"] == 1.5
     assert set(baseline["method"]) == {"BASELINE"}
+    assert baseline.loc["A:long", "in_stock_days"] == 28  # no is_stockout column → every day in stock
+
+
+def test_baseline_excludes_stockout_and_censored_days() -> None:
+    # D-30: 26 normal days of 4 units; one censored day (opened with stock, sold 2, closed at 0) and one day
+    # out of stock all day. Both are stockout days and are excluded → 4.0 (not 106 / 28 = 3.79).
+    units = [4.0] * 26 + [2.0, 0.0]
+    rows = _series("A:p", units)
+    for row in rows[-2:]:
+        row["is_stockout"] = True
+    for row in rows[:-2]:
+        row["is_stockout"] = False
+
+    baseline = ForecastTools.baseline_avg_daily(pd.DataFrame(rows), window_days=28).set_index("unique_id")
+
+    assert baseline.loc["A:p", "daily_demand"] == 4.0
+    assert baseline.loc["A:p", "in_stock_days"] == 26
+
+
+def test_baseline_with_no_in_stock_day_in_the_window_is_zero() -> None:
+    rows = _series("A:p", [5.0] * 10 + [0.0] * 3)
+    for i, row in enumerate(rows):
+        row["is_stockout"] = i >= 10
+
+    baseline = ForecastTools.baseline_avg_daily(pd.DataFrame(rows), window_days=3).set_index("unique_id")
+
+    assert baseline.loc["A:p", "daily_demand"] == 0.0
+    assert baseline.loc["A:p", "in_stock_days"] == 0
 
 
 def test_baseline_avg_daily_empty_input() -> None:
     empty = ForecastTools.baseline_avg_daily(pd.DataFrame(columns=["unique_id", "ds", "y"]))
 
     assert empty.empty
-    assert list(empty.columns) == ["unique_id", "daily_demand", "method"]
+    assert list(empty.columns) == ["unique_id", "daily_demand", "method", "in_stock_days"]

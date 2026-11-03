@@ -33,7 +33,7 @@ loop for group_name, group_df in groups
     end
     DF -> FT : select_best(cv_results: DataFrame, baseline: DataFrame) → DataFrame\n(model replaces baseline only where wmape is lower)
   else baseline (PoC default)
-    DF -> FT : baseline_avg_daily(df=group_df, window_days: int = 28) → DataFrame[unique_id, daily_demand]\n(method = "BASELINE")
+    DF -> FT : baseline_avg_daily(df=group_df, window_days: int = 28) → DataFrame[unique_id, daily_demand, in_stock_days]\n(method = "BASELINE"; stockout days — closing on-hand 0 — excluded, D-30)
   end
 end
 opt ctx.params.use_calendar_uplift == True (extension)

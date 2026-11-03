@@ -8,7 +8,7 @@ import math
 import pandas as pd
 
 ABC_XYZ_COLUMNS = ["unique_id", "abc", "xyz", "cv", "adi"]
-BASELINE_COLUMNS = ["unique_id", "daily_demand", "method"]
+BASELINE_COLUMNS = ["unique_id", "daily_demand", "method", "in_stock_days"]
 
 
 def _store_of(unique_id: str) -> str:
@@ -62,10 +62,22 @@ class ForecastTools:
 
     @staticmethod
     def baseline_avg_daily(df: pd.DataFrame, window_days: int = 28) -> pd.DataFrame:
-        """Mean daily units over each series' last `window_days` days (zero-filled input). method = BASELINE."""
+        """Mean daily units over the in-stock days of each series' last `window_days` days (D-30).
+
+        df: [unique_id, ds, y] zero-filled, with an optional boolean `is_stockout` column marking stockout days
+        (closing on-hand = 0, including censored days that opened with stock — D-21). Stockout days are excluded
+        so they do not pull the forecast down; with no in-stock day in the window the demand is 0.0.
+        Without `is_stockout` every day counts as in stock. method = BASELINE.
+        """
         rows: list[dict[str, object]] = []
         for uid, group in df.groupby("unique_id", sort=True):
             dates = pd.to_datetime(group["ds"])
-            window = group.loc[dates > dates.max() - pd.Timedelta(days=window_days), "y"]
-            rows.append({"unique_id": uid, "daily_demand": float(window.mean()), "method": "BASELINE"})
+            in_window = dates > dates.max() - pd.Timedelta(days=window_days)
+            if "is_stockout" in group.columns:
+                in_window &= ~group["is_stockout"].astype(bool)
+            window = group.loc[in_window, "y"]
+            demand = float(window.mean()) if len(window) else 0.0
+            rows.append(
+                {"unique_id": uid, "daily_demand": demand, "method": "BASELINE", "in_stock_days": len(window)}
+            )
         return pd.DataFrame(rows, columns=BASELINE_COLUMNS)
