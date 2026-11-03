@@ -54,10 +54,11 @@ select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "N", "ASYNC"]
 ignore = [
     "RUF001", "RUF002", "RUF003",  # allow unicode (₹, ×, −) in strings/comments/docstrings
     "N818",  # exception names follow the spec (PermissionDenied, NotFound), not the *Error suffix
+    "E501",  # line length is enforced by `ruff format`; long comments/docstrings are allowed
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["N802"]
+"tests/**" = ["N802", "N814", "N817"]  # short aliases such as TE / RC in tests
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
@@ -82,6 +83,7 @@ warn_required_dynamic_aliases = true
 # --- Pytest -----------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-ra --import-mode=importlib"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
