@@ -295,3 +295,16 @@ In the synthetic data, scenario products have constant daily demand in their las
 so the planted demand equals the baseline exactly (one documented exception: Store C in scenario 3 must hold 0,
 so its last day closes at 0 — a stockout day — and is excluded; the remaining 27 days give the same constant).
 **Changed.** Spec §1, §8; SD-04.
+
+---
+
+## D-31 (PROPOSED — awaiting approval) FEFO at-risk formula counts only units actually sold
+**Finding (Phase 4a FEFO check).** The synthetic stock simulator depletes batches strictly FEFO and writes off
+whatever is left at expiry. Cross-checking its write-offs against `FreshnessTools.at_risk_by_batch` showed that
+the spec §1 formula overstates the risk of later batches whenever an earlier batch expires unsold: it adds the
+earlier batch's **full** qty to `qty_ahead`, but the expired units never consume selling days.
+Example (1 unit/day; batches 15 @ day 4, 20 @ day 8, 25 @ day 12): spec predicts 11 / 20 / 25 at risk;
+actual FEFO write-offs are 11 / 16 / 21.
+**Proposal.** `qty_ahead += batch.qty − at_risk` (only the units that sell). Matches the simulator for every
+tested demand rate. Scenario 5 is unaffected (single batch). Until approved, the spec formula stays and the
+cross-check test is a strict xfail referencing this entry.

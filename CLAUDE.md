@@ -87,7 +87,9 @@ infra/docker-compose.yml
 ## Commands
 - Infra: `docker compose -f infra/docker-compose.yml up -d`
 - Backend: `cd backend && uv sync` · `uv run alembic upgrade head` · `uv run uvicorn app.main:app --reload`
-- Tests: `cd backend && uv run pytest -q` · lint: `uv run ruff check . && uv run mypy app`
+- Tests: `cd backend && uv run pytest -q` · lint: `uv run ruff check --config pyproject.toml . ../data && uv run mypy`
+  (always pass `--config pyproject.toml` when ruff also checks `../data`: data/ has no config of its own, so
+  without it ruff falls back to its defaults; mypy already covers app/ and ../data via pyproject.toml)
 - Worker: `uv run celery -A app.workers.celery_app worker -B -l info`
 - Synthetic data (from the repo root): `uv run --project backend python -m data.synthetic.generate --scenarios all`
 - Frontend: `cd frontend && npm install && npm run dev` · types: `npm run gen:api` · checks: `npm run lint && npm run typecheck`
