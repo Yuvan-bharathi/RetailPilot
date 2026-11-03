@@ -50,8 +50,11 @@ loop for po in draft_pos
   alt result.ok
     PA -> PA : budget_remaining −= po.total_value
   else budget exceeded
-    PA -> PB : prioritise_within_budget(po: DraftPO, budget: Decimal) → DraftPO\n(keep lines by priority HIGH first, then ABC class A→C)
-    PA -> PA : po.flags.append("BUDGET_TRIMMED"); budget_remaining −= po.total_value
+    PA -> PB : prioritise_within_budget(po: DraftPO, budget: Decimal) → BudgetTrimResult(po, reduced, skipped)\n(HIGH first, then ABC A→C; a line that does not fit is reduced to the largest\n pack/MOQ-valid qty that fits, else skipped — D-29)
+    loop for line in result.skipped
+      PA -> PA : Recommendation(rec_type="REORDER", status="NEEDS_REVIEW", reason="BUDGET", store_id, product_id, qty)
+    end
+    PA -> PA : po = result.po (flag BUDGET_TRIMMED); budget_remaining −= po.total_value
   else other rule violation (MOQ, pack size)
     PA -> PA : po.status = "NEEDS_REVIEW"; po.errors = result.errors
   end

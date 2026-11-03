@@ -217,14 +217,14 @@ Critical agents (failure stops the run, no cache swap): DemandForecasting, Stock
 | RequirementCalculator | surplus(available: int, requirement: int) | int | SD-06, SD-12 |
 | RequirementCalculator | assert_donor_protected(donor: StoreState, qty: int) | bool | SD-07 |
 | TransferDecisionEngine | decide(product_id, states, routes, cost_inputs: CostInputs) | TransferPlan | SD-06, SD-07 |
-| TransferDecisionEngine | find_expiry_receivers(product_id, qty, days_left, from_store, states, routes) | list[TransferProposal] | SD-08 |
+| TransferDecisionEngine | find_expiry_receivers(product_id, qty, days_left, from_store, states, routes, unit_cost) — single receiver first; split only if none can; only if transfer cost < qty × unit_cost (D-28) | list[TransferProposal] | SD-08 |
 | MarkdownRules | recommend(days_left: int, at_risk: int, unit_margin: Decimal, rules: list)  [ext] | MarkdownAction | SD-08 |
 | POBuilder | select_supplier(need, offers, required_by: date, scores: dict\|None = None) | SupplierOffer\|None | SD-09 |
 | POBuilder | consolidate(assigned: list[tuple[ReplenishmentNeed, SupplierOffer]]) | list[DraftPO] | SD-09 |
 | POBuilder | round_to_pack(qty: int, order_pack_size: int, moq: int) | int | SD-09 |
 | POBuilder | apply_scheme(line, schemes, daily_demand, shelf_life_days, budget_remaining)  [ext] | POLine | SD-09 |
 | POBuilder | validate(po, rules: BusinessRules, budget_remaining: Decimal) | ValidationResult | SD-09, SD-10 |
-| POBuilder | prioritise_within_budget(po: DraftPO, budget: Decimal) | DraftPO | SD-09 |
+| POBuilder | prioritise_within_budget(po: DraftPO, budget: Decimal) — reduce to largest pack/MOQ-valid qty before skipping (D-29) | BudgetTrimResult(po, reduced, skipped) | SD-09 |
 | POBuilder | apply_edits(po, edits: list[POLineEdit], store_id: UUID) | PurchaseOrder | SD-10 |
 | ExplanationService | explain(items: list[ExplanationInput]) | list[str] | SD-09 |
 | LLMClient | complete(system: str, prompt: str, max_tokens: int = 1000, temperature: float = 0) | LLMResponse | SD-09 |
@@ -265,7 +265,7 @@ are read-only `Protocol`s in `app/tools/types.py`; `apply_edits` and `split` tak
 Defaults for ABC/XYZ, ADI, baseline, rule filtering, bill cleaning, expiry receivers, supplier choice and budget
 trimming are recorded in decision D-22.
 | NotificationService | notify(role: Role\|None, store_id: UUID\|None, message: str, link: str\|None) / list_for(user) / mark_read(id, user) | Notification / list / None | SD-14 |
-| BasketTools | clean_bills(lines: DataFrame, rules: BasketQualityRules) | DataFrame | SD-05 |
+| BasketTools | clean_bills(lines: DataFrame, rules: BasketQualityRules) — bulk limit per category (D-27) | DataFrame | SD-05 |
 | InventoryLedgerService | post(movements: list[InventoryMovement]) | None | SD-02, SD-12 |
 | InventoryLedgerService | reconcile(store_id: UUID, snapshot: list[StockRow]) | list[InventoryMovement] | SD-02 |
 | TransferService | reject(transfer_id: UUID, reason: str, user: User) | TransferOrder | SD-12 |
@@ -305,7 +305,8 @@ trimming are recorded in decision D-22.
 | expiry_risk_pct | Business rule | Expected expiry loss share for perishable donor surplus (SD-07) |
 | l1_deadline_hours | Business rule (e.g. 24) | Time allowed for store supervisors to decide their PO lines (SD-09, SD-14) |
 | deadline_action | ESCALATE or EXPIRE | What happens to undecided lines at the deadline (SD-14) |
-| basket.max_qty_per_line / exclude_promo_days | Business rule / true | Bulk-bill filter and promotion-day exclusion for basket mining (SD-05) |
+| basket.max_qty_per_line / exclude_promo_days | 24 / true | Bulk-bill filter and promotion-day exclusion for basket mining (SD-05) |
+| basket.max_qty_per_line_by_category | {} | Per-category bulk limits overriding the default, e.g. {"rice": 50} (SD-05, D-27) |
 | approval deadline job | every 15 minutes | Celery Beat schedule for SD-14 |
 
 Placeholder defaults to confirm with the business: `holding_cost_rate_per_day = 0.0005` (≈18%/year),

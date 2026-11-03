@@ -10,6 +10,7 @@ choose silently.
 | D-01 … D-12 | 2026-11-03 | Product owner (Phase 0 review) |
 | D-13 … D-17 | 2026-11-03 | Product owner (review of the D-01 … D-12 interpretations) |
 | D-18 … D-26 | 2026-11-03 | Product owner (Phase 1 acceptance, Phase 3 approval) |
+| D-27 … D-29 | 2026-11-03 | Product owner (Phase 3 acceptance) |
 
 ---
 
@@ -225,11 +226,11 @@ fewer than 7 in-stock days. `estimate()` expects `daily_sales` zero-filled for t
   co-replenishment and assortment-gap filters use **≥** 1.5 (scenario 4 "lift ≥ 1.5").
 - `clean_bills` drops return and voided lines, **whole bills** containing a line above `max_qty_per_line`
   (bulk/wholesale bills), and promotion-day lines when `exclude_promo_days`.
-- `find_expiry_receivers` allocates the at-risk qty greedily to receivers with the largest sell-before-expiry
+- *(superseded by D-28)* `find_expiry_receivers` allocates the at-risk qty greedily to receivers with the largest sell-before-expiry
   capacity `floor(daily_demand × (days_left − transit_days))` (ties by store id), so a batch may be split.
 - `select_supplier`: eligibility uses days from the need's run date to `required_by`; the preferred supplier
   wins if eligible (D-07), else lowest price → shorter lead time → supplier id.
-- `prioritise_within_budget`: lines ordered HIGH before NORMAL, then ABC A→B→C→unclassified, then store and
+- *(superseded by D-29)* `prioritise_within_budget`: lines ordered HIGH before NORMAL, then ABC A→B→C→unclassified, then store and
   product id; greedily kept while they fit the budget (a line that does not fit is skipped, later smaller lines
   may still fit).
 **Changed.** Spec §8 notes.
@@ -255,3 +256,28 @@ results (and, for the two-pass agent step, shuffled product order).
 ## D-26 pandas 3.1 with mlxtend
 **Finding.** mlxtend 0.25 `fpgrowth` + `association_rules(num_itemsets=…)` run on pandas 3.1 without warnings.
 No pin needed.
+
+---
+
+## D-27 Bulk-bill limit per category
+**Decision.** Approves the D-22 bulk-bill rule (a line above the limit drops the whole bill) and makes the limit
+configurable per category: business rules `basket.max_qty_per_line` (default 24) and
+`basket.max_qty_per_line_by_category` (e.g. `{"rice": 50}`). Lines without a category use the default.
+**Changed.** Spec §8, §9; `BasketQualityRules.max_qty_per_line_by_category`.
+
+## D-28 Expiry receivers: single receiver first, only when worth it
+**Decision.** Replaces the D-22 greedy allocation. `find_expiry_receivers(…, unit_cost)`:
+1. Prefer a **single receiver** whose sell-before-expiry capacity covers the whole at-risk qty (cheapest transfer,
+   then shorter transit, then store id).
+2. **Split only if no single store can** absorb it: largest capacity first.
+3. A transfer is proposed only if `transfer_incremental_cost < qty × unit_cost` (the value of the stock it saves;
+   for a split, each part is checked with its own qty). Otherwise the batch goes to markdown / EXPIRY_ALERT.
+**Changed.** Spec §8; SD-08.
+
+## D-29 Budget trimming reduces before skipping
+**Decision.** Replaces the D-22 skip rule. `prioritise_within_budget(po, budget) → BudgetTrimResult(po, reduced,
+skipped)`. Lines are attempted HIGH first, then ABC A→B→C→unclassified, then store and product id. A line that
+does not fit is **reduced** to the largest pack-rounded qty ≥ MOQ (or exactly the MOQ) that fits the remaining
+budget; if none fits it is **skipped**, and the PO Agent creates a `Recommendation(REORDER, status NEEDS_REVIEW)`
+with reason `BUDGET` for each skipped line. The PO is flagged `BUDGET_TRIMMED` when anything was reduced or skipped.
+**Changed.** Spec §8; SD-09.

@@ -51,6 +51,21 @@ def test_clean_bills_rules_can_be_switched_off() -> None:
     assert len(BasketTools.clean_bills(_lines(), rules)) == 8
 
 
+def test_clean_bills_bulk_limit_per_category() -> None:
+    # D-27: rice is sold in larger quantities (limit 50); other categories use the default limit (24)
+    lines = pd.DataFrame(
+        {
+            "bill_id": [1, 1, 2, 2, 3],
+            "product_id": [BREAD, MILK, BUTTER, JAM, TEA],
+            "qty": [30, 1, 30, 1, 30],
+            "category": ["rice", "dairy", "biscuits", "jam", None],  # bill 3: unknown category → default
+        }
+    )
+    rules = BasketQualityRules(max_qty_per_line=24, max_qty_per_line_by_category={"rice": 50})
+
+    assert _kept(BasketTools.clean_bills(lines, rules)) == [(1, BREAD), (1, MILK)]
+
+
 def test_clean_bills_tolerates_missing_optional_columns() -> None:
     lines = pd.DataFrame({"bill_id": [1, 1, 2], "product_id": [BREAD, BUTTER, MILK], "qty": [1, -1, 2]})
 

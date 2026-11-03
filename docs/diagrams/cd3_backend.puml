@@ -149,7 +149,7 @@ package "Deterministic tools (unit-tested)" {
   }
   class TransferDecisionEngine {
     +decide(product_id: UUID, states: list[StoreState], routes: dict, cost_inputs: CostInputs): TransferPlan
-    +find_expiry_receivers(product_id: UUID, qty: int, days_left: int, from_store: UUID, states: list[StoreState], routes: dict): list[TransferProposal]
+    +find_expiry_receivers(product_id: UUID, qty: int, days_left: int, from_store: UUID, states: list[StoreState], routes: dict, unit_cost: Decimal): list[TransferProposal]
     -_priority(state: StoreState, lead_time_days: int): str
   }
   class CostModel {
@@ -162,7 +162,7 @@ package "Deterministic tools (unit-tested)" {
     +round_to_pack(qty: int, order_pack_size: int, moq: int): int
     +apply_scheme(line: POLine, schemes: list, daily_demand: float, shelf_life_days: int, budget_remaining: Decimal): POLine <<ext>>
     +validate(po: DraftPO, rules: BusinessRules, budget_remaining: Decimal): ValidationResult
-    +prioritise_within_budget(po: DraftPO, budget: Decimal): DraftPO
+    +prioritise_within_budget(po: DraftPO, budget: Decimal): BudgetTrimResult
     +apply_edits(po: PurchaseOrder, edits: list[POLineEdit], store_id: UUID): PurchaseOrder
     +split(po: PurchaseOrder, lines: list[POLine]): PurchaseOrder
   }

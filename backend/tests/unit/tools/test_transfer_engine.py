@@ -194,29 +194,72 @@ def test_mark_po_pairs_marks_short_stores_of_products_without_any_surplus() -> N
     assert marked == frozenset({(SUPPLIER, STORE_A), (other_supplier, STORE_C)})
 
 
-def test_find_expiry_receivers_prefers_the_largest_capacity() -> None:
-    states = [
+UNIT_COST = Decimal("50")
+
+
+def _expiry_states() -> list[StoreState]:
+    return [
         _state(STORE_A, 10, 40, 1),  # the store holding the batch
         _state(STORE_B, 10, 10, 2),  # capacity floor(2 × (10 − 1)) = 18
         _state(STORE_C, 10, 10, 5),  # capacity floor(5 × (10 − 2)) = 40
     ]
-    routes = {(STORE_A, STORE_B): route(transit_days=1), (STORE_A, STORE_C): route(transit_days=2)}
 
-    receivers = TE.find_expiry_receivers(PRODUCT, 30, 10, STORE_A, states, routes)
 
-    assert [(r.to_store, r.qty) for r in receivers] == [(STORE_C, 30)]
+EXPIRY_ROUTES = {(STORE_A, STORE_B): route(transit_days=1), (STORE_A, STORE_C): route(transit_days=2)}
+
+
+def test_find_expiry_receivers_single_receiver_that_absorbs_everything() -> None:
+    receivers = TE.find_expiry_receivers(PRODUCT, 30, 10, STORE_A, _expiry_states(), EXPIRY_ROUTES, UNIT_COST)
+
+    assert [(r.to_store, r.qty) for r in receivers] == [(STORE_C, 30)]  # only C can take all 30
     assert isinstance(receivers[0], TransferProposal)
     assert receivers[0].evidence["days_left"] == 10
     assert receivers[0].evidence["sell_capacity"] == 40
+    assert receivers[0].evidence["value_at_risk"] == "1500.00"  # 30 × 50
 
 
-def test_find_expiry_receivers_splits_across_receivers() -> None:
-    states = [_state(STORE_A, 10, 40, 1), _state(STORE_B, 10, 10, 2), _state(STORE_C, 10, 10, 5)]
-    routes = {(STORE_A, STORE_B): route(transit_days=1), (STORE_A, STORE_C): route(transit_days=2)}
+def test_find_expiry_receivers_cheapest_single_receiver_wins_over_largest_capacity() -> None:
+    # D-28: both B (capacity 18) and C (capacity 40) can absorb 15 units → the cheaper transfer (B) is chosen.
+    routes = {
+        (STORE_A, STORE_B): route(fixed="50", transit_days=1),
+        (STORE_A, STORE_C): route(fixed="100", transit_days=2),
+    }
 
-    receivers = TE.find_expiry_receivers(PRODUCT, 50, 10, STORE_A, states, routes)
+    receivers = TE.find_expiry_receivers(PRODUCT, 15, 10, STORE_A, _expiry_states(), routes, UNIT_COST)
+
+    assert [(r.to_store, r.qty) for r in receivers] == [(STORE_B, 15)]
+
+
+def test_find_expiry_receivers_splits_only_when_no_single_store_can_absorb() -> None:
+    store_d = UUID(int=0xD)
+    states = [*_expiry_states(), _state(store_d, 10, 10, 1)]  # D: capacity floor(1 × 9) = 9, never needed
+    routes = {**EXPIRY_ROUTES, (STORE_A, store_d): route(transit_days=1)}
+
+    receivers = TE.find_expiry_receivers(PRODUCT, 50, 10, STORE_A, states, routes, UNIT_COST)
 
     assert [(r.to_store, r.qty) for r in receivers] == [(STORE_C, 40), (STORE_B, 10)]
+
+
+def test_find_expiry_receivers_only_when_transfer_costs_less_than_the_stock_saved() -> None:
+    # transfer of 30 to C costs 100 + 2×30 + 1×30 = 190
+    too_cheap_stock = TE.find_expiry_receivers(
+        PRODUCT, 30, 10, STORE_A, _expiry_states(), EXPIRY_ROUTES, Decimal("5")
+    )
+    worth_it = TE.find_expiry_receivers(
+        PRODUCT, 30, 10, STORE_A, _expiry_states(), EXPIRY_ROUTES, Decimal("10")
+    )
+
+    assert too_cheap_stock == []  # 190 ≥ 30 × 5 = 150
+    assert [(r.to_store, r.qty) for r in worth_it] == [(STORE_C, 30)]  # 190 < 300
+
+
+def test_find_expiry_receivers_split_skips_parts_not_worth_moving() -> None:
+    # split of 50: C 40 costs 220 < 400 ✓ ; B 10 costs 100 + 20 + 10 = 130 ≥ 10 × 10 = 100 ✗
+    receivers = TE.find_expiry_receivers(
+        PRODUCT, 50, 10, STORE_A, _expiry_states(), EXPIRY_ROUTES, Decimal("10")
+    )
+
+    assert [(r.to_store, r.qty) for r in receivers] == [(STORE_C, 40)]
 
 
 def test_find_expiry_receivers_excludes_slow_unrouted_and_idle_stores() -> None:
@@ -228,4 +271,4 @@ def test_find_expiry_receivers_excludes_slow_unrouted_and_idle_stores() -> None:
     ]
     routes = {(STORE_A, STORE_B): route(transit_days=10), (STORE_A, STORE_C): route(transit_days=1)}
 
-    assert TE.find_expiry_receivers(PRODUCT, 30, 10, STORE_A, states, routes) == []
+    assert TE.find_expiry_receivers(PRODUCT, 30, 10, STORE_A, states, routes, UNIT_COST) == []

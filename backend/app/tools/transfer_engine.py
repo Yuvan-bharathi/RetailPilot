@@ -153,11 +153,16 @@ class TransferDecisionEngine:
         from_store: UUID,
         states: Sequence[StoreState],
         routes: RouteMap,
+        unit_cost: Decimal,
     ) -> list[TransferProposal]:
-        """Stores that can sell an at-risk batch before it expires (SD-08, D-22).
+        """Stores that can sell an at-risk batch before it expires (SD-08, D-28).
 
         A receiver needs a route with transit_days < days_left; its capacity is
-        floor(daily_demand × (days_left − transit_days)). Qty is allocated greedily, largest capacity first.
+        floor(daily_demand × (days_left − transit_days)). A transfer is proposed only if its incremental cost
+        is below the value of the stock it saves (qty × unit_cost).
+        1. Prefer a single receiver that can absorb the whole qty: cheapest transfer, then shorter transit,
+           then store id.
+        2. Only if none can, split: largest capacity first (ties by store id), skipping parts not worth moving.
         """
         candidates: list[tuple[int, UUID, TransferRouteLike]] = []
         for s in states:
@@ -167,33 +172,47 @@ class TransferDecisionEngine:
             capacity = floor6(s.daily_demand * (days_left - route.transit_days))
             if capacity > 0:
                 candidates.append((capacity, s.store_id, route))
-        candidates.sort(key=lambda c: (-c[0], c[1]))
+
+        def worth_it(route: TransferRouteLike, give: int) -> bool:
+            return CostModel.transfer_incremental_cost(route, give) < give * unit_cost
+
+        def proposal(capacity: int, store_id: UUID, route: TransferRouteLike, give: int) -> TransferProposal:
+            cost = CostModel.transfer_incremental_cost(route, give)
+            return TransferProposal(
+                from_store=from_store,
+                to_store=store_id,
+                product_id=product_id,
+                qty=give,
+                transfer_cost=money(cost),
+                po_cost_avoided=Decimal("0.00"),
+                transit_days=route.transit_days,
+                evidence={
+                    "days_left": days_left,
+                    "at_risk": qty,
+                    "sell_capacity": capacity,
+                    "transit_days": route.transit_days,
+                    "transfer_cost": str(money(cost)),
+                    "value_at_risk": str(money(give * unit_cost)),
+                },
+            )
+
+        singles = [c for c in candidates if c[0] >= qty and worth_it(c[2], qty)]
+        if singles:
+            best = min(
+                singles,
+                key=lambda c: (CostModel.transfer_incremental_cost(c[2], qty), c[2].transit_days, c[1]),
+            )
+            return [proposal(best[0], best[1], best[2], qty)]
 
         proposals: list[TransferProposal] = []
         remaining = qty
-        for capacity, store_id, route in candidates:
+        for capacity, store_id, route in sorted(candidates, key=lambda c: (-c[0], c[1])):
             if remaining <= 0:
                 break
             give = min(capacity, remaining)
-            cost = CostModel.transfer_incremental_cost(route, give)
-            proposals.append(
-                TransferProposal(
-                    from_store=from_store,
-                    to_store=store_id,
-                    product_id=product_id,
-                    qty=give,
-                    transfer_cost=money(cost),
-                    po_cost_avoided=Decimal("0.00"),
-                    transit_days=route.transit_days,
-                    evidence={
-                        "days_left": days_left,
-                        "at_risk": qty,
-                        "sell_capacity": capacity,
-                        "transit_days": route.transit_days,
-                        "transfer_cost": str(money(cost)),
-                    },
-                )
-            )
+            if not worth_it(route, give):
+                continue
+            proposals.append(proposal(capacity, store_id, route, give))
             remaining -= give
         return proposals
 

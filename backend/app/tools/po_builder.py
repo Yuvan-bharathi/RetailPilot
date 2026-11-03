@@ -8,6 +8,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from app.tools.types import (
+    BudgetTrimResult,
     BusinessRules,
     DraftPO,
     DraftPOLine,
@@ -23,6 +24,20 @@ _ABC_RANK = {"A": 0, "B": 1, "C": 2}
 
 class POEditError(ValueError):
     """An edit is not allowed (wrong store, unknown or decided line, non-positive quantity)."""
+
+
+def _largest_affordable_qty(line: DraftPOLine, money_left: Decimal) -> int:
+    """Largest qty that is a pack multiple ≥ MOQ (or exactly the MOQ) and costs ≤ money_left; 0 if none.
+
+    Only called for a line that does not fit, so its unit price is > 0.
+    """
+    affordable = min(int(money_left // line.unit_price), line.qty)
+    packs = (affordable // line.order_pack_size) * line.order_pack_size
+    if packs >= max(line.moq, 1):
+        return packs
+    if 0 < line.moq <= affordable:
+        return line.moq
+    return 0
 
 
 class POBuilder:
@@ -98,8 +113,14 @@ class POBuilder:
         return ValidationResult(ok=not errors, errors=tuple(errors))
 
     @staticmethod
-    def prioritise_within_budget(po: DraftPO, budget: Decimal) -> DraftPO:
-        """Keep lines HIGH before NORMAL, then ABC A→C→unclassified, while they fit the budget (D-22)."""
+    def prioritise_within_budget(po: DraftPO, budget: Decimal) -> BudgetTrimResult:
+        """Fit the PO's active lines into `budget` (D-22, D-29).
+
+        Lines are attempted HIGH before NORMAL, then ABC A→B→C→unclassified, then store and product id.
+        A line that does not fit is first reduced to the largest pack-rounded qty ≥ MOQ that fits the remaining
+        budget; if even that is impossible it is skipped (the caller raises a NEEDS_REVIEW recommendation with
+        reason BUDGET for each skipped line).
+        """
         ordered = sorted(
             po.active_lines,
             key=lambda line: (
@@ -109,16 +130,26 @@ class POBuilder:
                 line.product_id,
             ),
         )
-        kept: set[UUID] = set()
-        spent = Decimal(0)
+        kept_qty: dict[UUID, int] = {}
+        reduced: list[UUID] = []
+        skipped: list[DraftPOLine] = []
+        remaining = budget
         for line in ordered:
-            if spent + line.value <= budget:
-                kept.add(line.line_id)
-                spent += line.value
-        if len(kept) == len(po.active_lines):
-            return po
-        lines = tuple(line for line in po.lines if line.line_id in kept)
-        return replace(po, lines=lines, flags=(*po.flags, "BUDGET_TRIMMED"))
+            qty = line.qty if line.value <= remaining else _largest_affordable_qty(line, remaining)
+            if qty <= 0:
+                skipped.append(line)
+                continue
+            kept_qty[line.line_id] = qty
+            remaining -= line.unit_price * qty
+            if qty < line.qty:
+                reduced.append(line.line_id)
+        if not reduced and not skipped:
+            return BudgetTrimResult(po=po)
+        lines = tuple(
+            replace(line, qty=kept_qty[line.line_id]) for line in po.lines if line.line_id in kept_qty
+        )
+        trimmed = replace(po, lines=lines, flags=(*po.flags, "BUDGET_TRIMMED"))
+        return BudgetTrimResult(po=trimmed, reduced=tuple(reduced), skipped=tuple(skipped))
 
     @staticmethod
     def apply_edits(po: DraftPO, edits: Sequence[POLineEdit], store_id: UUID) -> DraftPO:

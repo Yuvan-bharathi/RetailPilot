@@ -20,8 +20,9 @@ SUBSTITUTE_COLUMNS = ["store_id", "product_a", "product_b", "uplift"]
 class BasketTools:
     @staticmethod
     def clean_bills(lines: pd.DataFrame, rules: BasketQualityRules) -> pd.DataFrame:
-        """Drop return lines (is_return or qty < 0), voided lines, whole bills with a line above
-        max_qty_per_line (bulk / wholesale), and promotion-day lines. Optional flag columns may be absent."""
+        """Drop return lines (is_return or qty < 0), voided lines, whole bills with a line above the bulk limit
+        (bulk / wholesale; per category if a `category` column is present, D-27), and promotion-day lines.
+        Optional flag columns may be absent."""
         df = lines
         if rules.exclude_returns:
             is_return = df["qty"] < 0
@@ -30,7 +31,11 @@ class BasketTools:
             df = df.loc[~is_return]
         if rules.exclude_voided and "is_voided" in df.columns:
             df = df.loc[~df["is_voided"].astype(bool)]
-        bulk_bills = set(df.loc[df["qty"] > rules.max_qty_per_line, "bill_id"])
+        if "category" in df.columns:
+            limits = df["category"].map(lambda c: rules.limit_for(None if pd.isna(c) else str(c)))
+        else:
+            limits = pd.Series(rules.max_qty_per_line, index=df.index)
+        bulk_bills = set(df.loc[df["qty"] > limits, "bill_id"])
         df = df.loc[~df["bill_id"].isin(bulk_bills)]
         if rules.exclude_promo_days and "is_promo_day" in df.columns:
             df = df.loc[~df["is_promo_day"].astype(bool)]

@@ -198,26 +198,61 @@ def test_validate_ignores_rejected_lines() -> None:
 # --- prioritise_within_budget ---------------------------------------------------------------------------------------
 
 
-def test_prioritise_within_budget_keeps_high_priority_and_abc_order() -> None:
-    normal_a = _line(STORE_A, 40, "10", "NORMAL", "A")  # 400
+def test_budget_reduces_a_line_before_skipping_it() -> None:
+    normal_a = _line(STORE_A, 40, "10", "NORMAL", "A", pack=10)  # 400
     high_c = _line(STORE_C, 30, "10", "HIGH", "C")  # 300
     high_a = _line(STORE_B, 50, "10", "HIGH", "A")  # 500
     normal_b = _line(STORE_B, 10, "10", "NORMAL", None)  # 100
     po = DraftPO(supplier_id=S1, lines=(normal_a, high_c, high_a, normal_b))
 
-    trimmed = POBuilder.prioritise_within_budget(po, budget=Decimal("900"))
+    result = POBuilder.prioritise_within_budget(po, budget=Decimal("900"))
 
-    # HIGH/A 500 + HIGH/C 300 = 800; NORMAL/A 400 does not fit (skipped); NORMAL/unclassified 100 fits → 900
-    assert {line.line_id for line in trimmed.lines} == {high_a.line_id, high_c.line_id, normal_b.line_id}
-    assert trimmed.total_value == Decimal("900")
-    assert "BUDGET_TRIMMED" in trimmed.flags
-    assert trimmed.po_id == po.po_id
+    # HIGH/A 500 + HIGH/C 300 = 800 ; NORMAL/A reduced to 10 units (pack 10, ₹100) ; NORMAL/- no budget left
+    kept = {line.line_id: line.qty for line in result.po.lines}
+    assert kept == {high_a.line_id: 50, high_c.line_id: 30, normal_a.line_id: 10}
+    assert result.po.total_value == Decimal("900")
+    assert result.reduced == (normal_a.line_id,)
+    assert result.skipped == (normal_b,)
+    assert "BUDGET_TRIMMED" in result.po.flags
+    assert result.po.po_id == po.po_id
 
 
-def test_prioritise_within_budget_unchanged_when_everything_fits() -> None:
+def test_budget_high_priority_lines_are_attempted_first() -> None:
+    normal_a = _line(STORE_A, 10, "10", "NORMAL", "A")  # 100, best ABC class
+    high_c = _line(STORE_C, 10, "10", "HIGH", "C")  # 100, worst ABC class but HIGH
+
+    result = POBuilder.prioritise_within_budget(DraftPO(S1, (normal_a, high_c)), budget=Decimal("100"))
+
+    assert [line.line_id for line in result.po.lines] == [high_c.line_id]
+    assert result.skipped == (normal_a,)
+
+
+def test_budget_reduction_respects_moq() -> None:
+    line = _line(STORE_A, 48, "1", pack=12, moq=24)  # can afford 20 → 12 units < MOQ 24 → skip
+
+    result = POBuilder.prioritise_within_budget(DraftPO(S1, (line,)), budget=Decimal("20"))
+
+    assert result.po.lines == ()
+    assert result.skipped == (line,)
+    assert result.reduced == ()
+
+
+def test_budget_reduction_can_fall_back_to_the_moq_itself() -> None:
+    line = _line(STORE_A, 60, "1", pack=12, moq=30)  # can afford 35 → 24 (< MOQ) → MOQ 30 fits
+
+    result = POBuilder.prioritise_within_budget(DraftPO(S1, (line,)), budget=Decimal("35"))
+
+    assert [(x.qty, x.line_id) for x in result.po.lines] == [(30, line.line_id)]
+    assert result.reduced == (line.line_id,)
+
+
+def test_budget_unchanged_when_everything_fits() -> None:
     po = DraftPO(supplier_id=S1, lines=(_line(STORE_A, 10, "10"),))
 
-    assert POBuilder.prioritise_within_budget(po, budget=Decimal("100")) == po
+    result = POBuilder.prioritise_within_budget(po, budget=Decimal("100"))
+
+    assert result.po == po
+    assert result.reduced == () and result.skipped == ()
 
 
 # --- apply_edits --------------------------------------------------------------------------------------------------

@@ -24,11 +24,12 @@ loop for (store_id, product_id), batches in group_by_store_product(batches)
     FA -> FA : qty_ahead += batch.qty
     opt at_risk > 0
       FA -> IR : get_store_states(product_id, ctx.store_ids) → list[StoreState]
-      FA -> TE : find_expiry_receivers(product_id: UUID, qty: int = at_risk, days_left: int,\n from_store: UUID = store_id, states: list[StoreState], routes) → list[TransferProposal]
+      FA -> TE : find_expiry_receivers(product_id: UUID, qty: int = at_risk, days_left: int,\n from_store: UUID = store_id, states: list[StoreState], routes, unit_cost: Decimal) → list[TransferProposal]
       note right of TE
         receiver must: have a route with transit_days < days_left,
-        and forecast_demand × (days_left − transit_days) ≥ qty
-        (it can sell the batch before expiry)
+        capacity = floor(forecast_demand × (days_left − transit_days)) (it can sell before expiry)
+        D-28: prefer ONE receiver with capacity ≥ qty (cheapest transfer); split only if none can;
+        propose only if transfer_incremental_cost < qty × unit_cost
       end note
       alt receivers found
         loop for t in receivers

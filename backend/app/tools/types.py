@@ -240,6 +240,19 @@ class DraftPO:
 
 
 @dataclass(frozen=True, slots=True)
+class BudgetTrimResult:
+    """Outcome of POBuilder.prioritise_within_budget (D-29).
+
+    `reduced`: ids of lines whose qty was lowered to fit; `skipped`: lines removed because not even the MOQ /
+    one pack fits — the PO agent turns each into a NEEDS_REVIEW recommendation with reason BUDGET.
+    """
+
+    po: DraftPO
+    reduced: tuple[UUID, ...] = ()
+    skipped: tuple[DraftPOLine, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class POLineEdit:
     po_line_id: UUID
     qty: int
@@ -273,8 +286,15 @@ class ValidationResult:
 class BasketQualityRules:
     exclude_returns: bool = True
     exclude_voided: bool = True
-    max_qty_per_line: int = 24
+    max_qty_per_line: int = 24  # default bulk-line limit (business rule basket.max_qty_per_line)
     exclude_promo_days: bool = True
+    # per-category overrides (business rule basket.max_qty_per_line_by_category, D-27)
+    max_qty_per_line_by_category: Mapping[str, int] = field(default_factory=dict)
+
+    def limit_for(self, category: str | None) -> int:
+        if category is None:
+            return self.max_qty_per_line
+        return self.max_qty_per_line_by_category.get(category, self.max_qty_per_line)
 
 
 @dataclass(frozen=True, slots=True)
