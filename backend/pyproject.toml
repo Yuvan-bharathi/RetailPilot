@@ -61,13 +61,13 @@ ignore = [
 "tests/**" = ["N802", "N814", "N817"]  # short aliases such as TE / RC in tests
 
 [tool.ruff.lint.isort]
-known-first-party = ["app"]
+known-first-party = ["app", "data"]
 
 # --- Mypy -------------------------------------------------------------------
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["app"]
+files = ["app", "../data"]
 plugins = ["pydantic.mypy"]
 warn_unreachable = true
 
@@ -83,7 +83,7 @@ warn_required_dynamic_aliases = true
 # --- Pytest -----------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = [".", ".."]
 addopts = "-ra --import-mode=importlib"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

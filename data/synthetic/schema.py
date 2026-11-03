@@ -1,0 +1,131 @@
+"""CSV contract of the synthetic dataset — the single source for the writer, the reader and the README.
+
+Column kinds: uuid, str, int, decimal, date, datetime (ISO 8601, UTC), bool, opt_int / opt_date (may be empty).
+"""
+
+from typing import Literal
+
+Kind = Literal["uuid", "str", "int", "decimal", "date", "datetime", "bool", "opt_int", "opt_date"]
+
+SCHEMA: dict[str, list[tuple[str, Kind]]] = {
+    "stores.csv": [
+        ("store_id", "uuid"),
+        ("code", "str"),
+        ("name", "str"),
+        ("region", "str"),
+        ("store_type", "str"),
+        ("display_capacity", "int"),
+    ],
+    "products.csv": [
+        ("product_id", "uuid"),
+        ("sku", "str"),
+        ("name", "str"),
+        ("category", "str"),
+        ("brand", "str"),
+        ("cost_price", "decimal"),
+        ("selling_price", "decimal"),
+        ("pack_size", "int"),
+        ("shelf_life_days", "opt_int"),
+    ],
+    "suppliers.csv": [("supplier_id", "uuid"), ("name", "str"), ("default_lead_time_days", "int")],
+    "supplier_products.csv": [
+        ("supplier_id", "uuid"),
+        ("product_id", "uuid"),
+        ("price", "decimal"),
+        ("lead_time_days", "int"),
+        ("moq", "int"),
+        ("order_pack_size", "int"),
+    ],
+    "supplier_store_terms.csv": [
+        ("supplier_id", "uuid"),
+        ("store_id", "uuid"),
+        ("lead_time_days", "int"),
+        ("delivery_charge", "decimal"),
+    ],
+    "store_products.csv": [
+        ("store_id", "uuid"),
+        ("product_id", "uuid"),
+        ("preferred_supplier_id", "uuid"),
+        ("min_display_qty", "int"),
+        ("safety_stock_days", "int"),
+        ("review_period_days", "int"),
+        ("is_listed", "bool"),
+    ],
+    "transfer_routes.csv": [
+        ("from_store_id", "uuid"),
+        ("to_store_id", "uuid"),
+        ("fixed_cost", "decimal"),
+        ("per_unit_cost", "decimal"),
+        ("handling_cost_per_unit", "decimal"),
+        ("transit_days", "int"),
+    ],
+    "calendar_events.csv": [
+        ("event_id", "uuid"),
+        ("event_date", "date"),
+        ("event_type", "str"),
+        ("region", "str"),
+        ("description", "str"),
+    ],
+    "sales_bills.csv": [
+        ("bill_id", "uuid"),
+        ("store_id", "uuid"),
+        ("txn_datetime", "datetime"),
+        ("txn_date", "date"),
+        ("total_amount", "decimal"),
+    ],
+    "sales_lines.csv": [
+        ("bill_id", "uuid"),
+        ("line_no", "int"),
+        ("txn_date", "date"),
+        ("store_id", "uuid"),
+        ("product_id", "uuid"),
+        ("qty", "int"),
+        ("unit_price", "decimal"),
+        ("discount", "decimal"),
+        ("is_return", "bool"),
+        ("is_voided", "bool"),
+        ("is_promo_day", "bool"),
+    ],
+    "stock_snapshots.csv": [
+        ("store_id", "uuid"),
+        ("product_id", "uuid"),
+        ("snapshot_date", "date"),
+        ("shelf_qty", "int"),
+        ("backroom_qty", "int"),
+        ("closing_on_hand", "int"),
+    ],
+    "receipts.csv": [
+        ("receipt_id", "uuid"),
+        ("store_id", "uuid"),
+        ("product_id", "uuid"),
+        ("supplier_id", "uuid"),
+        ("receipt_date", "date"),
+        ("qty", "int"),
+        ("batch_no", "str"),
+        ("expiry_date", "opt_date"),
+    ],
+    "write_offs.csv": [
+        ("store_id", "uuid"),
+        ("product_id", "uuid"),
+        ("write_off_date", "date"),
+        ("batch_no", "str"),
+        ("qty", "int"),
+        ("reason", "str"),
+    ],
+    "batches.csv": [
+        ("batch_id", "uuid"),
+        ("store_id", "uuid"),
+        ("product_id", "uuid"),
+        ("batch_no", "str"),
+        ("qty", "int"),
+        ("expiry_date", "date"),
+    ],
+    "open_orders.csv": [
+        ("store_id", "uuid"),
+        ("product_id", "uuid"),
+        ("supplier_id", "uuid"),
+        ("qty", "int"),
+        ("order_date", "date"),
+        ("expected_date", "date"),
+    ],
+}
