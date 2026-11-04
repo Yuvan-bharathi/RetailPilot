@@ -22,12 +22,11 @@ class PurchasingRepo:
         self.session = session
 
     def get_committed_spend(self, week_start: date) -> Decimal:
-        stmt = (
-            select(func.coalesce(func.sum(PurchaseOrder.total_value), Decimal("0")))
-            .where(
-                PurchaseOrder.created_at >= week_start,
-                PurchaseOrder.status.in_([POStatus.APPROVED.value, POStatus.SUBMITTED.value, POStatus.RECEIVED.value]),
-            )
+        stmt = select(func.coalesce(func.sum(PurchaseOrder.total_value), Decimal("0"))).where(
+            PurchaseOrder.created_at >= week_start,
+            PurchaseOrder.status.in_(
+                [POStatus.APPROVED.value, POStatus.SUBMITTED.value, POStatus.RECEIVED.value]
+            ),
         )
         return Decimal(str(self.session.scalar(stmt) or Decimal("0")))
 

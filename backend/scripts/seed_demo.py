@@ -5,16 +5,19 @@ Usage:
 """
 
 import asyncio
-from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
 import uuid
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import select
+
+from app.core.config import get_settings
 from app.core.db import get_async_session_factory, get_sync_engine, use_selector_event_loop
 from app.domain.models import (
     AgentRun,
     Batch,
     InventoryPosition,
+    LLMUsage,
     Notification,
     POLine,
     Product,
@@ -23,12 +26,18 @@ from app.domain.models import (
     Store,
     Supplier,
     ToolCall,
-    LLMUsage,
     TransferOrder,
 )
-from app.domain.models.enums import LineStatus, POStatus, Priority, RecStatus, RecType, ToolCallStatus, TransferStatus
+from app.domain.models.enums import (
+    LineStatus,
+    POStatus,
+    Priority,
+    RecStatus,
+    RecType,
+    ToolCallStatus,
+    TransferStatus,
+)
 from scripts.seed import seed, seed_password
-from app.core.config import get_settings
 
 
 async def seed_demo_data() -> None:
@@ -50,9 +59,10 @@ async def seed_demo_data() -> None:
             print("[ERROR] Stores not found in database. Please run alembic migrations first.")
             return
 
-        store_a = stores.get("BLR-KOR") or list(stores.values())[0]
-        store_b = stores.get("BLR-IND") or list(stores.values())[1]
-        store_c = stores.get("BLR-HSR") or list(stores.values())[2]
+        ordered = list(stores.values())
+        store_a = stores.get("BLR-KOR") or ordered[0]
+        store_b = stores.get("BLR-IND") or ordered[1]
+        store_c = stores.get("BLR-HSR") or ordered[2]
 
         # Ensure demo products exist
         prod_res = await session.execute(select(Product).limit(10))

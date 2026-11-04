@@ -32,16 +32,12 @@ class SyntheticPosSource(PosSource):
         lines_df = self.dataset.sales_lines
         bills_df = self.dataset.sales_bills
 
-        matched_lines = lines_df.loc[
-            (lines_df["store_id"] == store_id) & (lines_df["txn_date"] == day)
-        ]
+        matched_lines = lines_df.loc[(lines_df["store_id"] == store_id) & (lines_df["txn_date"] == day)]
         if matched_lines.empty:
             return []
 
         # Merge with bills to retrieve txn_datetime
-        merged = matched_lines.merge(
-            bills_df[["bill_id", "txn_datetime"]], on="bill_id", how="left"
-        )
+        merged = matched_lines.merge(bills_df[["bill_id", "txn_datetime"]], on="bill_id", how="left")
 
         rows: list[RawBillLine] = []
         tuples_iter: Iterator[Any] = iter(merged.itertuples())

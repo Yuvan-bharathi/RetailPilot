@@ -25,10 +25,19 @@ def test_secrets_are_not_printed() -> None:
     assert "top-secret" not in repr(settings)
 
 
-def test_celery_app_has_empty_beat_schedule_in_phase_1() -> None:
+def test_celery_beat_schedule_matches_spec_section_7() -> None:
+    """Phase 5 jobs (spec §7, D-35): nightly run 23:30 IST, deadlines every 15 min, partition maintenance."""
     assert celery_app.main == "retailpilot"
-    assert celery_app.conf.beat_schedule == {}
     assert celery_app.conf.timezone == "Asia/Kolkata"
+    schedule = celery_app.conf.beat_schedule
+    assert {name: job["task"] for name, job in schedule.items()} == {
+        "nightly-run": "nightly_run_task",
+        "approval-deadlines": "approval_deadline_task",
+        "partition-maintenance": "partition_maintenance_task",
+    }
+    nightly = schedule["nightly-run"]["schedule"]
+    assert (nightly.hour, nightly.minute) == ({23}, {30})
+    assert schedule["approval-deadlines"]["schedule"] == 900.0
 
 
 def test_openapi_documents_health_and_error_body() -> None:

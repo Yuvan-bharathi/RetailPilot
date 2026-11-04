@@ -50,9 +50,7 @@ class PlanningRepo:
         rows = self.session.scalars(stmt).all()
         return {(f.store_id, f.product_id): f for f in rows}
 
-    def replace_association_rules(
-        self, run_id: UUID, store_id: UUID, rules: list[AssociationRule]
-    ) -> int:
+    def replace_association_rules(self, run_id: UUID, store_id: UUID, rules: list[AssociationRule]) -> int:
         stmt = delete(AssociationRule).where(
             AssociationRule.store_id == store_id, AssociationRule.run_id != run_id
         )
@@ -87,10 +85,5 @@ class PlanningRepo:
         return list(self.session.scalars(stmt).all())
 
     def set_explanation(self, rec_id: UUID, explanation: str) -> None:
-        stmt = (
-            update(Recommendation)
-            .where(Recommendation.rec_id == rec_id)
-            .values(explanation=explanation)
-        )
+        stmt = update(Recommendation).where(Recommendation.rec_id == rec_id).values(explanation=explanation)
         self.session.execute(stmt)
-

@@ -51,9 +51,17 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 480
 
     anthropic_api_key: SecretStr | None = None
+    # LLM explanations (D-44): Groq, OpenAI open-weight models. Numbers are never taken from the LLM — every
+    # number in its text must appear in the evidence, else the deterministic template is used (rule 11).
     groq_api_key: SecretStr | None = None
-    llm_provider: str = "groq"
-    llm_model: str = "openai/gpt-oss-20b"
+    llm_provider: Literal["groq", "template"] = "groq"  # "template": never call an LLM
+    llm_model: str = "openai/gpt-oss-120b"  # production model; best grounding for short factual text
+    llm_fallback_model: str = "openai/gpt-oss-20b"  # production model; used on errors / rate limits
+    llm_reasoning_effort: Literal["low", "medium", "high"] = "low"
+    llm_temperature: float = 0.0  # spec Phase 5: temperature 0
+    llm_max_completion_tokens: int = 4096  # reasoning tokens count toward this limit
+    llm_timeout_s: float = 30.0
+    llm_batch_size: int = 20
 
     app_timezone: str = "Asia/Kolkata"
     cors_origins: list[str] = ["http://localhost:5173"]

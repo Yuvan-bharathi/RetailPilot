@@ -25,11 +25,7 @@ logger = logging.getLogger(__name__)
 
 @shared_task(name="nightly_run_task")
 def nightly_run_task(run_date_str: str | None = None) -> dict[str, Any]:
-    run_date = (
-        datetime.strptime(run_date_str, "%Y-%m-%d").date()
-        if run_date_str
-        else date.today()
-    )
+    run_date = datetime.strptime(run_date_str, "%Y-%m-%d").date() if run_date_str else date.today()
     engine = get_sync_engine()
     with Session(engine) as session:
         orchestrator = WorkflowOrchestrator(session)
@@ -89,9 +85,7 @@ def partition_maintenance_task() -> dict[str, Any]:
 
             for table in ("sales_line", "inventory_movement"):
                 part_name = f"{table}_{suffix}"
-                exists = session.scalar(
-                    text(f"SELECT to_regclass('{part_name}')")
-                )
+                exists = session.scalar(text(f"SELECT to_regclass('{part_name}')"))
                 if not exists:
                     ddl = (
                         f"CREATE TABLE IF NOT EXISTS {part_name} "

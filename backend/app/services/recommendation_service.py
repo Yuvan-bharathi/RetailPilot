@@ -74,9 +74,13 @@ class RecommendationService:
             is_desc = sort.startswith("-")
             field = sort.lstrip("+-")
             if field == "priority":
-                stmt = stmt.order_by(desc(Recommendation.priority_rank) if is_desc else Recommendation.priority_rank)
+                stmt = stmt.order_by(
+                    desc(Recommendation.priority_rank) if is_desc else Recommendation.priority_rank
+                )
             elif field == "created_at":
-                stmt = stmt.order_by(desc(Recommendation.created_at) if is_desc else Recommendation.created_at)
+                stmt = stmt.order_by(
+                    desc(Recommendation.created_at) if is_desc else Recommendation.created_at
+                )
             elif field == "qty":
                 stmt = stmt.order_by(desc(Recommendation.qty) if is_desc else Recommendation.qty)
             else:
@@ -94,7 +98,9 @@ class RecommendationService:
         transfer_map: dict[UUID, tuple[UUID, str, int]] = {}
         if rec_ids:
             t_stmt = (
-                select(TransferOrder.source_rec_id, TransferOrder.from_store_id, Store.name, TransferOrder.qty)
+                select(
+                    TransferOrder.source_rec_id, TransferOrder.from_store_id, Store.name, TransferOrder.qty
+                )
                 .join(Store, Store.store_id == TransferOrder.from_store_id)
                 .where(TransferOrder.source_rec_id.in_(rec_ids))
             )

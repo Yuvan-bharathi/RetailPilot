@@ -518,3 +518,31 @@ CD-1/CD-2 against the sequence diagrams and the synthetic data:
 - **`llm_usage.est_cost`** is NUMERIC(14,6): provider cost estimates are fractions of a cent (not ₹ money).
 - **`kpi_snapshot.value`** is NUMERIC(18,4): it stores rates as well as amounts.
 **Changed.** CD-1 v3.2, spec §10, migration 0001.
+
+---
+
+## D-44 LLM provider: Groq with OpenAI open-weight models (approved 2026-11-04)
+**Decision (product owner: "use any model of OpenAI which is useful for our use case from Groq API").** The
+explanation text is generated through Groq's OpenAI-compatible chat API. This replaces the Anthropic SDK named in
+CLAUDE.md's fixed stack; rule 11 is unchanged (the LLM only writes text, all numbers come from the evidence).
+- **Models:** `openai/gpt-oss-120b` (primary) and `openai/gpt-oss-20b` (fallback on errors, timeouts, rate
+  limits). Both are Groq *production* models (console.groq.com/docs/models, checked 2026-11-04); preview models
+  (e.g. the earlier `qwen/qwen3.8-27b` fallback) are not used because Groq says they can be withdrawn at short
+  notice. 120b is chosen because the text must restate exact figures and stay grounded; at about $0.15 / $0.60
+  per 1M input / output tokens a 3-item batch measured ~950 tokens, about $0.0003, in 1.3 s.
+- **Request:** strict `json_schema` response format (constrained decoding on gpt-oss), `reasoning_effort` low,
+  `include_reasoning` false, temperature 0 (spec), `max_completion_tokens` 4096 (reasoning counts toward it), one
+  retry on 429/5xx honouring Retry-After, then the fallback model. A truncated answer (`finish_reason` ≠ stop) is
+  an error, never partial text.
+- **Batching:** `llm_batch_size` (20) items per call.
+- **Grounding:** facts sent to the model exclude ids and the donor-stock fields another store's supervisor must not
+  see (rule 10, D-32); keys and enum values are sent as words. A text is accepted only if every number in it is a
+  fact number (₹1,250 = 1,250 = 1250.00; Indian lakh grouping accepted) and it contains no field name; otherwise
+  that item uses its deterministic template. Templates now state only facts present in the evidence (missing
+  values are omitted, not shown as 0).
+- **Telemetry:** each call writes `llm_usage` (model, tokens, est_cost). The earlier logger passed wrong column
+  names and silently logged nothing; fixed.
+- `httpx` moved from dev to runtime dependencies (app code imports it). `LLM_PROVIDER=template` disables the LLM.
+  The `anthropic` package is no longer imported — removal pending the owner's OK (dependency change).
+**Changed.** CLAUDE.md stack; spec §8; `.env.example`; `app/services/{llm_client,explanation_service}.py`;
+`app/core/config.py`; observability repo; tests `tests/unit/services/test_explanation_service.py`.

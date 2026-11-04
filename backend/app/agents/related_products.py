@@ -34,12 +34,9 @@ class RelatedProductAgent(BaseAgent):
 
         # 1. Fetch recent clean sales transactions per store
         for store_id in ctx.store_ids:
-            stmt = (
-                select(SalesLine.bill_id, SalesLine.product_id)
-                .where(
-                    SalesLine.store_id == store_id,
-                    SalesLine.txn_date >= lookback_start,
-                )
+            stmt = select(SalesLine.bill_id, SalesLine.product_id).where(
+                SalesLine.store_id == store_id,
+                SalesLine.txn_date >= lookback_start,
             )
             rows = ctx.session.execute(stmt).all()
             if not rows:
@@ -52,9 +49,7 @@ class RelatedProductAgent(BaseAgent):
 
             # Convert to basket matrix and mine rules
             basket_mat = BasketTools.to_basket_matrix(df)
-            rules_df = BasketTools.mine_rules(
-                basket_mat, min_support=0.005, min_confidence=0.1, min_lift=1.0
-            )
+            rules_df = BasketTools.mine_rules(basket_mat, min_support=0.005, min_confidence=0.1, min_lift=1.0)
             if rules_df.empty:
                 continue
 
@@ -80,14 +75,16 @@ class RelatedProductAgent(BaseAgent):
 
         # 2. Assortment gap detection
         all_store_products = ctx.session.scalars(select(StoreProduct)).all()
-        listings_df = pd.DataFrame([
-            {
-                "store_id": sp.store_id,
-                "product_id": sp.product_id,
-                "is_listed": sp.is_listed,
-            }
-            for sp in all_store_products
-        ])
+        listings_df = pd.DataFrame(
+            [
+                {
+                    "store_id": sp.store_id,
+                    "product_id": sp.product_id,
+                    "is_listed": sp.is_listed,
+                }
+                for sp in all_store_products
+            ]
+        )
 
         total_gaps = 0
         if not listings_df.empty and rules_by_store:

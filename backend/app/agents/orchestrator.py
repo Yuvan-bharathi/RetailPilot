@@ -79,9 +79,7 @@ class RunSupersession:
         # 2. Supersede previous PROPOSED transfers
         # Join against recommendation via source_rec_id
         tr_subq = (
-            select(Recommendation.rec_id)
-            .where(Recommendation.run_id != current_run_id)
-            .scalar_subquery()
+            select(Recommendation.rec_id).where(Recommendation.run_id != current_run_id).scalar_subquery()
         )
         tr_stmt = (
             update(TransferOrder)
@@ -95,12 +93,9 @@ class RunSupersession:
         transfers_superseded = int(getattr(tr_res, "rowcount", 0) or 0)
 
         # 3. Supersede undecided PENDING_L1 POs
-        undecided_pos_stmt = (
-            select(PurchaseOrder.po_id)
-            .where(
-                PurchaseOrder.status == POStatus.PENDING_L1.value,
-                PurchaseOrder.run_id != current_run_id,
-            )
+        undecided_pos_stmt = select(PurchaseOrder.po_id).where(
+            PurchaseOrder.status == POStatus.PENDING_L1.value,
+            PurchaseOrder.run_id != current_run_id,
         )
         candidate_po_ids = list(session.scalars(undecided_pos_stmt).all())
         pos_superseded = 0
@@ -111,11 +106,13 @@ class RunSupersession:
                 select(POLine.po_line_id)
                 .where(
                     POLine.po_id == po_id,
-                    POLine.line_status.in_([
-                        LineStatus.APPROVED.value,
-                        LineStatus.EDITED.value,
-                        LineStatus.REJECTED.value,
-                    ]),
+                    POLine.line_status.in_(
+                        [
+                            LineStatus.APPROVED.value,
+                            LineStatus.EDITED.value,
+                            LineStatus.REJECTED.value,
+                        ]
+                    ),
                 )
                 .limit(1)
             )
@@ -175,8 +172,7 @@ class WorkflowOrchestrator:
 
         # Idempotency check: is a run already running for this run_date?
         existing_running = self.session.scalar(
-            select(AgentRun.run_id)
-            .where(
+            select(AgentRun.run_id).where(
                 AgentRun.agent_name == "nightly",
                 AgentRun.status == "RUNNING",
             )
@@ -303,12 +299,8 @@ class WorkflowOrchestrator:
 
         # 8. Refresh materialized views
         try:
-            self.session.execute(
-                text("REFRESH MATERIALIZED VIEW mv_dashboard_store_day")
-            )
-            self.session.execute(
-                text("REFRESH MATERIALIZED VIEW mv_inbox_counts")
-            )
+            self.session.execute(text("REFRESH MATERIALIZED VIEW mv_dashboard_store_day"))
+            self.session.execute(text("REFRESH MATERIALIZED VIEW mv_inbox_counts"))
             self.session.flush()
         except Exception as e:
             logger.warning("Materialized view refresh skipped/failed: %s", e)
@@ -322,15 +314,19 @@ class WorkflowOrchestrator:
 
         # 10. Finish root run
         duration_s = time.monotonic() - start_time
-        recs_count = self.session.scalar(
-            select(text("COUNT(*)")).select_from(Recommendation).where(Recommendation.run_id == run_id)
-        ) or 0
-        po_count = self.session.scalar(
-            select(text("COUNT(*)")).select_from(PurchaseOrder).where(PurchaseOrder.run_id == run_id)
-        ) or 0
-        transfers_count = self.session.scalar(
-            select(text("COUNT(*)")).select_from(TransferOrder)
-        ) or 0
+        recs_count = (
+            self.session.scalar(
+                select(text("COUNT(*)")).select_from(Recommendation).where(Recommendation.run_id == run_id)
+            )
+            or 0
+        )
+        po_count = (
+            self.session.scalar(
+                select(text("COUNT(*)")).select_from(PurchaseOrder).where(PurchaseOrder.run_id == run_id)
+            )
+            or 0
+        )
+        transfers_count = self.session.scalar(select(text("COUNT(*)")).select_from(TransferOrder)) or 0
 
         summary_dict = {
             "recommendations": recs_count,

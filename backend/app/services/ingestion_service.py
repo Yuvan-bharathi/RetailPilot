@@ -185,8 +185,7 @@ class DataIngestionService:
 
                 # Persist daily snapshot
                 snapshot_rows = [
-                    (s.product_id, s.shelf_qty, s.backroom_qty, s.closing_on_hand)
-                    for s in valid_stock
+                    (s.product_id, s.shelf_qty, s.backroom_qty, s.closing_on_hand) for s in valid_stock
                 ]
                 self.inventory_repo.upsert_daily_snapshot(store_id, run_date, snapshot_rows)
 
@@ -222,9 +221,7 @@ class DataIngestionService:
         self.session.flush()
         return report
 
-    def backfill(
-        self, start: date, end: date, store_ids: list[UUID]
-    ) -> ValidationReport:
+    def backfill(self, start: date, end: date, store_ids: list[UUID]) -> ValidationReport:
         """Backfill historical sales and stock across a date range [start, end] (SD-02 line 57)."""
         combined = ValidationReport()
         current = start

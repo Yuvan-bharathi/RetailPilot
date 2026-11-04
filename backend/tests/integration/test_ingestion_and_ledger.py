@@ -259,4 +259,3 @@ def test_ingestion_detects_stale_skus(db: Connection) -> None:
 
     # Should be flagged as stale because last sale > 30 days ago and stock > 0
     assert (store_id, product_id) in report.stale_skus
-

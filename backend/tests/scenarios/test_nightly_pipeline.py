@@ -79,21 +79,44 @@ def scenario_setup(db: Connection) -> dict[str, Any]:
     store_b = uuid.uuid4()
     store_c = uuid.uuid4()
     stores = [
-        {"store_id": store_a, "code": "IND", "name": "Indiranagar", "region": "BLR", "store_type": "standard", "display_capacity": 500},
-        {"store_id": store_b, "code": "KOR", "name": "Koramangala", "region": "BLR", "store_type": "standard", "display_capacity": 500},
-        {"store_id": store_c, "code": "WHI", "name": "Whitefield", "region": "BLR", "store_type": "standard", "display_capacity": 500},
+        {
+            "store_id": store_a,
+            "code": "IND",
+            "name": "Indiranagar",
+            "region": "BLR",
+            "store_type": "standard",
+            "display_capacity": 500,
+        },
+        {
+            "store_id": store_b,
+            "code": "KOR",
+            "name": "Koramangala",
+            "region": "BLR",
+            "store_type": "standard",
+            "display_capacity": 500,
+        },
+        {
+            "store_id": store_c,
+            "code": "WHI",
+            "name": "Whitefield",
+            "region": "BLR",
+            "store_type": "standard",
+            "display_capacity": 500,
+        },
     ]
     for s in stores:
         session.execute(insert(Store).values(s))
 
     # 2. Supplier
     supp_id = uuid.uuid4()
-    session.execute(insert(Supplier).values(
-        supplier_id=supp_id,
-        name="Apex FMCG Supplies",
-        default_lead_time_days=2,
-        is_active=True,
-    ))
+    session.execute(
+        insert(Supplier).values(
+            supplier_id=supp_id,
+            name="Apex FMCG Supplies",
+            default_lead_time_days=2,
+            is_active=True,
+        )
+    )
 
     # 3. Products:
     # Prod 1: Fast mover (Rice 5kg)
@@ -106,10 +129,49 @@ def scenario_setup(db: Connection) -> dict[str, Any]:
     prod_paneer = uuid.uuid4()
 
     products = [
-        {"product_id": prod_rice, "sku": "RICE-5K", "name": "Basmati Rice 5kg", "category": "Staples", "brand": "IndiaGate", "cost_price": Decimal("250.00"), "selling_price": Decimal("320.00"), "pack_size": 10},
-        {"product_id": prod_bread, "sku": "BREAD-W", "name": "Whole Wheat Bread 400g", "category": "Bakery", "brand": "Modern", "cost_price": Decimal("30.00"), "selling_price": Decimal("45.00"), "pack_size": 1, "shelf_life_days": 5},
-        {"product_id": prod_butter, "sku": "BUTTER-100", "name": "Table Butter 100g", "category": "Dairy", "brand": "Amul", "cost_price": Decimal("50.00"), "selling_price": Decimal("60.00"), "pack_size": 1, "shelf_life_days": 60},
-        {"product_id": prod_paneer, "sku": "PANEER-200", "name": "Fresh Malai Paneer 200g", "category": "Dairy", "brand": "Amul", "cost_price": Decimal("80.00"), "selling_price": Decimal("110.00"), "pack_size": 1, "shelf_life_days": 14},
+        {
+            "product_id": prod_rice,
+            "sku": "RICE-5K",
+            "name": "Basmati Rice 5kg",
+            "category": "Staples",
+            "brand": "IndiaGate",
+            "cost_price": Decimal("250.00"),
+            "selling_price": Decimal("320.00"),
+            "pack_size": 10,
+        },
+        {
+            "product_id": prod_bread,
+            "sku": "BREAD-W",
+            "name": "Whole Wheat Bread 400g",
+            "category": "Bakery",
+            "brand": "Modern",
+            "cost_price": Decimal("30.00"),
+            "selling_price": Decimal("45.00"),
+            "pack_size": 1,
+            "shelf_life_days": 5,
+        },
+        {
+            "product_id": prod_butter,
+            "sku": "BUTTER-100",
+            "name": "Table Butter 100g",
+            "category": "Dairy",
+            "brand": "Amul",
+            "cost_price": Decimal("50.00"),
+            "selling_price": Decimal("60.00"),
+            "pack_size": 1,
+            "shelf_life_days": 60,
+        },
+        {
+            "product_id": prod_paneer,
+            "sku": "PANEER-200",
+            "name": "Fresh Malai Paneer 200g",
+            "category": "Dairy",
+            "brand": "Amul",
+            "cost_price": Decimal("80.00"),
+            "selling_price": Decimal("110.00"),
+            "pack_size": 1,
+            "shelf_life_days": 14,
+        },
     ]
     for p in products:
         session.execute(insert(Product).values(p))
@@ -117,43 +179,77 @@ def scenario_setup(db: Connection) -> dict[str, Any]:
     # 4. StoreProduct listings
     for sid in [store_a, store_b, store_c]:
         for p in products:
-            session.execute(insert(StoreProduct).values(
-                store_id=sid,
-                product_id=p["product_id"],
-                preferred_supplier_id=supp_id,
-                min_display_qty=5,
-                safety_stock_days=2,
-                review_period_days=7,
-                abc_class="A",
-                xyz_class="X",
-                is_listed=True,
-            ))
+            session.execute(
+                insert(StoreProduct).values(
+                    store_id=sid,
+                    product_id=p["product_id"],
+                    preferred_supplier_id=supp_id,
+                    min_display_qty=5,
+                    safety_stock_days=2,
+                    review_period_days=7,
+                    abc_class="A",
+                    xyz_class="X",
+                    is_listed=True,
+                )
+            )
 
     # 5. Supplier Products & Store Terms
     for p in products:
-        session.execute(insert(SupplierProduct).values(
-            supplier_id=supp_id,
-            product_id=p["product_id"],
-            price=p["cost_price"],
-            lead_time_days=2,
-            moq=5,
-            order_pack_size=5,
-        ))
+        session.execute(
+            insert(SupplierProduct).values(
+                supplier_id=supp_id,
+                product_id=p["product_id"],
+                price=p["cost_price"],
+                lead_time_days=2,
+                moq=5,
+                order_pack_size=5,
+            )
+        )
 
     for sid in [store_a, store_b, store_c]:
-        session.execute(insert(SupplierStoreTerms).values(
-            supplier_id=supp_id,
-            store_id=sid,
-            lead_time_days=2,
-            delivery_charge=Decimal("50.00"),
-        ))
+        session.execute(
+            insert(SupplierStoreTerms).values(
+                supplier_id=supp_id,
+                store_id=sid,
+                lead_time_days=2,
+                delivery_charge=Decimal("50.00"),
+            )
+        )
 
     # 6. Transfer Routes between stores
     routes = [
-        {"from_store_id": store_a, "to_store_id": store_b, "fixed_cost": Decimal("20.00"), "per_unit_cost": Decimal("1.00"), "handling_cost_per_unit": Decimal("0.50"), "transit_days": 1},
-        {"from_store_id": store_a, "to_store_id": store_c, "fixed_cost": Decimal("30.00"), "per_unit_cost": Decimal("1.50"), "handling_cost_per_unit": Decimal("0.50"), "transit_days": 1},
-        {"from_store_id": store_b, "to_store_id": store_c, "fixed_cost": Decimal("20.00"), "per_unit_cost": Decimal("1.00"), "handling_cost_per_unit": Decimal("0.50"), "transit_days": 1},
-        {"from_store_id": store_c, "to_store_id": store_a, "fixed_cost": Decimal("30.00"), "per_unit_cost": Decimal("1.50"), "handling_cost_per_unit": Decimal("0.50"), "transit_days": 1},
+        {
+            "from_store_id": store_a,
+            "to_store_id": store_b,
+            "fixed_cost": Decimal("20.00"),
+            "per_unit_cost": Decimal("1.00"),
+            "handling_cost_per_unit": Decimal("0.50"),
+            "transit_days": 1,
+        },
+        {
+            "from_store_id": store_a,
+            "to_store_id": store_c,
+            "fixed_cost": Decimal("30.00"),
+            "per_unit_cost": Decimal("1.50"),
+            "handling_cost_per_unit": Decimal("0.50"),
+            "transit_days": 1,
+        },
+        {
+            "from_store_id": store_b,
+            "to_store_id": store_c,
+            "fixed_cost": Decimal("20.00"),
+            "per_unit_cost": Decimal("1.00"),
+            "handling_cost_per_unit": Decimal("0.50"),
+            "transit_days": 1,
+        },
+        {
+            "from_store_id": store_c,
+            "to_store_id": store_a,
+            "fixed_cost": Decimal("30.00"),
+            "per_unit_cost": Decimal("1.50"),
+            "handling_cost_per_unit": Decimal("0.50"),
+            "transit_days": 1,
+        },
     ]
     for r in routes:
         session.execute(insert(TransferRoute).values(r))
@@ -180,23 +276,27 @@ def test_nightly_orchestrator_pipeline_end_to_end(db: Connection, scenario_setup
     for day_offset in range(1, 15):
         past_date = D - timedelta(days=day_offset)
         past_bill = uuid.uuid4()
-        session.execute(insert(SalesTransaction).values(
-            bill_id=past_bill,
-            store_id=s["store_a"],
-            txn_datetime=datetime.combine(past_date, datetime.min.time(), tzinfo=UTC),
-            txn_date=past_date,
-            total_amount=Decimal("3200.00"),
-        ))
-        session.execute(insert(SalesLine).values(
-            bill_id=past_bill,
-            line_no=1,
-            txn_date=past_date,
-            store_id=s["store_a"],
-            product_id=s["prod_rice"],
-            qty=10,
-            unit_price=Decimal("320.00"),
-            discount=Decimal("0.00"),
-        ))
+        session.execute(
+            insert(SalesTransaction).values(
+                bill_id=past_bill,
+                store_id=s["store_a"],
+                txn_datetime=datetime.combine(past_date, datetime.min.time(), tzinfo=UTC),
+                txn_date=past_date,
+                total_amount=Decimal("3200.00"),
+            )
+        )
+        session.execute(
+            insert(SalesLine).values(
+                bill_id=past_bill,
+                line_no=1,
+                txn_date=past_date,
+                store_id=s["store_a"],
+                product_id=s["prod_rice"],
+                qty=10,
+                unit_price=Decimal("320.00"),
+                discount=Decimal("0.00"),
+            )
+        )
     session.flush()
 
     # Prepare POS mock data:
@@ -232,12 +332,40 @@ def test_nightly_orchestrator_pipeline_end_to_end(db: Connection, scenario_setup
 
     mock_stock = [
         # Store A: 0 Rice, 50 Paneer
-        RawStockRow(store_id=s["store_a"], product_id=s["prod_rice"], snapshot_date=D, shelf_qty=0, backroom_qty=0, closing_on_hand=0),
-        RawStockRow(store_id=s["store_a"], product_id=s["prod_paneer"], snapshot_date=D, shelf_qty=50, backroom_qty=0, closing_on_hand=50),
+        RawStockRow(
+            store_id=s["store_a"],
+            product_id=s["prod_rice"],
+            snapshot_date=D,
+            shelf_qty=0,
+            backroom_qty=0,
+            closing_on_hand=0,
+        ),
+        RawStockRow(
+            store_id=s["store_a"],
+            product_id=s["prod_paneer"],
+            snapshot_date=D,
+            shelf_qty=50,
+            backroom_qty=0,
+            closing_on_hand=50,
+        ),
         # Store B: 0 Rice
-        RawStockRow(store_id=s["store_b"], product_id=s["prod_rice"], snapshot_date=D, shelf_qty=0, backroom_qty=0, closing_on_hand=0),
+        RawStockRow(
+            store_id=s["store_b"],
+            product_id=s["prod_rice"],
+            snapshot_date=D,
+            shelf_qty=0,
+            backroom_qty=0,
+            closing_on_hand=0,
+        ),
         # Store C: 0 Rice
-        RawStockRow(store_id=s["store_c"], product_id=s["prod_rice"], snapshot_date=D, shelf_qty=0, backroom_qty=0, closing_on_hand=0),
+        RawStockRow(
+            store_id=s["store_c"],
+            product_id=s["prod_rice"],
+            snapshot_date=D,
+            shelf_qty=0,
+            backroom_qty=0,
+            closing_on_hand=0,
+        ),
     ]
 
     mock_batches = [
@@ -317,36 +445,42 @@ def test_run_supersession_on_second_nightly_run(db: Connection, scenario_setup: 
 
     # Create a manual PENDING recommendation and PENDING_L1 PO on run 1
     rec_id = uuid.uuid4()
-    session.execute(insert(Recommendation).values(
-        rec_id=rec_id,
-        run_id=run_1,
-        store_id=s["store_a"],
-        product_id=s["prod_rice"],
-        rec_type="REORDER",
-        qty=15,
-        priority=Priority.HIGH.value,
-        status=RecStatus.PENDING.value,
-        evidence={"qty": 15},
-    ))
+    session.execute(
+        insert(Recommendation).values(
+            rec_id=rec_id,
+            run_id=run_1,
+            store_id=s["store_a"],
+            product_id=s["prod_rice"],
+            rec_type="REORDER",
+            qty=15,
+            priority=Priority.HIGH.value,
+            status=RecStatus.PENDING.value,
+            evidence={"qty": 15},
+        )
+    )
     po_id = uuid.uuid4()
-    session.execute(insert(PurchaseOrder).values(
-        po_id=po_id,
-        supplier_id=s["supp_id"],
-        run_id=run_1,
-        total_value=Decimal("500.00"),
-        status=POStatus.PENDING_L1.value,
-    ))
+    session.execute(
+        insert(PurchaseOrder).values(
+            po_id=po_id,
+            supplier_id=s["supp_id"],
+            run_id=run_1,
+            total_value=Decimal("500.00"),
+            status=POStatus.PENDING_L1.value,
+        )
+    )
     po_line_id = uuid.uuid4()
-    session.execute(insert(POLine).values(
-        po_line_id=po_line_id,
-        po_id=po_id,
-        store_id=s["store_a"],
-        product_id=s["prod_rice"],
-        qty=15,
-        unit_price=Decimal("250.00"),
-        source_rec_id=rec_id,
-        line_status=LineStatus.PENDING.value,
-    ))
+    session.execute(
+        insert(POLine).values(
+            po_line_id=po_line_id,
+            po_id=po_id,
+            store_id=s["store_a"],
+            product_id=s["prod_rice"],
+            qty=15,
+            unit_price=Decimal("250.00"),
+            source_rec_id=rec_id,
+            line_status=LineStatus.PENDING.value,
+        )
+    )
     session.flush()
 
     # Run 2 on next day (D + 1)
@@ -373,36 +507,42 @@ def test_approval_deadline_escalation_service(db: Connection, scenario_setup: di
     po_id = uuid.uuid4()
     run_id = uuid.uuid4()
     session.execute(insert(AgentRun).values(run_id=run_id, agent_name="test", status="SUCCESS"))
-    session.execute(insert(PurchaseOrder).values(
-        po_id=po_id,
-        supplier_id=s["supp_id"],
-        run_id=run_id,
-        total_value=Decimal("1200.00"),
-        status=POStatus.PENDING_L1.value,
-        l1_deadline=NOW - timedelta(hours=2),  # 2 hours overdue!
-    ))
+    session.execute(
+        insert(PurchaseOrder).values(
+            po_id=po_id,
+            supplier_id=s["supp_id"],
+            run_id=run_id,
+            total_value=Decimal("1200.00"),
+            status=POStatus.PENDING_L1.value,
+            l1_deadline=NOW - timedelta(hours=2),  # 2 hours overdue!
+        )
+    )
     rec_id = uuid.uuid4()
-    session.execute(insert(Recommendation).values(
-        rec_id=rec_id,
-        run_id=run_id,
-        store_id=s["store_a"],
-        product_id=s["prod_rice"],
-        rec_type="REORDER",
-        qty=10,
-        status=RecStatus.PENDING.value,
-        evidence={"qty": 10},
-    ))
+    session.execute(
+        insert(Recommendation).values(
+            rec_id=rec_id,
+            run_id=run_id,
+            store_id=s["store_a"],
+            product_id=s["prod_rice"],
+            rec_type="REORDER",
+            qty=10,
+            status=RecStatus.PENDING.value,
+            evidence={"qty": 10},
+        )
+    )
     line_id = uuid.uuid4()
-    session.execute(insert(POLine).values(
-        po_line_id=line_id,
-        po_id=po_id,
-        store_id=s["store_a"],
-        product_id=s["prod_rice"],
-        qty=10,
-        unit_price=Decimal("250.00"),
-        source_rec_id=rec_id,
-        line_status=LineStatus.PENDING.value,
-    ))
+    session.execute(
+        insert(POLine).values(
+            po_line_id=line_id,
+            po_id=po_id,
+            store_id=s["store_a"],
+            product_id=s["prod_rice"],
+            qty=10,
+            unit_price=Decimal("250.00"),
+            source_rec_id=rec_id,
+            line_status=LineStatus.PENDING.value,
+        )
+    )
     session.flush()
 
     # Run ApprovalService.expire_overdue()
@@ -419,4 +559,3 @@ def test_partition_maintenance(db: Connection) -> None:
     res = partition_maintenance_task()
     assert isinstance(res["created_partitions"], list)
     assert len(res["default_overflow_alerts"]) == 0
-

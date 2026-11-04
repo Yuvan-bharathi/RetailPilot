@@ -54,7 +54,9 @@ class RetailPilotUser(HttpUser):
         with self.client.get("/api/v1/recommendations", catch_response=True) as resp:
             if resp.status_code == 200:
                 if resp.elapsed.total_seconds() > 0.200:
-                    resp.failure(f"Recommendations read SLA exceeded: {resp.elapsed.total_seconds():.3f}s > 0.200s")
+                    resp.failure(
+                        f"Recommendations read SLA exceeded: {resp.elapsed.total_seconds():.3f}s > 0.200s"
+                    )
                 else:
                     resp.success()
 
@@ -96,4 +98,3 @@ class RetailPilotUser(HttpUser):
                     resp.failure(f"Telemetry SLA exceeded: {resp.elapsed.total_seconds():.3f}s > 0.500s")
                 else:
                     resp.success()
-

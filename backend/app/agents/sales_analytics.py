@@ -125,7 +125,11 @@ class SalesAnalyticsAgent(BaseAgent):
         nil_uuid = uuid.UUID(int=0)
         for s_id in ctx.store_ids:
             store_sales = sales_df.loc[sales_df["store_id"] == s_id] if not sales_df.empty else sales_df
-            store_rev = Decimal(str(round(store_sales["revenue"].sum(), 2))) if not store_sales.empty else Decimal("0")
+            store_rev = (
+                Decimal(str(round(store_sales["revenue"].sum(), 2)))
+                if not store_sales.empty
+                else Decimal("0")
+            )
             kpi_records.append(
                 KpiSnapshot(
                     run_id=ctx.run_id,
@@ -139,6 +143,10 @@ class SalesAnalyticsAgent(BaseAgent):
 
         return AgentResult(
             status="SUCCESS",
-            outputs={"kpis": len(kpi_records), "lost_sales_rows": len(lost_sales_records), "total_revenue": total_rev},
+            outputs={
+                "kpis": len(kpi_records),
+                "lost_sales_rows": len(lost_sales_records),
+                "total_revenue": total_rev,
+            },
             step_count=5,
         )

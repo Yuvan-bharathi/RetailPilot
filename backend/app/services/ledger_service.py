@@ -95,9 +95,7 @@ class InventoryLedgerService:
 
         self.session.flush()
 
-    def reconcile(
-        self, store_id: UUID, snapshot: Sequence[RawStockRow]
-    ) -> list[InventoryMovement]:
+    def reconcile(self, store_id: UUID, snapshot: Sequence[RawStockRow]) -> list[InventoryMovement]:
         """Reconcile physical stock counts against ledger positions (SD-02 lines 34-40).
 
         For any discrepancy between snapshot counts and maintained positions, posts an
@@ -165,4 +163,3 @@ class InventoryLedgerService:
             self.post(adjustments)
 
         return adjustments
-

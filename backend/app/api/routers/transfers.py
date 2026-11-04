@@ -113,4 +113,3 @@ async def receive_transfer(
     """Destination store supervisor confirms receipt quantity (SD-12 step 5)."""
     service = TransferService()
     return await service.receive(session, transfer_id, body.received_qty, current_user)
-

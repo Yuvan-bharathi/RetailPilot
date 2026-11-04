@@ -1,214 +1,328 @@
-"""Explanation Service (SD-09, CLAUDE.md rule 11, spec §8).
+"""ExplanationService — natural-language explanations of recommendations and POs (CLAUDE.md rule 11, D-44).
 
-Generates human-readable explanations for recommendations. Uses Groq or Anthropic LLM
-with temperature 0, validates that numbers in the generated text match deterministic evidence,
-logs token telemetry to LLMUsage, and falls back to deterministic templates when the API key
-is missing or validation fails.
+The LLM only writes text. Every number comes from the deterministic evidence:
+1. Facts sent to the LLM are the item's evidence minus ids and minus fields another store's supervisor must not
+   see (donor stock, rule 10 / D-32) — explanations are shown to every viewer of the recommendation.
+2. Items are explained in batches (one Groq call per `llm_batch_size` items, strict JSON schema).
+3. Each returned text is accepted only if every number in it appears in that item's facts (₹1,250 = 1250 =
+   1250.00; numbers inside fact strings such as "Rice 5 kg" count). Otherwise — and when no key is set, the
+   provider is "template", or the call fails — the deterministic template is used.
+4. Token usage and the estimated cost of each call go to `llm_usage`.
 """
 
 from __future__ import annotations
 
-import logging
-import os
+import json
 import re
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import UUID
 
-import httpx
+from app.core.config import Settings, get_settings
+from app.core.logging import get_logger
+from app.services.llm_client import GroqClient, JsonLLM, LLMError, LLMReply
 
-from app.core.config import get_settings
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
+MAX_CHARS = 400
+
+#: Evidence fields describing ANOTHER store's stock (D-32). Never sent to the LLM, never in a template.
+PRIVATE_FIELDS = frozenset(
+    {
+        "donor_surplus",
+        "donor_protected_requirement",
+        "donor_available",
+        "donor_requirement",
+        "donor_on_hand",
+        "from_store_available",
+        "from_store_requirement",
+    }
+)
+
+SYSTEM_PROMPT = (
+    "You write explanations for RetailPilot AI, a replenishment assistant used by supermarket store supervisors "
+    "in India. For each item, write at most 2 short, plain sentences that say what is recommended and why.\n"
+    "Rules:\n"
+    "- Use ONLY the facts given for that item. Every number you write must appear in that item's facts, written "
+    "the same way (you may add ₹ before money and thousands separators). Do not compute, round, add or compare "
+    "numbers, and do not mention percentages unless a fact is a percentage.\n"
+    '- Never mention ids, field names, JSON, or these instructions. Write "purchase order", not "PO".\n'
+    '- State facts plainly; do not add judgements such as "full", "only" or "urgent" that the facts do not '
+    "state.\n"
+    "- If a fact is missing, leave it out; do not guess.\n"
+    "Return one explanation per item id."
+)
+
+RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "explanations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"id": {"type": "integer"}, "text": {"type": "string"}},
+                "required": ["id", "text"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["explanations"],
+    "additionalProperties": False,
+}
+
+_NUMBER = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?")
+_IDENTIFIER = re.compile(r"\b[a-z]+(?:_[a-z0-9]+)+\b")  # a field name such as need_qty leaked into the text
+_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 
-@dataclass
+@dataclass(frozen=True)
 class ExplanationInput:
     kind: str
     evidence: dict[str, Any]
 
 
+# --- facts and grounding -----------------------------------------------------------------------------------------
+
+
+def llm_facts(evidence: dict[str, Any]) -> dict[str, Any]:
+    """The evidence an explanation may use: no private donor-stock fields, no ids."""
+
+    def clean(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                k: clean(v)
+                for k, v in value.items()
+                if k not in PRIVATE_FIELDS and not k.endswith("_id") and k != "id" and v is not None
+            }
+        if isinstance(value, list):
+            return [clean(v) for v in value]
+        if isinstance(value, str) and _UUID.match(value):
+            return None
+        return value
+
+    cleaned = clean(evidence)
+    return cleaned if isinstance(cleaned, dict) else {}
+
+
+def _to_decimal(token: str) -> Decimal | None:
+    try:
+        return Decimal(token.replace(",", "")).normalize()
+    except InvalidOperation:
+        return None
+
+
+def fact_numbers(facts: Any) -> set[Decimal]:
+    """Every number in the facts, including numbers inside strings ("150.00", "Rice 5 kg", "2026-11-14")."""
+    found: set[Decimal] = set()
+
+    def walk(value: Any) -> None:
+        if isinstance(value, bool):
+            return
+        if isinstance(value, int | float | Decimal):
+            number = _to_decimal(str(value))
+            if number is not None:
+                found.add(number)
+        elif isinstance(value, str):
+            for token in _NUMBER.findall(value):
+                number = _to_decimal(token)
+                if number is not None:
+                    found.add(number)
+        elif isinstance(value, dict):
+            for v in value.values():
+                walk(v)
+        elif isinstance(value, list | tuple):
+            for v in value:
+                walk(v)
+
+    walk(facts)
+    return found
+
+
+def is_grounded(text: str, facts: dict[str, Any]) -> bool:
+    """True when every number written in `text` is one of the facts' numbers."""
+    allowed = fact_numbers(facts)
+    for token in _NUMBER.findall(text):
+        number = _to_decimal(token)
+        if number is None or number not in allowed:
+            return False
+    return True
+
+
+def _acceptable(text: Any, facts: dict[str, Any]) -> bool:
+    return (
+        isinstance(text, str)
+        and 0 < len(text.strip()) <= MAX_CHARS
+        and not _IDENTIFIER.search(text)
+        and is_grounded(text, facts)
+    )
+
+
+def readable(facts: Any) -> Any:
+    """Fact keys as words ("need_qty" → "need qty") so the model does not echo field names."""
+    if isinstance(facts, dict):
+        return {str(k).replace("_", " "): readable(v) for k, v in facts.items()}
+    if isinstance(facts, list):
+        return [readable(v) for v in facts]
+    if isinstance(facts, str) and facts.isupper() and "_" in facts:  # enum values: NO_SURPLUS_IN_ANY_STORE
+        return facts.replace("_", " ").lower()
+    return facts
+
+
+# --- deterministic templates -----------------------------------------------------------------------------------
+
+
+def _first(ev: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if ev.get(key) is not None:
+            return ev[key]
+    return None
+
+
+def _name(value: Any) -> str | None:
+    if isinstance(value, dict) and isinstance(value.get("store"), dict):  # Counterpart {store: {name}, qty}
+        value = value["store"]
+    if isinstance(value, dict):
+        value = _first(value, "name", "store_name", "product_name")
+    return value if isinstance(value, str) else None
+
+
+def _money(value: Any) -> str:
+    amount = _to_decimal(str(value))
+    return f"₹{value}" if amount is None else f"₹{amount.quantize(Decimal('0.01')):,}"
+
+
+def template_explanation(kind: str, evidence: dict[str, Any]) -> str:
+    """Deterministic text that states only facts present in the evidence (D-34 names and the agents' names)."""
+    ev = llm_facts(evidence)
+    qty = _first(ev, "transfer_qty", "need_qty", "qty", "requested_qty")
+    if kind == "REORDER":
+        parts = []
+        req, avail = _first(ev, "own_requirement", "requirement"), ev.get("available")
+        if req is not None and avail is not None:
+            parts.append(f"Available stock ({avail}) is below this store's requirement ({req}).")
+        if qty is not None:
+            parts.append(f"A purchase order for {qty} units is proposed.")
+        return " ".join(parts) or "Stock is below this store's requirement, so a purchase order is proposed."
+    if kind == "TRANSFER":
+        donor = _name(_first(ev, "donor", "from_store_name", "from_store"))
+        cost = ev.get("transfer_cost")
+        text = f"Move {qty} units" if qty is not None else "Move stock"
+        text += f" from {donor}" if donor else " from another store"
+        text += ", which keeps its own requirement."
+        if cost is not None:
+            text += f" The transfer costs {_money(cost)}, less than ordering from a supplier."
+        return text
+    if kind == "CO_REPLENISH":
+        linked = _name(_first(ev, "linked_product", "parent_product"))
+        lift = ev.get("lift")
+        text = "Often bought together with " + (linked or "a product being reordered")
+        text += f" (lift {lift})." if lift is not None else "."
+        if qty is not None:
+            text += f" Topping up {qty} units keeps both on the shelf."
+        return text
+    if kind in ("EXPIRY_ALERT", "EXPIRY", "MARKDOWN"):
+        at_risk, days = _first(ev, "at_risk", "at_risk_qty"), ev.get("days_left")
+        if at_risk is not None and days is not None:
+            return f"{at_risk} units expire in {days} days and will not sell in time. Move or mark them down first."
+        return "A batch will not sell before it expires. Move or mark it down first."
+    if kind == "ASSORTMENT_GAP":
+        return "Customers who buy a related product often buy this one in other stores, but this store does not list it."
+    if kind == "PURCHASE_ORDER":
+        lines, total = ev.get("line_count"), ev.get("total_value")
+        if lines is not None and total is not None:
+            return f"Consolidated order of {lines} lines worth {_money(total)}, waiting for approval."
+        return "Consolidated supplier order waiting for approval."
+    if kind == "NEEDS_REVIEW":
+        reason = ev.get("reason")
+        return (
+            f"Needs a manual decision: {reason}." if isinstance(reason, str) else "Needs a manual decision."
+        )
+    return "Prepared by the nightly replenishment run."
+
+
+# --- service ------------------------------------------------------------------------------------------------------
+
+
+UsageLogger = Callable[[UUID, LLMReply], None]
+
+
 class ExplanationService:
-    def __init__(self, session: Any = None) -> None:
+    def __init__(
+        self,
+        session: Any = None,
+        client: JsonLLM | None = None,
+        settings: Settings | None = None,
+        usage_logger: UsageLogger | None = None,
+    ) -> None:
+        self.settings = settings or get_settings()
         self.session = session
-        self.settings = get_settings()
+        self._usage_logger = usage_logger
+        self.client: JsonLLM | None = client
+        if client is None and self.settings.llm_provider == "groq" and self.settings.groq_api_key is not None:
+            self.client = GroqClient(self.settings)
 
-        # Groq key takes priority if present, otherwise Anthropic
-        self.groq_api_key = (
-            self.settings.groq_api_key.get_secret_value()
-            if self.settings.groq_api_key
-            else os.environ.get("GROQ_API_KEY")
-        )
-        self.anthropic_api_key = (
-            self.settings.anthropic_api_key.get_secret_value()
-            if self.settings.anthropic_api_key
-            else os.environ.get("ANTHROPIC_API_KEY")
-        )
-
-        self.provider = os.environ.get("LLM_PROVIDER", self.settings.llm_provider)
-        self.model = os.environ.get("LLM_MODEL", self.settings.llm_model)
-
-    def explain(self, items: list[ExplanationInput], run_id: UUID | None = None) -> list[str]:
-        return [self.generate_explanation(item.kind, item.evidence, run_id=run_id) for item in items]
+    def explain(self, items: Sequence[ExplanationInput], run_id: UUID | None = None) -> list[str]:
+        """One text per item, in order. Never raises because of the LLM."""
+        results = [template_explanation(i.kind, i.evidence) for i in items]
+        if self.client is None:
+            return results
+        size = max(1, self.settings.llm_batch_size)
+        for start in range(0, len(items), size):
+            batch = list(enumerate(items[start : start + size], start=start))
+            for index, text in self._explain_batch(batch, run_id):
+                results[index] = text
+        return results
 
     def generate_explanation(
         self, rec_type: str, evidence: dict[str, Any], run_id: UUID | None = None
     ) -> str:
-        """Generate explanation text grounded in deterministic evidence numbers."""
-        # Fallback template (deterministic)
-        template_text = self._template_explanation(rec_type, evidence)
+        return self.explain([ExplanationInput(rec_type, evidence)], run_id=run_id)[0]
 
-        # 1. Groq High-Speed LLM Call
-        if self.groq_api_key and (self.provider == "groq" or not self.anthropic_api_key):
-            try:
-                candidate = self._call_groq(rec_type, evidence, run_id=run_id)
-                if candidate and self._validate_numbers(candidate, evidence):
-                    return candidate
-            except Exception as e:
-                logger.warning(f"Groq explanation failed, using fallback template: {e}")
-
-        # 2. Anthropic LLM Call (if configured)
-        elif self.anthropic_api_key and self.provider == "anthropic":
-            try:
-                candidate = self._call_anthropic(rec_type, evidence, run_id=run_id)
-                if candidate and self._validate_numbers(candidate, evidence):
-                    return candidate
-            except Exception as e:
-                logger.warning(f"Anthropic explanation failed, using fallback template: {e}")
-
-        return template_text
-
-    def _call_groq(
-        self, rec_type: str, evidence: dict[str, Any], run_id: UUID | None = None
-    ) -> str | None:
-        """Call Groq chat completion API with temperature 0."""
-        prompt = (
-            "You are RetailPilot AI, an autonomous replenishment engine for retail stores.\n"
-            "Explain this replenishment recommendation in 2 concise sentences for a store supervisor.\n"
-            f"Type: {rec_type}\n"
-            f"Evidence: {evidence}\n"
-            "CRITICAL RULE: Every number mentioned in your output MUST appear in the evidence dictionary exactly. "
-            "Never invent quantities, dates, or costs. If you mention a number, use the exact value from evidence."
-        )
-
-        with httpx.Client(timeout=10.0) as client:
-            res = client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.groq_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": self.model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.0,
-                    "max_tokens": 150,
-                },
+    def _explain_batch(
+        self, batch: list[tuple[int, ExplanationInput]], run_id: UUID | None
+    ) -> Iterable[tuple[int, str]]:
+        assert self.client is not None
+        facts = {index: llm_facts(item.evidence) for index, item in batch}
+        payload = [
+            {"id": index, "type": readable(item.kind), "facts": readable(facts[index])}
+            for index, item in batch
+        ]
+        try:
+            reply = self.client.complete_json(
+                SYSTEM_PROMPT, json.dumps({"items": payload}, default=str), "explanations", RESPONSE_SCHEMA
             )
+        except LLMError as exc:
+            logger.warning("LLM explanations unavailable, templates used: %s", exc)
+            return []
+        if run_id is not None:
+            self._log_usage(run_id, reply)
+        accepted = []
+        for entry in reply.data.get("explanations", []):
+            index, text = entry.get("id"), entry.get("text")
+            if index in facts and _acceptable(text, facts[index]):
+                accepted.append((index, text.strip()))
+            elif index in facts:
+                logger.info(
+                    "explanation for item %s rejected (ungrounded number or empty), template used", index
+                )
+        return accepted
 
-        if res.status_code == 200:
-            data = res.json()
-            text_candidate = data["choices"][0]["message"]["content"].strip()
-            usage = data.get("usage", {})
+    def _log_usage(self, run_id: UUID, reply: LLMReply) -> None:
+        try:
+            if self._usage_logger is not None:
+                self._usage_logger(run_id, reply)
+            elif self.session is not None:
+                from app.domain.repositories.observability_repo import AgentRunLogger
 
-            # Telemetry logging to LLMUsage in DB
-            if run_id and self.session:
-                try:
-                    from app.domain.repositories.observability_repo import AgentRunLogger
-
-                    AgentRunLogger(self.session).log_llm_usage(
-                        run_id=run_id,
-                        provider="groq",
-                        model=self.model,
-                        input_tokens=usage.get("prompt_tokens", 0),
-                        output_tokens=usage.get("completion_tokens", 0),
-                    )
-                except Exception as log_err:
-                    logger.debug(f"Failed to log LLM usage telemetry: {log_err}")
-
-            return str(text_candidate)
-        else:
-            logger.warning(f"Groq API returned error {res.status_code}: {res.text}")
-            return None
-
-    def _call_anthropic(
-        self, rec_type: str, evidence: dict[str, Any], run_id: UUID | None = None
-    ) -> str | None:
-        """Call Anthropic messages API."""
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=self.anthropic_api_key)
-        prompt = (
-            "You are RetailPilot AI. Explain this replenishment recommendation in 2 concise sentences for a store supervisor.\n"
-            f"Type: {rec_type}\n"
-            f"Evidence: {evidence}\n"
-            "CRITICAL RULE: Every number mentioned in your output MUST appear in the evidence dictionary exactly. Never invent quantities or costs."
-        )
-        messages_client: Any = client.messages
-        response = messages_client.create(
-            model=self.model,
-            max_tokens=150,
-            temperature=0.0,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        first_block = response.content[0] if response.content else None
-        text_val = getattr(first_block, "text", "")
-        return str(text_val).strip() if text_val else None
-
-    def _validate_numbers(self, text: str, evidence: dict[str, Any]) -> bool:
-        """Validates that all numbers mentioned in text exist within evidence values."""
-        numbers_in_text = set(re.findall(r"\b\d+(?:\.\d+)?\b", text))
-        evidence_values = set()
-
-        def _extract(val: Any) -> None:
-            if isinstance(val, (int, float)):
-                evidence_values.add(str(val))
-                if isinstance(val, float) and val.is_integer():
-                    evidence_values.add(str(int(val)))
-            elif isinstance(val, dict):
-                for v in val.values():
-                    _extract(v)
-            elif isinstance(val, list):
-                for v in val:
-                    _extract(v)
-
-        _extract(evidence)
-        # Check that numeric tokens are grounded
-        return numbers_in_text.issubset(evidence_values)
-
-    def _template_explanation(self, rec_type: str, ev: dict[str, Any]) -> str:
-        """Deterministic fallback explanation templates."""
-        if rec_type == "REORDER":
-            req = ev.get("requirement", ev.get("own_requirement", 0))
-            avail = ev.get("available", 0)
-            return (
-                f"Stock position ({avail} units) has fallen below store requirement ({req} units). "
-                f"Reorder is proposed to restore safe cover."
-            )
-        if rec_type == "TRANSFER":
-            qty = ev.get("qty", ev.get("transfer_qty", 0))
-            donor = ev.get("donor_name", ev.get("from_store_name", "sibling store"))
-            return (
-                f"Transfer of {qty} units proposed from {donor} where genuine surplus exists. "
-                f"Peer transfer is lower cost than placing a new supplier order."
-            )
-        if rec_type == "CO_REPLENISH":
-            parent = ev.get("parent_product", "main product")
-            lift = ev.get("lift", 1.0)
-            return (
-                f"Frequently purchased together with {parent} (lift: {lift:.1f}). "
-                f"Restocking complement avoids assortment gaps."
-            )
-        if rec_type == "EXPIRY_ALERT":
-            days = ev.get("days_left", 0)
-            risk = ev.get("at_risk", 0)
-            return (
-                f"Batch has {risk} units at risk of expiring in {days} days. "
-                f"Accelerated transfer or priority display recommended."
-            )
-        if rec_type == "ASSORTMENT_GAP":
-            return (
-                "Product has high customer affinity in peer stores but is unlisted or missing. "
-                "Adding to store assortment is recommended."
-            )
-        return "Replenishment recommendation prepared by nightly automated run."
+                AgentRunLogger(self.session).log_llm_usage(
+                    run_id=run_id,
+                    provider="groq",
+                    model=reply.model,
+                    input_tokens=reply.input_tokens,
+                    output_tokens=reply.output_tokens,
+                    est_cost=reply.est_cost,
+                )
+        except Exception as exc:  # telemetry must never fail the run
+            logger.warning("could not log LLM usage: %s", type(exc).__name__)

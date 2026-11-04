@@ -32,4 +32,3 @@ async def list_stores(current_user: CurrentUser, session: DbSession) -> list[Sto
         )
         for s in stores
     ]
-

@@ -16,9 +16,7 @@ class BatchRepo:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def get_expiring(
-        self, store_ids: list[UUID], as_of_date: date, within_days: int = 14
-    ) -> list[Batch]:
+    def get_expiring(self, store_ids: list[UUID], as_of_date: date, within_days: int = 14) -> list[Batch]:
         """Fetch held batches expiring within window (D-38, SD-08)."""
         if not store_ids:
             return []
@@ -61,4 +59,3 @@ class BatchRepo:
         )
         self.session.execute(stmt)
         return len(batches)
-

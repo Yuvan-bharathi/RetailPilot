@@ -1,8 +1,9 @@
 """Celery application. Run with: uv run celery -A app.workers.celery_app worker -B -l info
 
-The beat schedule is empty in Phase 1. Phase 5 adds (docs/02-technical-spec.md §7):
-  nightly-run          nightly_run_task(run_date)  23:30 IST daily
-  approval-deadlines   approval_deadline_task()    every 15 minutes
+Beat schedule (docs/02-technical-spec.md §7, D-35):
+  nightly-run            nightly_run_task(run_date)    23:30 IST daily
+  approval-deadlines     approval_deadline_task()      every 15 minutes
+  partition-maintenance  partition_maintenance_task()  00:00 IST daily (future months, default-partition alert)
 """
 
 from typing import Any

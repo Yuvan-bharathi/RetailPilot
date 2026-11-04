@@ -1164,6 +1164,7 @@ dependencies = [
     { name = "bcrypt" },
     { name = "celery" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "mlxtend" },
     { name = "numpy" },
     { name = "pandas" },
@@ -1180,7 +1181,6 @@ dependencies = [
 dev = [
     { name = "celery-types" },
     { name = "factory-boy" },
-    { name = "httpx" },
     { name = "hypothesis" },
     { name = "mypy" },
     { name = "pandas-stubs" },
@@ -1197,6 +1197,7 @@ requires-dist = [
     { name = "bcrypt", specifier = ">=4.2" },
     { name = "celery", specifier = ">=5.4" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "mlxtend", specifier = ">=0.23" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pandas", specifier = ">=2.2" },
@@ -1213,7 +1214,6 @@ requires-dist = [
 dev = [
     { name = "celery-types", specifier = ">=0.22" },
     { name = "factory-boy", specifier = ">=3.3" },
-    { name = "httpx", specifier = ">=0.27" },
     { name = "hypothesis", specifier = ">=6.100" },
     { name = "mypy", specifier = ">=1.11" },
     { name = "pandas-stubs", specifier = ">=2.2" },

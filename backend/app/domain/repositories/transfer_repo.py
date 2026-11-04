@@ -26,4 +26,3 @@ class TransferRepo:
             self.session.add(t)
         self.session.flush()
         return transfers
-

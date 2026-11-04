@@ -42,9 +42,13 @@ class TransferService:
         )
 
         if user.role == Role.STORE_SUPERVISOR.value:
-            stmt = stmt.where((TransferOrder.from_store_id == user.store_id) | (TransferOrder.to_store_id == user.store_id))
+            stmt = stmt.where(
+                (TransferOrder.from_store_id == user.store_id) | (TransferOrder.to_store_id == user.store_id)
+            )
         elif store_id is not None:
-            stmt = stmt.where((TransferOrder.from_store_id == store_id) | (TransferOrder.to_store_id == store_id))
+            stmt = stmt.where(
+                (TransferOrder.from_store_id == store_id) | (TransferOrder.to_store_id == store_id)
+            )
 
         if status:
             stmt = stmt.where(TransferOrder.status == status)
@@ -112,10 +116,14 @@ class TransferService:
         await self._adjust_commitment(session, t.from_store_id, t.product_id, reserved_delta=t.qty)
 
         await session.commit()
-        self.cache_service.invalidate_store_keys([t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"])
+        self.cache_service.invalidate_store_keys(
+            [t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"]
+        )
         return await self._build_dto(session, t, user)
 
-    async def approve_release(self, session: AsyncSession, transfer_id: UUID, user: AppUser) -> TransferOrderDTO:
+    async def approve_release(
+        self, session: AsyncSession, transfer_id: UUID, user: AppUser
+    ) -> TransferOrderDTO:
         """Donor store supervisor approves releasing surplus stock (SD-12 step 2)."""
         t = await session.get(TransferOrder, transfer_id, with_for_update=True)
         if not t:
@@ -144,10 +152,14 @@ class TransferService:
         session.add(appr)
 
         await session.commit()
-        self.cache_service.invalidate_store_keys([t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"])
+        self.cache_service.invalidate_store_keys(
+            [t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"]
+        )
         return await self._build_dto(session, t, user)
 
-    async def reject(self, session: AsyncSession, transfer_id: UUID, reason: str, user: AppUser) -> TransferOrderDTO:
+    async def reject(
+        self, session: AsyncSession, transfer_id: UUID, reason: str, user: AppUser
+    ) -> TransferOrderDTO:
         """Destination or donor supervisor rejects the transfer."""
         t = await session.get(TransferOrder, transfer_id, with_for_update=True)
         if not t:
@@ -156,7 +168,11 @@ class TransferService:
         if user.role == Role.STORE_SUPERVISOR.value and user.store_id not in (t.from_store_id, t.to_store_id):
             raise PermissionDenied("User is not a party to this transfer")
 
-        if t.status in (TransferStatus.DISPATCHED.value, TransferStatus.RECEIVED.value, TransferStatus.CANCELLED.value):
+        if t.status in (
+            TransferStatus.DISPATCHED.value,
+            TransferStatus.RECEIVED.value,
+            TransferStatus.CANCELLED.value,
+        ):
             raise ConflictError(f"Transfer in status {t.status} cannot be rejected")
 
         # If it was DEST_ACCEPTED or DONOR_APPROVED, release the reservations
@@ -181,7 +197,9 @@ class TransferService:
         session.add(appr)
 
         await session.commit()
-        self.cache_service.invalidate_store_keys([t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"])
+        self.cache_service.invalidate_store_keys(
+            [t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"]
+        )
         return await self._build_dto(session, t, user)
 
     async def dispatch(self, session: AsyncSession, transfer_id: UUID, user: AppUser) -> TransferOrderDTO:
@@ -230,7 +248,9 @@ class TransferService:
             pos.backroom_qty = max(0, pos.backroom_qty - t.qty)
 
         await session.commit()
-        self.cache_service.invalidate_store_keys([t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"])
+        self.cache_service.invalidate_store_keys(
+            [t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"]
+        )
         return await self._build_dto(session, t, user)
 
     async def receive(
@@ -304,7 +324,9 @@ class TransferService:
                 b_obj.store_id = t.to_store_id
 
         await session.commit()
-        self.cache_service.invalidate_store_keys([t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"])
+        self.cache_service.invalidate_store_keys(
+            [t.from_store_id, t.to_store_id], ["inbox", "dash", "inv", "twin"]
+        )
         return await self._build_dto(session, t, user)
 
     async def _adjust_commitment(

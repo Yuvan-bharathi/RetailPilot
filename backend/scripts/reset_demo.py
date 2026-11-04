@@ -5,8 +5,10 @@ Usage:
 """
 
 import asyncio
+
 import redis
 from sqlalchemy import text
+
 from app.core.config import get_settings
 from app.core.db import get_async_session_factory, use_selector_event_loop
 

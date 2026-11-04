@@ -39,6 +39,7 @@ def authed_client(client: TestClient):
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
+
 STUBS = [
     ("post", "/api/v1/auth/login", {"username": "admin", "password": "x"}),
     ("get", "/api/v1/me", None),

@@ -6,6 +6,7 @@ import contextlib
 import json
 import uuid
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -62,9 +63,7 @@ class AgentRunLogger:
         status: str = "OK",
     ) -> None:
         summary_str = (
-            json.dumps(result_summary)
-            if isinstance(result_summary, (dict, list))
-            else str(result_summary)
+            json.dumps(result_summary) if isinstance(result_summary, (dict, list)) else str(result_summary)
         )
         call = ToolCall(
             call_id=uuid.uuid4(),
@@ -102,14 +101,18 @@ class AgentRunLogger:
         model: str,
         input_tokens: int,
         output_tokens: int,
+        est_cost: Decimal = Decimal(0),
     ) -> None:
+        # column names per the model (input_tokens / output_tokens / est_cost); the earlier keywords
+        # prompt_tokens / completion_tokens raised TypeError, which the caller swallowed — nothing was logged
         usage = LLMUsage(
             usage_id=uuid.uuid4(),
             run_id=run_id,
             provider=provider,
             model=model,
-            prompt_tokens=input_tokens,
-            completion_tokens=output_tokens,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            est_cost=est_cost,
         )
         self.session.add(usage)
         self.session.flush()
@@ -128,9 +131,7 @@ class AgentRunLogger:
             run.ended_at = now
             if output_summary is not None:
                 run.output_summary = (
-                    json.dumps(output_summary)
-                    if isinstance(output_summary, dict)
-                    else str(output_summary)
+                    json.dumps(output_summary) if isinstance(output_summary, dict) else str(output_summary)
                 )
             run.error = error
             self.session.flush()

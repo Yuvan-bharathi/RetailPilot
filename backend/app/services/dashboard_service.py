@@ -76,7 +76,9 @@ class DashboardService:
                   AND day BETWEEN :start_date AND :end_date
                 """
             )
-            mv_res = await session.execute(mv_stmt, {"store_id": store_id, "start_date": start_date, "end_date": end_date})
+            mv_res = await session.execute(
+                mv_stmt, {"store_id": store_id, "start_date": start_date, "end_date": end_date}
+            )
             row = mv_res.mappings().one_or_none()
             if row:
                 revenue = Decimal(str(row["rev"]))
@@ -137,7 +139,9 @@ class DashboardService:
                   AND b.qty > 0
                 """
             )
-            exp_res = await session.execute(exp_stmt, {"store_id": store_id, "cutoff": run_date + timedelta(days=14)})
+            exp_res = await session.execute(
+                exp_stmt, {"store_id": store_id, "cutoff": run_date + timedelta(days=14)}
+            )
             exp_row = exp_res.mappings().one_or_none()
             if exp_row:
                 near_expiry_val = Decimal(str(exp_row["exp_value"]))

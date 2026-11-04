@@ -42,9 +42,17 @@ class PurchaseOrderService:
 
         # Scoping filter
         if user.role == Role.STORE_SUPERVISOR.value:
-            stmt = stmt.join(POLine, POLine.po_id == PurchaseOrder.po_id).where(POLine.store_id == user.store_id).distinct()
+            stmt = (
+                stmt.join(POLine, POLine.po_id == PurchaseOrder.po_id)
+                .where(POLine.store_id == user.store_id)
+                .distinct()
+            )
         elif store_id is not None:
-            stmt = stmt.join(POLine, POLine.po_id == PurchaseOrder.po_id).where(POLine.store_id == store_id).distinct()
+            stmt = (
+                stmt.join(POLine, POLine.po_id == PurchaseOrder.po_id)
+                .where(POLine.store_id == store_id)
+                .distinct()
+            )
 
         # Count
         count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -78,7 +86,9 @@ class PurchaseOrderService:
         if user.role == Role.STORE_SUPERVISOR.value:
             has_line = any(ln.store_id == user.store_id for ln in po.lines)
             if not has_line:
-                raise PermissionDenied("Store supervisor cannot view purchase orders without lines for their store")
+                raise PermissionDenied(
+                    "Store supervisor cannot view purchase orders without lines for their store"
+                )
 
         return await self._build_po_dto(session, po, user)
 
@@ -118,7 +128,11 @@ class PurchaseOrderService:
         if user.role != Role.SUPER_ADMIN.value:
             raise PermissionDenied("Only Super Admin can close-short purchase orders")
 
-        stmt = select(PurchaseOrder).options(selectinload(PurchaseOrder.lines)).where(PurchaseOrder.po_id == po_id)
+        stmt = (
+            select(PurchaseOrder)
+            .options(selectinload(PurchaseOrder.lines))
+            .where(PurchaseOrder.po_id == po_id)
+        )
         res = await session.execute(stmt)
         po = res.scalar_one_or_none()
         if not po:
@@ -132,7 +146,9 @@ class PurchaseOrderService:
         await session.commit()
         return await self.get_po(session, po_id, user)
 
-    async def _build_po_dto(self, session: AsyncSession, po: PurchaseOrder, user: AppUser) -> PurchaseOrderDTO:
+    async def _build_po_dto(
+        self, session: AsyncSession, po: PurchaseOrder, user: AppUser
+    ) -> PurchaseOrderDTO:
         # Supplier ref
         sup_stmt = select(Supplier).where(Supplier.supplier_id == po.supplier_id)
         sup_res = await session.execute(sup_stmt)

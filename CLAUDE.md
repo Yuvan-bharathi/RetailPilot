@@ -21,7 +21,9 @@ If code and docs disagree, follow the docs and tell me. Never silently change a 
 - Frontend: React + TypeScript (Vite), TanStack Query, TanStack Table, React Router,
   Recharts, Tailwind v4 with tokens mapped via `@theme` to CSS variables from `frontend/src/styles/tokens.css`
 - API types: generate TS types from FastAPI's OpenAPI spec (openapi-typescript); never hand-write DTO types
-- LLM (explanations only): Anthropic SDK, model name from env `LLM_MODEL`; deterministic template fallback
+- LLM (explanations only, D-44): Groq chat completions (httpx) with OpenAI open-weight models —
+  `LLM_MODEL` default `openai/gpt-oss-120b`, `LLM_FALLBACK_MODEL` `openai/gpt-oss-20b`; key `GROQ_API_KEY`;
+  strict JSON-schema output; every number checked against the evidence; deterministic template fallback
 - Local infra: docker-compose (postgres, redis)
 - Later extensions only (do NOT build unless a phase asks): 3D twin (react-three-fiber), statsforecast models,
   scheme slabs, markdown rules, WhatsApp, supplier scorecard, shelf vision

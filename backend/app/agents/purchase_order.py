@@ -46,10 +46,7 @@ class PurchaseOrderAgent(BaseAgent):
 
         # 2. StoreProduct for preferred supplier & ABC class
         sp_stmt = select(StoreProduct).where(StoreProduct.store_id.in_(ctx.store_ids))
-        store_products = {
-            (sp.store_id, sp.product_id): sp
-            for sp in ctx.session.scalars(sp_stmt).all()
-        }
+        store_products = {(sp.store_id, sp.product_id): sp for sp in ctx.session.scalars(sp_stmt).all()}
 
         # 3. Supplier offers for needed products
         product_ids = list({n.product_id for n in needs})
@@ -253,9 +250,7 @@ class PurchaseOrderAgent(BaseAgent):
         batch_size = 20
         for i in range(0, len(items_to_explain), batch_size):
             chunk = items_to_explain[i : i + batch_size]
-            explanations = explanation_service.explain(
-                [c[2] for c in chunk], run_id=ctx.run_id
-            )
+            explanations = explanation_service.explain([c[2] for c in chunk], run_id=ctx.run_id)
             for (target_kind, target_id, _), expl in zip(chunk, explanations, strict=False):
                 if target_kind == "rec":
                     planning_repo.set_explanation(target_id, expl)

@@ -100,4 +100,3 @@ async def close_short(
     """Super Admin closes short an undelivered balance on a PO."""
     service = PurchaseOrderService()
     return await service.close_short(session, po_id, body.reason, current_user)
-

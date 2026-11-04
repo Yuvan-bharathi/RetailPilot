@@ -246,7 +246,7 @@ Critical agents (failure stops the run, no cache swap): DemandForecasting, Stock
 | POBuilder | prioritise_within_budget(po: DraftPO, budget: Decimal) — reduce to largest pack/MOQ-valid qty before skipping (D-29) | BudgetTrimResult(po, reduced, skipped) | SD-09 |
 | POBuilder | apply_edits(po, edits: list[POLineEdit], store_id: UUID) | PurchaseOrder | SD-10 |
 | ExplanationService | explain(items: list[ExplanationInput]) | list[str] | SD-09 |
-| LLMClient | complete(system: str, prompt: str, max_tokens: int = 1000, temperature: float = 0) | LLMResponse | SD-09 |
+| GroqClient (LLM, D-44) | complete_json(system: str, user: str, schema_name: str, schema: dict) — strict JSON schema; primary then fallback model | LLMReply(data, model, input_tokens, output_tokens, est_cost) | SD-09 |
 | ApprovalService | decide(req: ApprovalRequest, user: User) | ApprovalResult | SD-10 |
 | PurchaseOrderService | submit(po_id: UUID) | SubmissionResult | SD-10 |
 | SupplierGateway | submit(po: PurchaseOrder) | SupplierAck | SD-10 |

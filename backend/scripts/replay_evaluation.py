@@ -5,12 +5,12 @@ Usage:
 """
 
 import asyncio
-from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
+
 from app.core.db import get_async_session_factory, use_selector_event_loop
-from app.domain.models import Forecast, Product, Store, SalesLine, SalesTransaction, Recommendation
+from app.domain.models import Forecast, Product, Recommendation, SalesTransaction, Store
 
 
 async def run_replay_evaluation() -> None:

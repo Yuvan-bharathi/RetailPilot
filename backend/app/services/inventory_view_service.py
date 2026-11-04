@@ -86,7 +86,9 @@ class InventoryViewService:
         if prod_ids:
             b_stmt = (
                 select(Batch.product_id, func.sum(Batch.qty))
-                .where(Batch.store_id == store_id, Batch.product_id.in_(prod_ids), Batch.expiry_date <= cutoff)
+                .where(
+                    Batch.store_id == store_id, Batch.product_id.in_(prod_ids), Batch.expiry_date <= cutoff
+                )
                 .group_by(Batch.product_id)
             )
             b_res = await session.execute(b_stmt)

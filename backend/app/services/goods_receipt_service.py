@@ -70,7 +70,9 @@ class GoodsReceiptService:
             receiving_store_ids.add(pl.store_id)
 
             if pl.line_status not in (LineStatus.APPROVED.value, LineStatus.EDITED.value):
-                raise ConflictError(f"PO Line {pl.po_line_id} is in status {pl.line_status}, not APPROVED/EDITED")
+                raise ConflictError(
+                    f"PO Line {pl.po_line_id} is in status {pl.line_status}, not APPROVED/EDITED"
+                )
 
             if pl.received_qty + r_line.qty > pl.qty:
                 raise ValidationError(

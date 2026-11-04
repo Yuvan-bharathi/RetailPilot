@@ -47,28 +47,21 @@ class StockBalancingAgent(BaseAgent):
 
         # 2. Fetch inventory positions
         pos_stmt = select(InventoryPosition).where(InventoryPosition.store_id.in_(ctx.store_ids))
-        positions = {
-            (p.store_id, p.product_id): p
-            for p in ctx.session.scalars(pos_stmt).all()
-        }
+        positions = {(p.store_id, p.product_id): p for p in ctx.session.scalars(pos_stmt).all()}
 
         # 3. StoreProduct listings and rules
         sp_stmt = select(StoreProduct).where(StoreProduct.store_id.in_(ctx.store_ids))
         store_products = {
-            (sp.store_id, sp.product_id): sp
-            for sp in ctx.session.scalars(sp_stmt).all()
-            if sp.is_listed
+            (sp.store_id, sp.product_id): sp for sp in ctx.session.scalars(sp_stmt).all() if sp.is_listed
         }
 
         # 4. Supplier terms and products
         suppliers = {s.supplier_id: s for s in ctx.session.scalars(select(Supplier)).all()}
         supplier_prods = {
-            (sp.supplier_id, sp.product_id): sp
-            for sp in ctx.session.scalars(select(SupplierProduct)).all()
+            (sp.supplier_id, sp.product_id): sp for sp in ctx.session.scalars(select(SupplierProduct)).all()
         }
         terms = {
-            (t.supplier_id, t.store_id): t
-            for t in ctx.session.scalars(select(SupplierStoreTerms)).all()
+            (t.supplier_id, t.store_id): t for t in ctx.session.scalars(select(SupplierStoreTerms)).all()
         }
 
         # 5. Routes
@@ -121,7 +114,11 @@ class StockBalancingAgent(BaseAgent):
                 default_lead=supp.default_lead_time_days if supp else 3,
             )
             delivery_chg = term.delivery_charge if term else Decimal("100.00")
-            unit_c = supp_prod.price if supp_prod else (products[product_id].cost_price if product_id in products else Decimal("10.00"))
+            unit_c = (
+                supp_prod.price
+                if supp_prod
+                else (products[product_id].cost_price if product_id in products else Decimal("10.00"))
+            )
 
             st_terms = StoreSupplyTerms(
                 supplier_id=supp_id or uuid.UUID(int=0),

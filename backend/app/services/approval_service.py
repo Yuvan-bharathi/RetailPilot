@@ -93,9 +93,7 @@ class ApprovalService:
             if action == "ESCALATE":
                 line_ids = [line.po_line_id for line in pending_lines]
                 self.session.execute(
-                    update(POLine)
-                    .where(POLine.po_line_id.in_(line_ids))
-                    .values(line_status="ESCALATED")
+                    update(POLine).where(POLine.po_line_id.in_(line_ids)).values(line_status="ESCALATED")
                 )
                 logger.info("Escalated %d lines on PO %s to Super Admin", len(line_ids), po.po_id)
             else:  # EXPIRE
@@ -196,7 +194,9 @@ class ApprovalService:
             raise NotFound(f"Purchase order {req.entity_id} not found")
 
         if po.status not in (POStatus.PENDING_L1.value, POStatus.PENDING_L2.value):
-            raise ConflictError(f"Purchase order {po.po_id} is in status {po.status}, not PENDING_L1 or PENDING_L2")
+            raise ConflictError(
+                f"Purchase order {po.po_id} is in status {po.status}, not PENDING_L1 or PENDING_L2"
+            )
 
         now = datetime.now(UTC)
         child_po_id: UUID | None = None
@@ -219,11 +219,21 @@ class ApprovalService:
                     raise PermissionDenied("Store supervisor can only approve lines for their assigned store")
                 if po.l1_deadline and now > po.l1_deadline:
                     raise ConflictError("Approval deadline has passed; lines are escalated")
-                lines_to_decide = [ln for ln in po.lines if ln.store_id == store_id and ln.line_status == LineStatus.PENDING.value]
+                lines_to_decide = [
+                    ln
+                    for ln in po.lines
+                    if ln.store_id == store_id and ln.line_status == LineStatus.PENDING.value
+                ]
             else:  # Super Admin deciding escalated lines
-                lines_to_decide = [ln for ln in po.lines if ln.store_id == store_id and ln.line_status == "ESCALATED"]
+                lines_to_decide = [
+                    ln for ln in po.lines if ln.store_id == store_id and ln.line_status == "ESCALATED"
+                ]
                 if not lines_to_decide:
-                    lines_to_decide = [ln for ln in po.lines if ln.store_id == store_id and ln.line_status == LineStatus.PENDING.value]
+                    lines_to_decide = [
+                        ln
+                        for ln in po.lines
+                        if ln.store_id == store_id and ln.line_status == LineStatus.PENDING.value
+                    ]
 
             if not lines_to_decide:
                 raise ConflictError("No pending lines found for this store on PO")
@@ -264,7 +274,9 @@ class ApprovalService:
             if not pending_or_escalated:
                 # Finalize L1
                 ok_lines = [
-                    ln for ln in po.lines if ln.line_status in (LineStatus.APPROVED.value, LineStatus.EDITED.value)
+                    ln
+                    for ln in po.lines
+                    if ln.line_status in (LineStatus.APPROVED.value, LineStatus.EDITED.value)
                 ]
                 if not ok_lines:
                     po.status = POStatus.REJECTED.value
@@ -328,7 +340,9 @@ class ApprovalService:
                     target_status = next_status
                 else:
                     # All lines approved
-                    new_total = sum((Decimal(str(ln.qty)) * ln.unit_price for ln in po.lines), Decimal("0.00"))
+                    new_total = sum(
+                        (Decimal(str(ln.qty)) * ln.unit_price for ln in po.lines), Decimal("0.00")
+                    )
                     po.total_value = new_total
                     if new_total >= l2_threshold:
                         po.status = POStatus.PENDING_L2.value
