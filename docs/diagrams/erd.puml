@@ -1,0 +1,537 @@
+@startuml erd
+!include style.iuml
+skinparam linetype ortho
+title RetailPilot AI — Entity Relationship Diagram (ERD)\n<size:11>Generated from SQLAlchemy models (app.domain.models)</size>
+hide empty methods
+
+package "Master Data" as MD {
+  class Store as "store" {
+    +store_id: UUID <<PK>>
+    +code: str(16)
+    +name: str
+    +region: str
+    +store_type: str
+    +location_context: JSONB
+    +display_capacity: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class Product as "product" {
+    +product_id: UUID <<PK>>
+    +sku: str(64)
+    +name: str
+    +category: str
+    +brand: str
+    +cost_price: Decimal
+    +selling_price: Decimal
+    +pack_size: int
+    +shelf_life_days: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class StoreProduct as "store_product" {
+    +store_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
+    +preferred_supplier_id: UUID <<FK>>
+    +min_display_qty: int
+    +safety_stock_days: int
+    +review_period_days: int
+    +abc_class: str(1)
+    +xyz_class: str(1)
+    +is_listed: bool
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class Supplier as "supplier" {
+    +supplier_id: UUID <<PK>>
+    +name: str
+    +default_lead_time_days: int
+    +is_active: bool
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class SupplierProduct as "supplier_product" {
+    +supplier_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
+    +price: Decimal
+    +lead_time_days: int
+    +moq: int
+    +order_pack_size: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class SupplierStoreTerms as "supplier_store_terms" {
+    +supplier_id: UUID <<PK,FK>>
+    +store_id: UUID <<PK,FK>>
+    +lead_time_days: int
+    +delivery_charge: Decimal
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class CalendarEvent as "calendar_event" {
+    +event_id: UUID <<PK>>
+    +event_date: date
+    +event_type: str
+    +region: str
+    +description: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+package "Sales" as S {
+  class SalesTransaction as "sales_transaction" {
+    +bill_id: UUID <<PK>>
+    +store_id: UUID <<FK>>
+    +txn_datetime: datetime
+    +txn_date: date
+    +total_amount: Decimal
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class SalesLine as "sales_line" {
+    +bill_id: UUID <<PK,FK>>
+    +line_no: int <<PK>>
+    +txn_date: date <<PK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +qty: int
+    +unit_price: Decimal
+    +discount: Decimal
+    +is_return: bool
+    +is_voided: bool
+    +is_promo_day: bool
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+package "Inventory" as I {
+  class InventoryPosition as "inventory_position" {
+    +store_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
+    +shelf_qty: int
+    +backroom_qty: int
+    +reserved: int
+    +incoming: int
+    +in_transit_out: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class InventoryMovement as "inventory_movement" {
+    +movement_id: UUID <<PK>>
+    +occurred_at: datetime <<PK>>
+    +business_date: date
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +batch_id: UUID <<FK>>
+    +movement_type: str
+    +qty: int
+    +location: str
+    +reference_type: str
+    +reference_id: UUID
+    +reason: str
+    +user_id: UUID <<FK>>
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class Batch as "batch" {
+    +batch_id: UUID <<PK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +batch_no: str
+    +qty: int
+    +received_date: date
+    +expiry_date: date
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class InventoryDailySnapshot as "inventory_daily_snapshot" {
+    +store_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
+    +snapshot_date: date <<PK>>
+    +shelf_qty: int
+    +backroom_qty: int
+    +closing_on_hand: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+package "Planning" as P {
+  class Forecast as "forecast" {
+    +run_id: UUID <<PK,FK>>
+    +store_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
+    +horizon_days: int
+    +daily_demand: float
+    +method: str
+    +confidence: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class AssociationRule as "association_rule" {
+    +rule_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +antecedent_id: UUID <<FK>>
+    +consequent_id: UUID <<FK>>
+    +support: float
+    +confidence: float
+    +lift: float
+    +rule_type: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class ReplenishmentNeed as "replenishment_need" {
+    +need_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +qty: int
+    +source: str
+    +reason: str
+    +priority: str
+    +linked_product_id: UUID <<FK>>
+    +lift: float
+    +rec_id: UUID <<FK>>
+    +required_by: date
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class Recommendation as "recommendation" {
+    +rec_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +rec_type: str
+    +qty: int
+    +priority: str
+    +priority_rank: int
+    +reason: str
+    +lost_sales_value: Decimal
+    +lost_profit: Decimal
+    +explanation: str
+    +evidence: JSONB
+    +status: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class LostSalesEstimate as "lost_sales_estimate" {
+    +run_id: UUID <<PK,FK>>
+    +store_id: UUID <<PK,FK>>
+    +product_id: UUID <<PK,FK>>
+    +lost_units: float
+    +lost_revenue: Decimal
+    +lost_profit: Decimal
+    +confidence: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class KpiSnapshot as "kpi_snapshot" {
+    +run_id: UUID <<PK,FK>>
+    +store_id: UUID <<PK,FK>>
+    +metric: str <<PK>>
+    +product_key: UUID <<PK>>
+    +value: Decimal
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+package "Purchasing" as P {
+  class PurchaseOrder as "purchase_order" {
+    +po_id: UUID <<PK>>
+    +supplier_id: UUID <<FK>>
+    +run_id: UUID <<FK>>
+    +total_value: Decimal
+    +required_level: str
+    +parent_po_id: UUID <<FK>>
+    +l1_deadline: datetime
+    +status: str
+    +flags: ARRAY
+    +explanation: str
+    +supplier_ref: str
+    +submitted_at: datetime
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class PoLine as "po_line" {
+    +po_line_id: UUID <<PK>>
+    +po_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +qty: int
+    +unit_price: Decimal
+    +scheme_id: UUID <<FK>>
+    +source_rec_id: UUID <<FK>>
+    +line_status: str
+    +received_qty: int
+    +short_closed_qty: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class GoodsReceipt as "goods_receipt" {
+    +receipt_id: UUID <<PK>>
+    +po_id: UUID <<FK>>
+    +store_id: UUID <<FK>>
+    +received_by: UUID <<FK>>
+    +received_at: datetime
+    +note: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class GoodsReceiptLine as "goods_receipt_line" {
+    +receipt_id: UUID <<PK,FK>>
+    +po_line_id: UUID <<PK,FK>>
+    +qty: int
+    +batch_no: str
+    +expiry_date: date
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+package "Transfers & Approvals" as T&A {
+  class TransferOrder as "transfer_order" {
+    +transfer_id: UUID <<PK>>
+    +from_store_id: UUID <<FK>>
+    +to_store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +batch_id: UUID <<FK>>
+    +qty: int
+    +transfer_cost: Decimal
+    +transit_days: int
+    +is_expiry_aware: bool
+    +source_rec_id: UUID <<FK>>
+    +status: str
+    +dest_accepted_by: UUID <<FK>>
+    +donor_approved_by: UUID <<FK>>
+    +dispatched_at: datetime
+    +received_at: datetime
+    +status_reason: str
+    +expected_qty: int
+    +received_qty: int
+    +loss_value: Decimal
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class TransferRoute as "transfer_route" {
+    +from_store_id: UUID <<PK,FK>>
+    +to_store_id: UUID <<PK,FK>>
+    +fixed_cost: Decimal
+    +per_unit_cost: Decimal
+    +handling_cost_per_unit: Decimal
+    +transit_days: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class Approval as "approval" {
+    +approval_id: UUID <<PK>>
+    +entity_type: str
+    +entity_id: UUID
+    +level: str
+    +store_id: UUID <<FK>>
+    +approver_id: UUID <<FK>>
+    +decision: str
+    +reason: str
+    +decided_at: datetime
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class BusinessRule as "business_rule" {
+    +rule_id: UUID <<PK>>
+    +rule_key: str
+    +value: JSONB
+    +scope_store_id: UUID <<FK>>
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+package "Users & Access" as U&A {
+  class AppUser as "app_user" {
+    +user_id: UUID <<PK>>
+    +username: str(64)
+    +password_hash: str
+    +is_active: bool
+    +name: str
+    +role: str
+    +store_id: UUID <<FK>>
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class Notification as "notification" {
+    +notification_id: UUID <<PK>>
+    +role: str
+    +store_id: UUID <<FK>>
+    +user_id: UUID <<FK>>
+    +message: str
+    +link: str
+    +read_at: datetime
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+package "Observability" as O {
+  class AgentRun as "agent_run" {
+    +run_id: UUID <<PK>>
+    +parent_run_id: UUID <<FK>>
+    +agent_name: str
+    +run_date: date
+    +status: str
+    +started_at: datetime
+    +ended_at: datetime
+    +input_ref: JSONB
+    +output_summary: str
+    +error: str
+    +step_count: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class ToolCall as "tool_call" {
+    +call_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +tool_name: str
+    +args: JSONB
+    +result_summary: str
+    +duration_ms: int
+    +retries: int
+    +status: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class DecisionEvidence as "decision_evidence" {
+    +evidence_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +rec_id: UUID <<FK>>
+    +data: JSONB
+    +validation_result: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class LlmUsage as "llm_usage" {
+    +usage_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +provider: str
+    +model: str
+    +input_tokens: int
+    +output_tokens: int
+    +est_cost: Decimal
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+package "Extensions" as E {
+  class StoreLayout as "store_layout" {
+    +layout_id: UUID <<PK>>
+    +store_id: UUID <<FK>>
+    +width_m: float
+    +depth_m: float
+    +version: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class ShelfLocation as "shelf_location" {
+    +shelf_id: UUID <<PK>>
+    +layout_id: UUID <<FK>>
+    +aisle: str
+    +x: float
+    +y: float
+    +z: float
+    +rotation: float
+    +product_id: UUID <<FK>>
+    +facings: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class SupplierScheme as "supplier_scheme" {
+    +scheme_id: UUID <<PK>>
+    +supplier_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +slab_qty: int
+    +free_qty: int
+    +valid_from: date
+    +valid_to: date
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+AgentRun "1" -- "*" AgentRun
+AgentRun "1" -- "*" AssociationRule
+AgentRun "1" -- "*" DecisionEvidence
+AgentRun "1" -- "*" Forecast
+AgentRun "1" -- "*" KpiSnapshot
+AgentRun "1" -- "*" LlmUsage
+AgentRun "1" -- "*" LostSalesEstimate
+AgentRun "1" -- "*" PurchaseOrder
+AgentRun "1" -- "*" Recommendation
+AgentRun "1" -- "*" ReplenishmentNeed
+AgentRun "1" -- "*" ToolCall
+AppUser "1" -- "*" Approval
+AppUser "1" -- "*" GoodsReceipt
+AppUser "1" -- "*" InventoryMovement
+AppUser "1" -- "*" Notification
+AppUser "1" -- "*" TransferOrder
+Batch "1" -- "*" InventoryMovement
+Batch "1" -- "*" TransferOrder
+GoodsReceipt "1" -- "*" GoodsReceiptLine
+PoLine "1" -- "*" GoodsReceiptLine
+Product "1" -- "*" AssociationRule
+Product "1" -- "*" Batch
+Product "1" -- "*" Forecast
+Product "1" -- "*" InventoryDailySnapshot
+Product "1" -- "*" InventoryMovement
+Product "1" -- "*" InventoryPosition
+Product "1" -- "*" LostSalesEstimate
+Product "1" -- "*" PoLine
+Product "1" -- "*" Recommendation
+Product "1" -- "*" ReplenishmentNeed
+Product "1" -- "*" SalesLine
+Product "1" -- "*" ShelfLocation
+Product "1" -- "*" StoreProduct
+Product "1" -- "*" SupplierProduct
+Product "1" -- "*" SupplierScheme
+Product "1" -- "*" TransferOrder
+PurchaseOrder "1" -- "*" GoodsReceipt
+PurchaseOrder "1" -- "*" PoLine
+PurchaseOrder "1" -- "*" PurchaseOrder
+Recommendation "1" -- "*" DecisionEvidence
+Recommendation "1" -- "*" PoLine
+Recommendation "1" -- "*" ReplenishmentNeed
+Recommendation "1" -- "*" TransferOrder
+SalesTransaction "1" -- "*" SalesLine
+Store "1" -- "*" AppUser
+Store "1" -- "*" Approval
+Store "1" -- "*" AssociationRule
+Store "1" -- "*" Batch
+Store "1" -- "*" BusinessRule
+Store "1" -- "*" Forecast
+Store "1" -- "*" GoodsReceipt
+Store "1" -- "*" InventoryDailySnapshot
+Store "1" -- "*" InventoryMovement
+Store "1" -- "*" InventoryPosition
+Store "1" -- "*" KpiSnapshot
+Store "1" -- "*" LostSalesEstimate
+Store "1" -- "*" Notification
+Store "1" -- "*" PoLine
+Store "1" -- "*" Recommendation
+Store "1" -- "*" ReplenishmentNeed
+Store "1" -- "*" SalesLine
+Store "1" -- "*" SalesTransaction
+Store "1" -- "*" StoreLayout
+Store "1" -- "*" StoreProduct
+Store "1" -- "*" SupplierStoreTerms
+Store "1" -- "*" TransferOrder
+Store "1" -- "*" TransferRoute
+StoreLayout "1" -- "*" ShelfLocation
+Supplier "1" -- "*" PurchaseOrder
+Supplier "1" -- "*" StoreProduct
+Supplier "1" -- "*" SupplierProduct
+Supplier "1" -- "*" SupplierScheme
+Supplier "1" -- "*" SupplierStoreTerms
+SupplierScheme "1" -- "*" PoLine
+@enduml
