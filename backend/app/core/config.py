@@ -69,7 +69,22 @@ class Settings(BaseSettings):
     health_check_timeout_s: float = 2.0
 
 
+MIN_JWT_SECRET_BYTES = 32
+
+
+def check_secrets(settings: Settings) -> Settings:
+    """Outside local/test, refuse the default or a short JWT secret (HS256 needs ≥ 32 bytes, RFC 7518 §3.2)."""
+    secret = settings.jwt_secret.get_secret_value()
+    if settings.app_env not in ("local", "test") and (
+        secret == "change-me" or len(secret.encode()) < MIN_JWT_SECRET_BYTES
+    ):
+        raise ValueError(
+            f"JWT_SECRET must be set to at least {MIN_JWT_SECRET_BYTES} random bytes in {settings.app_env}"
+        )
+    return settings
+
+
 @lru_cache
 def get_settings() -> Settings:
     """Cached settings instance (call `get_settings.cache_clear()` in tests after changing env)."""
-    return Settings()
+    return check_secrets(Settings())

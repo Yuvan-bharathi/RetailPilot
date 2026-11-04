@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import ConflictError, NotFound, PermissionDenied
 from app.domain.models.enums import RecStatus, Role
 from app.domain.models.master import Product, Store
-from app.domain.models.observability import DecisionEvidence
 from app.domain.models.planning import Recommendation
 from app.domain.models.transfers import TransferOrder
 from app.domain.models.users import AppUser
@@ -160,31 +159,31 @@ class RecommendationService:
             raise NotFound(f"Recommendation {rec_id} not found")
 
         rec, store, prod = row
-        if user.role == Role.STORE_SUPERVISOR.value and rec.store_id != user.store_id:
+        donor_store = (
+            await session.execute(
+                select(TransferOrder.from_store_id).where(TransferOrder.source_rec_id == rec_id)
+            )
+        ).scalar_one_or_none()
+        is_donor_viewer = donor_store is not None and donor_store == user.store_id
+        if user.role == Role.STORE_SUPERVISOR.value and rec.store_id != user.store_id and not is_donor_viewer:
             raise PermissionDenied("Store supervisor cannot view recommendations for another store")
 
-        # Fetch evidence
-        ev_stmt = select(DecisionEvidence).where(DecisionEvidence.rec_id == rec_id)
-        ev_res = await session.execute(ev_stmt)
-        ev_obj = ev_res.scalar_one_or_none()
-
+        # Evidence (D-34): the validated union written by the agents. Invalid stored evidence is a server bug and
+        # is NOT hidden (the old code swallowed validation errors and showed no evidence at all).
         parsed_evidence: Evidence | None = None
-        if ev_obj and ev_obj.data:
-            try:
-                raw_ev = dict(ev_obj.data)
-                # Viewer scoping for TransferEvidence (D-32):
-                # Donor surplus and protected requirement are visible only to Super Admin and donor supervisor.
-                if raw_ev.get("kind") == "TRANSFER" and user.role == Role.STORE_SUPERVISOR.value:
-                    donor_info = raw_ev.get("donor")
-                    donor_id = donor_info.get("store", {}).get("store_id") if donor_info else None
-                    if str(user.store_id) != str(donor_id):
-                        raw_ev["donor_surplus"] = None
-                        raw_ev["donor_protected_requirement"] = None
-                        raw_ev["donor_keeps_requirement"] = True
+        if rec.evidence:
+            raw_ev = dict(rec.evidence)
+            # Viewer scoping for TransferEvidence (D-32):
+            # Donor surplus and protected requirement are visible only to Super Admin and donor supervisor.
+            if raw_ev.get("kind") == "TRANSFER" and user.role == Role.STORE_SUPERVISOR.value:
+                donor_info = raw_ev.get("donor")
+                donor_id = donor_info.get("store", {}).get("store_id") if donor_info else None
+                if str(user.store_id) != str(donor_id):
+                    raw_ev["donor_surplus"] = None
+                    raw_ev["donor_protected_requirement"] = None
+                    raw_ev["donor_keeps_requirement"] = True
 
-                parsed_evidence = _evidence_adapter.validate_python(raw_ev)
-            except Exception:
-                pass
+            parsed_evidence = _evidence_adapter.validate_python(raw_ev)
 
         # Counterpart
         counterpart: Counterpart | None = None

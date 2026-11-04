@@ -7037,7 +7037,7 @@
               }
             ],
             "title": "Run Date",
-            "description": "Target run date; defaults to today (IST)"
+            "description": "Target run date; defaults to the day after the latest loaded POS day"
           }
         },
         "type": "object",
@@ -7061,15 +7061,21 @@
             "title": "Run Id"
           },
           "run_date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Run Date"
           }
         },
         "type": "object",
         "required": [
-          "message",
-          "run_date"
+          "message"
         ],
         "title": "TriggerRunResponse"
       }

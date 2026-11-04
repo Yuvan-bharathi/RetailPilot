@@ -10,19 +10,23 @@ import uuid
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.agents.base import AgentResult, BaseAgent, RunContext
-from app.domain.models.enums import ApprovalLevelRequired, LineStatus, POStatus, Priority, RecStatus, RecType
-from app.domain.models.master import StoreProduct
+from app.domain.models.enums import ApprovalLevelRequired, LineStatus, POStatus, Priority, RecStatus
+from app.domain.models.master import StoreProduct, Supplier, SupplierStoreTerms
+from app.domain.models.observability import DecisionEvidence
 from app.domain.models.planning import Recommendation
 from app.domain.models.purchasing import POLine, PurchaseOrder
 from app.domain.repositories.planning_repo import PlanningRepo
 from app.domain.repositories.purchasing_repo import PurchasingRepo
+from app.domain.schemas.dtos import NeedsReviewEvidence
 from app.services.explanation_service import ExplanationInput, ExplanationService
 from app.tools.po_builder import POBuilder
+from app.tools.requirement import RequirementCalculator
 from app.tools.types import ReplenishmentNeed as ToolNeed
 from app.tools.types import SupplierOffer
 
@@ -51,6 +55,13 @@ class PurchaseOrderAgent(BaseAgent):
         # 3. Supplier offers for needed products
         product_ids = list({n.product_id for n in needs})
         offers_by_prod = purchasing_repo.get_offers(product_ids)
+        store_leads = {
+            (t.supplier_id, t.store_id): t.lead_time_days
+            for t in ctx.session.scalars(select(SupplierStoreTerms))
+        }
+        default_leads = {
+            s.supplier_id: s.default_lead_time_days for s in ctx.session.scalars(select(Supplier))
+        }
 
         # 4. Business rules and remaining budget
         rules = purchasing_repo.get_business_rules()
@@ -83,7 +94,19 @@ class PurchaseOrderAgent(BaseAgent):
                 need_id=need.need_id,
             )
 
-            prod_offers = offers_by_prod.get(need.product_id, [])
+            # Rule 1 / D-05: a supplier's lead time for THIS store (store terms → offer → supplier default), the
+            # same lead time the requirement and required_by were computed with.
+            prod_offers = [
+                replace(
+                    o,
+                    lead_time_days=RequirementCalculator.lead_time(
+                        store_leads.get((o.supplier_id, need.store_id)),
+                        o.lead_time_days,
+                        default_leads.get(o.supplier_id, o.lead_time_days),
+                    ),
+                )
+                for o in offers_by_prod.get(need.product_id, [])
+            ]
             selected_offer = POBuilder.select_supplier(
                 need=tool_need,
                 offers=prod_offers,
@@ -91,24 +114,10 @@ class PurchaseOrderAgent(BaseAgent):
             )
 
             if selected_offer is None:
-                # Flag need as NEEDS_REVIEW (D-07)
-                rec = Recommendation(
-                    rec_id=uuid.uuid4(),
-                    run_id=ctx.run_id,
-                    store_id=need.store_id,
-                    product_id=need.product_id,
-                    rec_type=RecType.REORDER.value,
-                    qty=need.qty,
-                    priority=need.priority,
-                    status=RecStatus.NEEDS_REVIEW.value,
-                    reason="NO_ELIGIBLE_SUPPLIER",
-                    evidence={
-                        "need_qty": need.qty,
-                        "required_by": need.required_by.isoformat(),
-                        "reason": "No active supplier can deliver within required lead time",
-                    },
-                )
-                recs_to_insert.append(rec)
+                # D-07: the shortfall's recommendation goes to manual review (no second recommendation)
+                if need.rec_id is not None:
+                    _to_review(ctx, need.rec_id, "NO_ELIGIBLE_SUPPLIER",
+                               f"No active supplier can deliver by {need.required_by.isoformat()}.")  # fmt: skip
                 needs_review_count += 1
             else:
                 assigned.append((tool_need, selected_offer))
@@ -139,23 +148,10 @@ class PurchaseOrderAgent(BaseAgent):
             if val_res.budget_exceeded:
                 trim_res = POBuilder.prioritise_within_budget(po, budget_remaining)
                 for skipped in trim_res.skipped:
-                    rec = Recommendation(
-                        rec_id=uuid.uuid4(),
-                        run_id=ctx.run_id,
-                        store_id=skipped.store_id,
-                        product_id=skipped.product_id,
-                        rec_type=RecType.REORDER.value,
-                        qty=skipped.qty,
-                        priority=skipped.priority,
-                        status=RecStatus.NEEDS_REVIEW.value,
-                        reason="BUDGET",
-                        evidence={
-                            "unit_price": str(skipped.unit_price),
-                            "requested_qty": skipped.qty,
-                            "reason": "Exceeded remaining weekly budget",
-                        },
-                    )
-                    recs_to_insert.append(rec)
+                    # D-29: a line the budget cannot fit goes to manual review on its own recommendation
+                    if skipped.source_rec_id is not None:
+                        _to_review(ctx, skipped.source_rec_id, "BUDGET",
+                                   "Does not fit the remaining weekly budget after reducing other lines.")  # fmt: skip
                     budget_trimmed_count += 1
                 po = trim_res.po
                 flags.append("BUDGET_TRIMMED")
@@ -275,3 +271,23 @@ class PurchaseOrderAgent(BaseAgent):
             },
             step_count=1,
         )
+
+
+def _to_review(ctx: RunContext, rec_id: UUID, reason: str, detail: str) -> None:
+    """Move a recommendation to NEEDS_REVIEW with D-34 NeedsReviewEvidence built from its own figures."""
+    rec = ctx.session.get(Recommendation, rec_id)
+    if rec is None:
+        return
+    previous = dict(rec.evidence or {})
+    evidence = NeedsReviewEvidence(
+        kind="NEEDS_REVIEW",
+        reason=cast(Any, reason),
+        own_requirement=int(previous.get("own_requirement", 0)),
+        available=int(previous.get("available", 0)),
+        suggested_qty=rec.qty,
+        detail=detail,
+    ).model_dump(mode="json")
+    rec.status, rec.reason, rec.evidence = RecStatus.NEEDS_REVIEW.value, reason, evidence
+    ctx.session.execute(
+        update(DecisionEvidence).where(DecisionEvidence.rec_id == rec_id).values(data=evidence)
+    )

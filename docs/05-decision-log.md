@@ -599,3 +599,40 @@ previous version contained typed-in numbers).
   synthetic data with the same definitions.
 **Changed.** Spec §5 (new route); DTOs; `dashboard_service.py`; `inventory_view_service.py`;
 `app/tools/requirement.py`; frontend Dashboard page, API client, mock; tests (backend integration, frontend).
+
+---
+
+## D-47 The five demo scenarios through the real pipeline (2026-11-04)
+**Decision / fixes.** Phase 5's acceptance ("the pipeline on synthetic data asserts the outcomes of scenarios 1–5")
+was not met: the scenario tests used hand-made rows and asserted only that rows existed. Now
+`tests/scenarios/test_demo_scenarios.py` bulk-loads the small synthetic dataset, runs the orchestrator and asserts
+every planted outcome from the manifest, D-34 evidence on every recommendation, the planted mismatch and stale SKU,
+and per-viewer scoping through the HTTP API. Fixes needed to get there:
+- **Synthetic loader** (`app/services/synthetic_loader.py`, COPY, D-41): master data, bills, lines, snapshots and the
+  ledger (opening balance, daily SALE totals, PO_RECEIPT, EXPIRY_WRITE_OFF, reconciliation ADJUSTMENT only where the
+  replay differs — exactly the planted mismatch). Position = last snapshot = Σ movements; incoming = open orders.
+- **Orchestrator:** ingests `run_date − 1` (it ingested the run date itself, which has no data); ingestion is
+  idempotent per store-day; the already-running guard is per run date.
+- **Nothing committed the nightly run** (Celery task, `run_agents`, the UI trigger) — every run was rolled back.
+  Callers now commit, including a FAILED status. Default run date = day after the latest loaded POS day.
+- **RunParams.load** reads the BusinessRule table (it returned code defaults; e.g. stale_days was 30, not 3).
+- **Stock balancing** rewritten on shared `PlanningInputs`: available includes `incoming` (rule 1); cost inputs from
+  business rules (were hard-coded 200 / 0.001 / 0.05); urgency order and D-17 planned deliveries; LOW confidence →
+  NEEDS_REVIEW; **co-replenishment** only for a product reordered in the SAME store, this run's rules, lift ≥
+  co_replenish.min_lift, ≤ limit, supplier already delivering (it used any store's reorders and a 3-day lead time).
+- **Freshness** uses real receiver states (requirement was 0) and D-34 evidence; **related products** cleans bills
+  and uses the basket business rules (min_bills was 10, confidence 0.1); **purchase orders** check supplier
+  eligibility with the lead time of that supplier for that store (58 needs were wrongly "no eligible supplier"),
+  and move the existing recommendation to NEEDS_REVIEW instead of creating a duplicate.
+- **Evidence:** every agent writes the D-34 union (validated DTO) to the recommendation and `decision_evidence`; the
+  detail endpoint no longer hides invalid evidence; a donor store's supervisor may open a transfer it donates to
+  (D-32); `/agent-runs` is Super Admin only.
+- **Schema:** `supplier_product.moq` may be 0 (= no minimum; migration 0003). **Security:** outside local/test the
+  JWT secret must not be the default and must be ≥ 32 bytes.
+- **Demo:** `seed_demo` = generate + load + users + real nightly run; `reset_demo` keeps the global business rules
+  (TRUNCATE … CASCADE had emptied them). The demo uses the **small** profile: in the full profile (500 bills/day) the
+  planted bread→butter pair has support 0.0039 < `basket.min_support` 0.005, so scenario 4's co-replenishment does
+  not appear — the business rule is not changed to suit the demo.
+- **Measured (D-42):** full profile — load 81 s; agents ≈ 25 s; explanations ≈ 4.7 min (22 Groq batches, rate
+  limits → fallback model); small profile end to end 57 s. **Proposed nightly limit: 15 minutes** on the full
+  dataset with the LLM (≈ 2 minutes without it).

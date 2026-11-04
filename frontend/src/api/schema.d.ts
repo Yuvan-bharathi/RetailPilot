@@ -1804,7 +1804,7 @@ export interface components {
         TriggerRunRequest: {
             /**
              * Run Date
-             * @description Target run date; defaults to today (IST)
+             * @description Target run date; defaults to the day after the latest loaded POS day
              */
             run_date?: string | null;
         };
@@ -1814,11 +1814,8 @@ export interface components {
             message: string;
             /** Run Id */
             run_id?: string | null;
-            /**
-             * Run Date
-             * Format: date
-             */
-            run_date: string;
+            /** Run Date */
+            run_date?: string | null;
         };
     };
     responses: never;

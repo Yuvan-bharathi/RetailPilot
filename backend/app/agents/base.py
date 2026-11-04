@@ -5,9 +5,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.repositories.observability_repo import AgentRunLogger
@@ -15,6 +17,9 @@ from app.domain.repositories.observability_repo import AgentRunLogger
 
 @dataclass
 class RunParams:
+    """Run parameters (spec §9). Business values come from the BusinessRule table (global rows), never code;
+    the defaults below are only used for keys missing from the table and equal migration 0002's seed."""
+
     kpi_lookback_days: int = 28
     forecast_horizon_days: int = 14
     forecast_lookback_days: int = 180
@@ -22,7 +27,24 @@ class RunParams:
     incoming_overdue_grace_days: int = 3
     expiry_window_days: int = 14
     max_steps: int = 50
-    stale_days: int = 30
+    stale_days: int = 3
+    order_fixed_cost: Decimal = Decimal("250")
+    holding_cost_rate_per_day: Decimal = Decimal("0.0005")
+    expiry_risk_pct: Decimal = Decimal("0.10")
+    perishable_max_shelf_life_days: int = 30
+    days_to_sell_default_cap: int = 90
+    basket: dict[str, Any] = field(
+        default_factory=lambda: {
+            "min_bills": 500,
+            "min_support": 0.005,
+            "min_confidence": 0.2,
+            "min_lift": 1.0,
+            "max_qty_per_line": 24,
+            "max_qty_per_line_by_category": {},
+            "exclude_promo_days": True,
+        }
+    )
+    co_replenish: dict[str, Any] = field(default_factory=lambda: {"min_lift": 1.5, "limit": 3})
     markdown_enabled: bool = False
     schemes_enabled: bool = False
     use_model_selection: bool = (
@@ -30,10 +52,39 @@ class RunParams:
     )
     use_calendar_uplift: bool = False
 
+    _INT_RULES = (
+        "kpi_lookback_days",
+        "incoming_overdue_grace_days",
+        "expiry_window_days",
+        "max_steps",
+        "stale_days",
+        "perishable_max_shelf_life_days",
+        "days_to_sell_default_cap",
+    )
+    _DECIMAL_RULES = ("order_fixed_cost", "holding_cost_rate_per_day", "expiry_risk_pct")
+
     @classmethod
     def load(cls, session: Session | None = None) -> RunParams:
-        # Default parameters from business rules or dataclass defaults
-        return cls()
+        """Defaults overridden by the global BusinessRule rows (D-47)."""
+        params = cls()
+        if session is None:
+            return params
+        from app.domain.models.transfers import BusinessRule  # local: models import agents' callers
+
+        rules = {
+            r.rule_key: r.value
+            for r in session.scalars(select(BusinessRule).where(BusinessRule.scope_store_id.is_(None)))
+        }
+        for key in cls._INT_RULES:
+            if key in rules:
+                setattr(params, key, int(rules[key]))
+        for key in cls._DECIMAL_RULES:
+            if key in rules:
+                setattr(params, key, Decimal(str(rules[key])))
+        for key in ("basket", "co_replenish"):
+            if isinstance(rules.get(key), dict):
+                setattr(params, key, getattr(params, key) | rules[key])
+        return params
 
 
 @dataclass

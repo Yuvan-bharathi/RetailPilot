@@ -19,13 +19,15 @@ router = APIRouter(tags=["runs"])
 
 
 class TriggerRunRequest(BaseModel):
-    run_date: date | None = Field(default=None, description="Target run date; defaults to today (IST)")
+    run_date: date | None = Field(
+        default=None, description="Target run date; defaults to the day after the latest loaded POS day"
+    )
 
 
 class TriggerRunResponse(BaseModel):
     message: str
     run_id: str | None = None
-    run_date: date
+    run_date: date | None = None
 
 
 class ToolCallDTO(BaseModel):
@@ -106,10 +108,11 @@ async def trigger_nightly_run(
     """Triggers the nightly replenishment pipeline manually (Super Admin only)."""
     from app.workers.tasks import nightly_run_task
 
-    target_date = body.run_date or date.today()
-    async_res = nightly_run_task.delay(str(target_date))
+    # No date → the worker plans the day after the latest loaded POS day (next_run_date)
+    async_res = nightly_run_task.delay(str(body.run_date) if body.run_date else None)
+    target_date = body.run_date
     return TriggerRunResponse(
-        message=f"Nightly pipeline queued for {target_date}",
+        message=f"Nightly pipeline queued for {target_date or 'the next business day'}",
         run_id=str(async_res.id),
         run_date=target_date,
     )
@@ -117,7 +120,7 @@ async def trigger_nightly_run(
 
 @router.get("/agent-runs", response_model=list[AgentRunDetailDTO])
 async def list_agent_runs(
-    current_user: CurrentUser,
+    current_user: RequireSuperAdmin,
     session: DbSession,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[AgentRunDetailDTO]:
@@ -145,7 +148,7 @@ async def list_agent_runs(
 @router.get("/agent-runs/{run_id}", response_model=AgentRunDetailDTO)
 async def get_agent_run(
     run_id: UUID,
-    current_user: CurrentUser,
+    current_user: RequireSuperAdmin,
     session: DbSession,
 ) -> AgentRunDetailDTO:
     """Returns detailed trace of a specific agent run including its tool calls and LLM usage."""

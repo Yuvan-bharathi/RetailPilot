@@ -1,36 +1,48 @@
-"""Stock Balancing Agent (SD-06, SD-07, spec §8, decisions D-02, D-04, D-05, D-07, D-10, D-14, D-17).
+"""Stock Balancing Agent (SD-06, SD-07, spec §1/§8; D-02, D-04, D-05, D-07, D-10, D-13, D-14, D-17, D-34, D-47).
 
-Evaluates store own_requirement and surplus. Compares incremental logistics costs against supplier
-order/delivery terms to balance stock between stores before raising purchase orders.
+Per listed store-SKU: own requirement (rule 1, lead time of the supplier serving THAT store) and
+available = shelf + backroom + incoming + pending lines of kept POs (D-14) − reserved.
+- LOW-confidence store-SKUs are neither donors nor receivers; if short → REORDER with status NEEDS_REVIEW and no
+  replenishment need (D-04).
+- Pass 1 (D-17) marks the (supplier, store) pairs that need a PO anyway; products are then decided by urgency
+  (shortest days of cover first) with the transfer engine: transfers of genuine surplus (donor protected), and PO
+  needs for what remains (rules 2–5).
+- Co-replenishment (D-02, D-13): complements of a product reordered in the SAME store, from this run's rules with
+  lift ≥ co_replenish.min_lift (at most co_replenish.limit per product), only if the complement's supplier already
+  delivers to that store this cycle and it would fall below its requirement before the next review.
+- Every recommendation carries D-34 evidence (validated DTO), also logged to decision_evidence.
+Cost parameters come from the BusinessRule table via RunParams (never code).
 """
 
 from __future__ import annotations
 
+import math
 import uuid
 from datetime import timedelta
-from decimal import Decimal
+from typing import Any, cast
 from uuid import UUID
 
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.agents.base import AgentResult, BaseAgent, RunContext
-from app.domain.models.inventory import InventoryPosition
-from app.domain.models.master import (
-    Product,
-    Store,
-    StoreProduct,
-    Supplier,
-    SupplierProduct,
-    SupplierStoreTerms,
-)
-from app.domain.models.planning import AssociationRule, Recommendation, ReplenishmentNeed
+from app.agents.planning_inputs import PlanningInputs
+from app.domain.models.observability import DecisionEvidence
+from app.domain.models.planning import AssociationRule, LostSalesEstimate, Recommendation, ReplenishmentNeed
 from app.domain.models.transfers import TransferOrder
 from app.domain.repositories.planning_repo import PlanningRepo
-from app.domain.repositories.purchasing_repo import PurchasingRepo
 from app.domain.repositories.transfer_repo import TransferRepo
-from app.tools.requirement import RequirementCalculator
+from app.domain.schemas.common import Counterpart, SupplierRef
+from app.domain.schemas.dtos import (
+    CoReplenishEvidence,
+    NeedsReviewEvidence,
+    ReorderEvidence,
+    TransferEvidence,
+)
+from app.tools.numeric import money
+from app.tools.requirement import RequirementCalculator as RC  # noqa: N817
 from app.tools.transfer_engine import TransferDecisionEngine
-from app.tools.types import CostInputs, Route, StoreState, StoreSupplyTerms
+from app.tools.types import CostInputs, PONeed, StoreState, TransferProposal
 
 
 class StockBalancingAgent(BaseAgent):
@@ -38,300 +50,311 @@ class StockBalancingAgent(BaseAgent):
     critical = True
 
     def run(self, ctx: RunContext) -> AgentResult:
-        planning_repo = PlanningRepo(ctx.session)
-        purchasing_repo = PurchasingRepo(ctx.session)
-        transfer_repo = TransferRepo(ctx.session)
-
-        # 1. Fetch forecasts for this run
-        forecasts = planning_repo.get_forecasts_by_run(ctx.run_id)
-
-        # 2. Fetch inventory positions
-        pos_stmt = select(InventoryPosition).where(InventoryPosition.store_id.in_(ctx.store_ids))
-        positions = {(p.store_id, p.product_id): p for p in ctx.session.scalars(pos_stmt).all()}
-
-        # 3. StoreProduct listings and rules
-        sp_stmt = select(StoreProduct).where(StoreProduct.store_id.in_(ctx.store_ids))
-        store_products = {
-            (sp.store_id, sp.product_id): sp for sp in ctx.session.scalars(sp_stmt).all() if sp.is_listed
+        session, params = ctx.session, ctx.params
+        inputs = PlanningInputs.load(session, ctx.run_id, ctx.store_ids)
+        planning_repo = PlanningRepo(session)
+        forecasts, listings, suppliers, products = (
+            inputs.forecasts,
+            inputs.listings,
+            inputs.suppliers,
+            inputs.products,
+        )
+        routes = inputs.routes
+        store_ref, product_ref = inputs.store_ref, inputs.product_ref
+        supplier_of, lead_time, state, supply_terms = (
+            inputs.supplier_of,
+            inputs.lead_time,
+            inputs.state,
+            inputs.supply_terms,
+        )
+        lost = {
+            (r.store_id, r.product_id): r
+            for r in session.scalars(select(LostSalesEstimate).where(LostSalesEstimate.run_id == ctx.run_id))
         }
 
-        # 4. Supplier terms and products
-        suppliers = {s.supplier_id: s for s in ctx.session.scalars(select(Supplier)).all()}
-        supplier_prods = {
-            (sp.supplier_id, sp.product_id): sp for sp in ctx.session.scalars(select(SupplierProduct)).all()
-        }
-        terms = {
-            (t.supplier_id, t.store_id): t for t in ctx.session.scalars(select(SupplierStoreTerms)).all()
-        }
+        recs: list[Recommendation] = []
+        needs: list[ReplenishmentNeed] = []
+        transfers: list[TransferOrder] = []
+        evidence_rows: list[DecisionEvidence] = []
 
-        # 5. Routes
-        routes_dict = transfer_repo.get_route_matrix()
-        tool_routes: dict[tuple[UUID, UUID], Route] = {
-            (r.from_store_id, r.to_store_id): Route(
-                fixed_cost=r.fixed_cost,
-                per_unit_cost=r.per_unit_cost,
-                handling_cost_per_unit=r.handling_cost_per_unit,
-                transit_days=r.transit_days,
+        def add_rec(
+            store_id: UUID, product_id: UUID, rec_type: str, qty: int, evidence: BaseModel, **kw: Any
+        ) -> UUID:
+            rec_id = uuid.uuid4()
+            data = evidence.model_dump(mode="json")
+            recs.append(
+                Recommendation(
+                    rec_id=rec_id,
+                    run_id=ctx.run_id,
+                    store_id=store_id,
+                    product_id=product_id,
+                    rec_type=rec_type,
+                    qty=qty,
+                    evidence=data,
+                    priority=kw.get("priority", "NORMAL"),
+                    status=kw.get("status", "PENDING"),
+                    reason=kw.get("reason"),
+                    lost_sales_value=kw.get("lost_revenue"),
+                    lost_profit=kw.get("lost_profit"),
+                )
             )
-            for r in routes_dict.values()
-        }
+            evidence_rows.append(
+                DecisionEvidence(run_id=ctx.run_id, rec_id=rec_id, data=data, validation_result="VALID")
+            )
+            return rec_id
 
-        # 6. On-order pending from earlier runs (D-14)
-        on_order_pending = purchasing_repo.get_on_order_pending(ctx.store_ids)
-
-        # 7. Products and stores
-        products = {p.product_id: p for p in ctx.session.scalars(select(Product)).all()}
-        stores = {s.store_id: s for s in ctx.session.scalars(select(Store)).all()}
-
+        # --- states; LOW confidence → NEEDS_REVIEW (D-04) ------------------------------------------------------
         states_by_product: dict[UUID, list[StoreState]] = {}
-        terms_by_product_store: dict[tuple[UUID, UUID], StoreSupplyTerms] = {}
-
-        recs_to_insert: list[Recommendation] = []
-        needs_to_insert: list[ReplenishmentNeed] = []
-        transfers_to_insert: list[TransferOrder] = []
-
-        # Build store states for each product
-        for (store_id, product_id), sp in store_products.items():
+        for (store_id, product_id), _sp in sorted(
+            listings.items(), key=lambda kv: (str(kv[0][1]), str(kv[0][0]))
+        ):
+            st = state(store_id, product_id)
             fc = forecasts.get((store_id, product_id))
-            daily_demand = fc.daily_demand if fc else 0.0
-            confidence = fc.confidence if fc else "HIGH"
-
-            pos = positions.get((store_id, product_id))
-            shelf_qty = pos.shelf_qty if pos else 0
-            backroom_qty = pos.backroom_qty if pos else 0
-            reserved_qty = pos.reserved if pos else 0
-            on_order = on_order_pending.get((store_id, product_id), 0)
-
-            # Terms lookup
-            supp_id = sp.preferred_supplier_id
-            term = terms.get((supp_id, store_id)) if supp_id else None
-            supp_prod = supplier_prods.get((supp_id, product_id)) if supp_id else None
-            supp = suppliers.get(supp_id) if supp_id else None
-
-            lead_days = RequirementCalculator.lead_time(
-                terms_lead=term.lead_time_days if term else None,
-                product_lead=supp_prod.lead_time_days if supp_prod else None,
-                default_lead=supp.default_lead_time_days if supp else 3,
-            )
-            delivery_chg = term.delivery_charge if term else Decimal("100.00")
-            unit_c = (
-                supp_prod.price
-                if supp_prod
-                else (products[product_id].cost_price if product_id in products else Decimal("10.00"))
-            )
-
-            st_terms = StoreSupplyTerms(
-                supplier_id=supp_id or uuid.UUID(int=0),
-                lead_time_days=lead_days,
-                delivery_charge=delivery_chg,
-                unit_cost=unit_c,
-            )
-            terms_by_product_store[(product_id, store_id)] = st_terms
-
-            req = RequirementCalculator.own_requirement(
-                daily_demand=daily_demand,
-                lead_time_days=lead_days,
-                review_period_days=sp.review_period_days,
-                safety_stock_days=sp.safety_stock_days,
-                min_display_qty=sp.min_display_qty,
-            )
-            avail = RequirementCalculator.available(
-                shelf_qty=shelf_qty,
-                backroom_qty=backroom_qty,
-                incoming=on_order,
-                reserved=reserved_qty,
-            )
-
-            if confidence == "LOW":
-                if avail < req:
-                    recs_to_insert.append(
-                        Recommendation(
-                            rec_id=uuid.uuid4(),
-                            run_id=ctx.run_id,
-                            store_id=store_id,
-                            product_id=product_id,
-                            rec_type="REORDER",
-                            qty=req - avail,
-                            priority="HIGH",
-                            evidence={"requirement": req, "available": avail, "issue": "LOW_CONFIDENCE"},
-                            status="NEEDS_REVIEW",
-                        )
+            if fc is not None and fc.confidence == "LOW":
+                if st.available < st.requirement:
+                    qty = st.requirement - st.available
+                    add_rec(
+                        store_id,
+                        product_id,
+                        "REORDER",
+                        qty,
+                        NeedsReviewEvidence(
+                            kind="NEEDS_REVIEW",
+                            reason="LOW_CONFIDENCE",
+                            own_requirement=st.requirement,
+                            available=st.available,
+                            suggested_qty=qty,
+                            detail=f"No sales for more than {params.stale_days} days while stock is held, "
+                            "or too little in-stock history.",
+                        ),
+                        status="NEEDS_REVIEW",
+                        reason="LOW_CONFIDENCE",
                     )
                 continue
+            if supply_terms(store_id, product_id) is None:
+                continue  # no serving supplier: handled by the PO agent as NO_ELIGIBLE_SUPPLIER if it is ever short
+            states_by_product.setdefault(product_id, []).append(st)
 
-            state = StoreState(
-                store_id=store_id,
-                requirement=req,
-                available=avail,
-                daily_demand=daily_demand,
-                review_period_days=sp.review_period_days,
+        # --- pass 1 (D-17) and decisions by urgency -------------------------------------------------------------
+        all_terms = {
+            (s.store_id, p): term
+            for p, sts in states_by_product.items()
+            for s in sts
+            if (term := supply_terms(s.store_id, p)) is not None
+        }
+        planned = set(TransferDecisionEngine.mark_po_pairs(states_by_product, all_terms))
+
+        def cost_inputs(product_id: UUID) -> CostInputs:
+            life = products[product_id].shelf_life_days
+            return CostInputs(
+                terms_by_store={
+                    s.store_id: all_terms[(s.store_id, product_id)] for s in states_by_product[product_id]
+                },
+                order_fixed_cost=params.order_fixed_cost,
+                holding_cost_rate_per_day=params.holding_cost_rate_per_day,
+                expiry_risk_pct=params.expiry_risk_pct,
+                is_perishable=life is not None and life <= params.perishable_max_shelf_life_days,
+                days_to_sell_cap=life if life is not None else params.days_to_sell_default_cap,
+                planned_supplier_stores=frozenset(planned),
             )
-            if product_id not in states_by_product:
-                states_by_product[product_id] = []
-            states_by_product[product_id].append(state)
 
-        # Run two-pass transfer engine
-        for product_id, states in states_by_product.items():
-            short_stores = [s for s in states if s.surplus < 0]
-            if not short_stores:
+        def urgency(product_id: UUID) -> tuple[float, str]:
+            short = [s.days_of_cover for s in states_by_product[product_id] if s.available < s.requirement]
+            return (min(short) if short else math.inf, str(product_id))
+
+        shortfalls: list[tuple[PONeed, UUID]] = []
+        for product_id in sorted(states_by_product, key=urgency):
+            sts = states_by_product[product_id]
+            if not any(s.available < s.requirement for s in sts):
                 continue
-
-            # Route & cost inputs
-            prod = products.get(product_id)
-            is_perish = (prod.shelf_life_days is not None and prod.shelf_life_days <= 30) if prod else False
-            cost_inputs = CostInputs(
-                order_fixed_cost=Decimal("200.00"),
-                holding_cost_rate_per_day=Decimal("0.001"),
-                expiry_risk_pct=Decimal("0.05"),
-                is_perishable=is_perish,
-                days_to_sell_cap=prod.shelf_life_days if (prod and prod.shelf_life_days) else 90,
-                terms_by_store={s.store_id: terms_by_product_store[(product_id, s.store_id)] for s in states},
-            )
-
-            plan = TransferDecisionEngine.decide(product_id, states, tool_routes, cost_inputs)
-
-            # Record transfers
+            plan = TransferDecisionEngine.decide(product_id, sts, routes, cost_inputs(product_id))
+            by_store = {s.store_id: s for s in sts}
+            remainder = {n.store_id: n.qty for n in plan.po_needs}
             for t in plan.transfers:
-                donor_store_name = stores[t.from_store].name if t.from_store in stores else "Store"
-                rec_id = uuid.uuid4()
-                recs_to_insert.append(
-                    Recommendation(
-                        rec_id=rec_id,
-                        run_id=ctx.run_id,
-                        store_id=t.to_store,
-                        product_id=product_id,
-                        rec_type="TRANSFER",
-                        qty=t.qty,
-                        priority="NORMAL",
-                        evidence={
-                            "from_store_name": donor_store_name,
-                            "qty": t.qty,
-                            "transfer_cost": float(t.transfer_cost),
-                        },
-                        status="PENDING",
-                    )
-                )
-                transfers_to_insert.append(
-                    TransferOrder(
-                        transfer_id=uuid.uuid4(),
-                        from_store_id=t.from_store,
-                        to_store_id=t.to_store,
-                        product_id=product_id,
-                        qty=t.qty,
-                        transfer_cost=t.transfer_cost,
-                        transit_days=t.transit_days,
-                        source_rec_id=rec_id,
-                        status="PROPOSED",
-                    )
-                )
-
-            # Record PO shortfall needs
+                self._transfer(ctx, t, by_store[t.to_store], remainder.get(t.to_store, 0), lead_time, store_ref,
+                               add_rec, transfers)  # fmt: skip
             for n in plan.po_needs:
-                rec_id = uuid.uuid4()
-                recs_to_insert.append(
-                    Recommendation(
-                        rec_id=rec_id,
-                        run_id=ctx.run_id,
-                        store_id=n.store_id,
-                        product_id=product_id,
-                        rec_type="REORDER",
-                        qty=n.qty,
-                        priority=str(n.priority),
-                        evidence={
-                            "need_qty": n.qty,
-                            "reason": str(n.reason),
-                        },
-                        status="PENDING",
-                    )
+                st = by_store[n.store_id]
+                sp = listings[(n.store_id, product_id)]
+                ls = lost.get((n.store_id, product_id))
+                lost_rev = ls.lost_revenue if ls is not None and ls.lost_revenue > 0 else None
+                lost_prof = ls.lost_profit if ls is not None and ls.lost_profit > 0 else None
+                rec_id = add_rec(
+                    n.store_id,
+                    product_id,
+                    "REORDER",
+                    n.qty,
+                    ReorderEvidence(
+                        kind="REORDER",
+                        reason=cast(Any, n.reason),
+                        daily_demand=round(st.daily_demand, 3),
+                        lead_time_days=lead_time(n.store_id, product_id),
+                        review_period_days=sp.review_period_days,
+                        safety_stock_days=sp.safety_stock_days,
+                        min_display_qty=sp.min_display_qty,
+                        own_requirement=st.requirement,
+                        available=st.available,
+                        need_qty=st.requirement - st.available,
+                        transferred_qty=int(str(n.evidence.get("transferred_qty", 0))),
+                        days_of_cover=round(st.days_of_cover, 1),
+                        supplier=SupplierRef(supplier_id=n.supplier_id, name=suppliers[n.supplier_id].name),
+                        lost_revenue=lost_rev,
+                        lost_profit=lost_prof,
+                    ),
+                    priority=n.priority,
+                    reason=n.reason,
+                    lost_revenue=lost_rev,
+                    lost_profit=lost_prof,
                 )
-                needs_to_insert.append(
-                    ReplenishmentNeed(
-                        need_id=uuid.uuid4(),
-                        run_id=ctx.run_id,
-                        store_id=n.store_id,
-                        product_id=product_id,
-                        qty=n.qty,
-                        source="SHORTFALL",
-                        reason=str(n.reason),
-                        priority=str(n.priority),
-                        required_by=ctx.run_date + timedelta(days=3),
-                        rec_id=rec_id,
-                    )
+                shortfalls.append((n, rec_id))
+                planned.add((n.supplier_id, n.store_id))
+
+        for n, rec_id in shortfalls:
+            needs.append(self._need(ctx, n, "SHORTFALL", rec_id, lead_time(n.store_id, n.product_id)))
+
+        # --- co-replenishment (D-02, D-13) ---------------------------------------------------------------------
+        delivering = {(n.supplier_id, n.store_id) for n, _ in shortfalls}
+        existing = {(n.store_id, n.product_id) for n, _ in shortfalls} | {
+            (r.store_id, r.product_id) for r in recs if r.status == "NEEDS_REVIEW"
+        }
+        rules = list(
+            session.scalars(
+                select(AssociationRule)
+                .where(
+                    AssociationRule.run_id == ctx.run_id,
+                    AssociationRule.rule_type == "COMPLEMENT",
+                    AssociationRule.lift >= float(params.co_replenish["min_lift"]),
                 )
+                .order_by(AssociationRule.lift.desc(), AssociationRule.consequent_id)
+            )
+        )
+        by_antecedent: dict[tuple[UUID, UUID], list[AssociationRule]] = {}
+        for rule in rules:
+            by_antecedent.setdefault((rule.store_id, rule.antecedent_id), []).append(rule)
+        limit = int(params.co_replenish["limit"])
+        for n, _ in list(shortfalls):
+            for rule in by_antecedent.get((n.store_id, n.product_id), [])[:limit]:
+                key = (n.store_id, rule.consequent_id)
+                if key in existing or key not in listings:
+                    continue
+                fc = forecasts.get(key)
+                if fc is None or fc.confidence == "LOW":
+                    continue
+                st = state(*key)
+                qty = RC.co_replenish_qty(
+                    st.available, st.daily_demand, st.review_period_days, st.requirement
+                )
+                supplier = supplier_of(*key)
+                if qty <= 0 or supplier is None or (supplier, n.store_id) not in delivering:
+                    continue
+                rec_id = add_rec(
+                    n.store_id,
+                    rule.consequent_id,
+                    "CO_REPLENISH",
+                    qty,
+                    CoReplenishEvidence(
+                        kind="CO_REPLENISH",
+                        linked_product=product_ref(n.product_id),
+                        support=round(rule.support, 4),
+                        confidence=round(rule.confidence, 3),
+                        lift=round(rule.lift, 2),
+                        daily_demand=round(st.daily_demand, 3),
+                        review_period_days=st.review_period_days,
+                        own_requirement=st.requirement,
+                        available=st.available,
+                        projected_at_next_review=round(
+                            st.available - st.daily_demand * st.review_period_days, 2
+                        ),
+                        supplier=SupplierRef(supplier_id=supplier, name=suppliers[supplier].name),
+                    ),
+                    reason="CO_REPLENISH",
+                )
+                co_need = PONeed(n.store_id, rule.consequent_id, qty, "NORMAL", "CO_REPLENISH", supplier)
+                need = self._need(ctx, co_need, "CO_REPLENISH", rec_id, lead_time(*key))
+                need.linked_product_id, need.lift = n.product_id, rule.lift
+                needs.append(need)
+                existing.add(key)
 
-        # 8. Check Co-Replenishment (D-02)
-        rules_stmt = select(AssociationRule).where(AssociationRule.rule_type == "COMPLEMENT")
-        comp_rules = ctx.session.scalars(rules_stmt).all()
-        reordered_products = {n.product_id for n in needs_to_insert}
-
-        for rule in comp_rules:
-            if rule.antecedent_id in reordered_products:
-                c_prod = rule.consequent_id
-                sp_c = store_products.get((rule.store_id, c_prod))
-                if sp_c is not None:
-                    fc = forecasts.get((rule.store_id, c_prod))
-                    daily_c = fc.daily_demand if fc else 0.0
-                    pos_c = positions.get((rule.store_id, c_prod))
-                    avail_c = pos_c.available if pos_c else 0
-                    req_c = RequirementCalculator.own_requirement(
-                        daily_demand=daily_c,
-                        lead_time_days=3,
-                        review_period_days=sp_c.review_period_days,
-                        safety_stock_days=sp_c.safety_stock_days,
-                        min_display_qty=sp_c.min_display_qty,
-                    )
-                    co_qty = RequirementCalculator.co_replenish_qty(
-                        available=avail_c,
-                        daily_demand=daily_c,
-                        review_period_days=sp_c.review_period_days,
-                        requirement=req_c,
-                    )
-                    if co_qty > 0:
-                        rec_id = uuid.uuid4()
-                        recs_to_insert.append(
-                            Recommendation(
-                                rec_id=rec_id,
-                                run_id=ctx.run_id,
-                                store_id=rule.store_id,
-                                product_id=c_prod,
-                                rec_type="CO_REPLENISH",
-                                qty=co_qty,
-                                priority="NORMAL",
-                                evidence={
-                                    "parent_product_id": str(rule.antecedent_id),
-                                    "lift": rule.lift,
-                                    "qty": co_qty,
-                                },
-                                status="PENDING",
-                            )
-                        )
-                        needs_to_insert.append(
-                            ReplenishmentNeed(
-                                need_id=uuid.uuid4(),
-                                run_id=ctx.run_id,
-                                store_id=rule.store_id,
-                                product_id=c_prod,
-                                qty=co_qty,
-                                source="CO_REPLENISH",
-                                reason="CO_REPLENISH",
-                                priority="NORMAL",
-                                linked_product_id=rule.antecedent_id,
-                                lift=rule.lift,
-                                required_by=ctx.run_date + timedelta(days=3),
-                                rec_id=rec_id,
-                            )
-                        )
-
-        planning_repo.insert_recommendations(recs_to_insert)
-        planning_repo.insert_replenishment_needs(needs_to_insert)
-        transfer_repo.insert_transfers(transfers_to_insert)
+        planning_repo.insert_recommendations(recs)
+        session.add_all(evidence_rows)
+        session.flush()
+        planning_repo.insert_replenishment_needs(needs)
+        TransferRepo(session).insert_transfers(transfers)
 
         return AgentResult(
             status="SUCCESS",
             outputs={
-                "transfers": len(transfers_to_insert),
-                "reorders": len([r for r in recs_to_insert if r.rec_type == "REORDER"]),
-                "co_replenish": len([r for r in recs_to_insert if r.rec_type == "CO_REPLENISH"]),
+                "transfers": len(transfers),
+                "reorders": sum(1 for r in recs if r.rec_type == "REORDER" and r.status == "PENDING"),
+                "needs_review": sum(1 for r in recs if r.status == "NEEDS_REVIEW"),
+                "co_replenish": sum(1 for r in recs if r.rec_type == "CO_REPLENISH"),
             },
-            step_count=8,
+            step_count=1,
+        )
+
+    @staticmethod
+    def _need(ctx: RunContext, n: PONeed, source: str, rec_id: UUID, lead: int) -> ReplenishmentNeed:
+        return ReplenishmentNeed(
+            need_id=uuid.uuid4(),
+            run_id=ctx.run_id,
+            store_id=n.store_id,
+            product_id=n.product_id,
+            qty=n.qty,
+            source=source,
+            reason=n.reason,
+            priority=n.priority,
+            rec_id=rec_id,
+            required_by=ctx.run_date + timedelta(days=lead),
+        )
+
+    @staticmethod
+    def _transfer(
+        ctx: RunContext,
+        t: TransferProposal,
+        short: StoreState,
+        po_remainder: int,
+        lead_time: Any,
+        store_ref: Any,
+        add_rec: Any,
+        transfers: list[TransferOrder],
+    ) -> None:
+        demand = max(short.daily_demand, 0.01)
+        evidence = TransferEvidence(
+            kind="TRANSFER",
+            destination_shortage=int(str(t.evidence["need"])),
+            donor=Counterpart(store=store_ref(t.from_store), qty=t.qty),
+            donor_surplus=int(str(t.evidence["donor_surplus"])),
+            donor_protected_requirement=int(str(t.evidence["donor_requirement"])),
+            donor_keeps_requirement=True,
+            transfer_qty=t.qty,
+            po_remainder_qty=po_remainder,
+            transfer_cost=money(t.transfer_cost),
+            po_incremental_cost=money(t.po_cost_avoided),
+            expected_delivery=ctx.run_date + timedelta(days=t.transit_days),
+            days_of_cover_before=round(short.available / demand, 1),
+            days_of_cover_after=round((short.available + t.qty) / demand, 1),
+        )
+        rec_id = add_rec(
+            t.to_store,
+            t.product_id,
+            "TRANSFER",
+            t.qty,
+            evidence,
+            priority=TransferDecisionEngine._priority(short, lead_time(t.to_store, t.product_id)),
+            reason="SURPLUS_TRANSFER" if not po_remainder else "PARTIAL_SURPLUS",
+        )
+        transfers.append(
+            TransferOrder(
+                transfer_id=uuid.uuid4(),
+                from_store_id=t.from_store,
+                to_store_id=t.to_store,
+                product_id=t.product_id,
+                qty=t.qty,
+                transfer_cost=money(t.transfer_cost),
+                transit_days=t.transit_days,
+                is_expiry_aware=False,
+                source_rec_id=rec_id,
+                status="PROPOSED",
+                expected_qty=t.qty,
+            )
         )

@@ -79,7 +79,7 @@ class StoreProduct(Timestamps, Base):
 class SupplierProduct(Timestamps, Base):
     __tablename__ = "supplier_product"
     __table_args__ = (
-        CheckConstraint("moq >= 1", name="moq"),
+        CheckConstraint("moq >= 0", name="moq"),  # 0 = no minimum order quantity (D-47)
         CheckConstraint("order_pack_size >= 1", name="order_pack_size"),
     )
 

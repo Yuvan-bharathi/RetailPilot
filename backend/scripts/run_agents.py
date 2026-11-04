@@ -9,12 +9,12 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from datetime import date, datetime
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agents.orchestrator import WorkflowOrchestrator
+from app.agents.orchestrator import WorkflowOrchestrator, next_run_date
 from app.core.db import get_sync_engine, use_selector_event_loop
 from app.domain.models.observability import LLMUsage, ToolCall
 
@@ -27,11 +27,15 @@ def main() -> None:
         "--date",
         dest="run_date",
         default=None,
-        help="Target business run date (YYYY-MM-DD). Defaults to today.",
+        help="Run date (YYYY-MM-DD). Default: the day after the latest loaded POS day.",
     )
     args = parser.parse_args()
 
-    target_date = datetime.strptime(args.run_date, "%Y-%m-%d").date() if args.run_date else date.today()
+    engine = get_sync_engine()
+    with Session(engine) as probe:
+        target_date = (
+            datetime.strptime(args.run_date, "%Y-%m-%d").date() if args.run_date else next_run_date(probe)
+        )
 
     print("=================================================================")
     print("  RetailPilot AI — Autonomous Multi-Agent Replenishment Pipeline ")
@@ -45,6 +49,7 @@ def main() -> None:
     with Session(engine) as session:
         orchestrator = WorkflowOrchestrator(session)
         summary = orchestrator.run_nightly(run_date=target_date)
+        session.commit()  # persist the run (and a FAILED status) — it was never committed before
 
         # Query LLM usages and tool calls for the run
         llm_usages = (

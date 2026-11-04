@@ -45,3 +45,16 @@ def test_openapi_documents_health_and_error_body() -> None:
 
     assert "/health" in spec["paths"]
     assert "ErrorResponse" in spec["components"]["schemas"]
+
+
+def test_weak_jwt_secret_is_refused_outside_local() -> None:
+    import pytest
+
+    from app.core.config import check_secrets
+
+    assert check_secrets(Settings(app_env="local", jwt_secret="change-me"))  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="JWT_SECRET"):
+        check_secrets(Settings(app_env="production", jwt_secret="change-me"))  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="JWT_SECRET"):
+        check_secrets(Settings(app_env="staging", jwt_secret="short"))  # type: ignore[arg-type]
+    assert check_secrets(Settings(app_env="production", jwt_secret="y" * 40))  # type: ignore[arg-type]

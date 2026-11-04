@@ -97,7 +97,10 @@ infra/docker-compose.yml
   without it ruff falls back to its defaults; mypy already covers app/ and ../data via pyproject.toml)
 - Worker: `uv run celery -A app.workers.celery_app worker -B -l info`
 - Synthetic data (from the repo root): `uv run --project backend python -m data.synthetic.generate --scenarios all`
-- Frontend: `cd frontend && npm install && npm run dev` (mock API: `VITE_USE_MOCKS=true` in `.env.development`;
+- Demo (from backend/): `uv run python -m scripts.reset_demo` then `uv run python -m scripts.seed_demo`
+  (generate + COPY-load + users + real nightly run, D-47) · next run: `uv run python -m scripts.run_agents` ·
+  evaluation: `uv run python -m scripts.replay_evaluation` (writes docs/EVALUATION_REPORT.md)
+- Frontend: `cd frontend && npm install && npm run dev` (real API via the Vite proxy to :8000; UI-only work: `VITE_USE_MOCKS=true` in `.env.development.local`;
   demo users admin / sup.a / sup.b / sup.c, password `demo`) · all checks: `npm run check`
   (lint, typecheck, check:no-hex, check:api, vitest incl. axe) · build: `npm run build` ·
   `npm run format:check` (Prettier 3.9.10 pinned, `.prettierrc.json` printWidth 120; not yet part of `check` —

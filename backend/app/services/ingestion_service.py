@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.models.enums import MovementReference, MovementType, StockLocation
-from app.domain.models.inventory import Batch, InventoryMovement, InventoryPosition
+from app.domain.models.inventory import Batch, InventoryDailySnapshot, InventoryMovement, InventoryPosition
 from app.domain.models.master import Product
 from app.domain.models.sales import SalesLine, SalesTransaction
 from app.domain.models.transfers import BusinessRule
@@ -140,6 +140,17 @@ class DataIngestionService:
         stale_days = self._get_stale_days()
 
         for store_id in store_ids:
+            already_loaded = self.session.scalar(
+                select(InventoryDailySnapshot.snapshot_date)
+                .where(
+                    InventoryDailySnapshot.store_id == store_id,
+                    InventoryDailySnapshot.snapshot_date == run_date,
+                )
+                .limit(1)
+            )
+            if already_loaded is not None:  # idempotent: the day was ingested (or bulk-loaded) before
+                self._flag_stale(store_id, run_date, stale_days, report)
+                continue
             # 1. Fetch raw rows
             raw_lines = self.pos_source.fetch_sales(store_id, run_date)
             raw_stock = self.pos_source.fetch_stock_snapshot(store_id, run_date)
@@ -207,19 +218,24 @@ class DataIngestionService:
                 self.batch_repo.bulk_upsert(store_id, batch_models)
 
             # 6. Check for stale SKUs
-            last_sales = self.sales_repo.get_last_sale_dates(store_id)
-            pos_stmt = select(InventoryPosition).where(
-                InventoryPosition.store_id == store_id,
-                (InventoryPosition.shelf_qty + InventoryPosition.backroom_qty) > 0,
-            )
-            positions_with_stock = self.session.scalars(pos_stmt).all()
-            for pos in positions_with_stock:
-                last_sale = last_sales.get(pos.product_id)
-                if last_sale is not None and (run_date - last_sale).days > stale_days:
-                    report.stale_skus.append((store_id, pos.product_id))
+            self._flag_stale(store_id, run_date, stale_days, report)
 
         self.session.flush()
         return report
+
+    def _flag_stale(self, store_id: UUID, day: date, stale_days: int, report: ValidationReport) -> None:
+        """Stock held but no sale for more than `stale_days` days up to `day` → stale (low confidence, D-04)."""
+        last_sales = self.sales_repo.get_last_sale_dates(store_id)
+        positions = self.session.scalars(
+            select(InventoryPosition).where(
+                InventoryPosition.store_id == store_id,
+                (InventoryPosition.shelf_qty + InventoryPosition.backroom_qty) > 0,
+            )
+        ).all()
+        for pos in positions:
+            last_sale = last_sales.get(pos.product_id)
+            if last_sale is not None and (day - last_sale).days > stale_days:
+                report.stale_skus.append((store_id, pos.product_id))
 
     def backfill(self, start: date, end: date, store_ids: list[UUID]) -> ValidationReport:
         """Backfill historical sales and stock across a date range [start, end] (SD-02 line 57)."""

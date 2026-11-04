@@ -15,7 +15,7 @@ import time
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID
 
 from sqlalchemy import select, text, update
@@ -138,6 +138,12 @@ class RunSupersession:
         }
 
 
+def next_run_date(session: Session) -> date:
+    """The day after the latest POS day loaded (a run plans the next day); today if nothing is loaded."""
+    latest = session.scalar(text("SELECT max(snapshot_date) FROM inventory_daily_snapshot"))
+    return latest + timedelta(days=1) if latest else date.today()
+
+
 class WorkflowOrchestrator:
     AGENT_SEQUENCE: Sequence[type[BaseAgent]] = (
         SalesAnalyticsAgent,
@@ -174,6 +180,7 @@ class WorkflowOrchestrator:
         existing_running = self.session.scalar(
             select(AgentRun.run_id).where(
                 AgentRun.agent_name == "nightly",
+                AgentRun.run_date == run_date,
                 AgentRun.status == "RUNNING",
             )
         )
@@ -203,7 +210,10 @@ class WorkflowOrchestrator:
 
         # 3. Data Ingestion & Validation (SD-02)
         ingestion_service = DataIngestionService(self.session, self.pos_source)
-        report = ingestion_service.load_and_validate(run_date=run_date, store_ids=store_ids)
+        # The run plans `run_date`; the POS data to ingest is the previous business day (history ends there).
+        report = ingestion_service.load_and_validate(
+            run_date=run_date - timedelta(days=1), store_ids=store_ids
+        )
         self.session.flush()
 
         # 4. Supersede previous runs (D-03)

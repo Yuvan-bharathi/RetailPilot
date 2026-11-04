@@ -1,29 +1,34 @@
-"""Freshness Agent (SD-08, spec §1, decisions D-20, D-28, D-31).
+"""Freshness Agent (SD-08, spec §1; D-04, D-20, D-28, D-31, D-34, D-47).
 
-Evaluates FEFO expiry risk per batch, proposes expiry-aware transfers to stores that can sell
-at-risk stock before expiration, and raises expiry alerts or markdown recommendations.
+For each store-SKU with batches expiring within `expiry_window_days`: FEFO at-risk units per batch (D-31). At-risk
+units go first to other HIGH-confidence stores that can sell them before expiry (single receiver first, D-28) as
+expiry-aware transfers; what nobody can sell becomes an EXPIRY_ALERT at the holding store. Receivers are evaluated
+with the same requirement / availability as stock balancing (PlanningInputs). Evidence is the D-34 union.
 """
 
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
-from uuid import UUID
+from datetime import timedelta
+from typing import Any
 
-from sqlalchemy import select
+from pydantic import BaseModel
 
 from app.agents.base import AgentResult, BaseAgent, RunContext
+from app.agents.planning_inputs import PlanningInputs
 from app.domain.models.enums import Priority, RecStatus, RecType, TransferStatus
-from app.domain.models.inventory import Batch, InventoryPosition
-from app.domain.models.master import Product, StoreProduct
+from app.domain.models.inventory import Batch
+from app.domain.models.observability import DecisionEvidence
 from app.domain.models.planning import Recommendation
 from app.domain.models.transfers import TransferOrder
 from app.domain.repositories.batch_repo import BatchRepo
 from app.domain.repositories.planning_repo import PlanningRepo
 from app.domain.repositories.transfer_repo import TransferRepo
+from app.domain.schemas.common import Counterpart
+from app.domain.schemas.dtos import BatchRiskRef, ExpiryEvidence, TransferEvidence
 from app.tools.freshness import FreshnessTools
+from app.tools.numeric import money
 from app.tools.transfer_engine import TransferDecisionEngine
-from app.tools.types import Route, StoreState
 
 
 class FreshnessAgent(BaseAgent):
@@ -31,194 +36,153 @@ class FreshnessAgent(BaseAgent):
     critical = False
 
     def run(self, ctx: RunContext) -> AgentResult:
-        batch_repo = BatchRepo(ctx.session)
-        planning_repo = PlanningRepo(ctx.session)
-        transfer_repo = TransferRepo(ctx.session)
-
-        # 1. Batches expiring within window
-        window_days = ctx.params.expiry_window_days
-        batches = batch_repo.get_expiring(
-            store_ids=ctx.store_ids, as_of_date=ctx.run_date, within_days=window_days
+        batches = BatchRepo(ctx.session).get_expiring(
+            store_ids=ctx.store_ids, as_of_date=ctx.run_date, within_days=ctx.params.expiry_window_days
         )
-
         if not batches:
-            ctx.logger.log_tool_call(
-                ctx.run_id,
-                "expiry_scan",
-                {"batches_found": 0},
-                "no batches expiring within window",
-                0,
-                "OK",
-            )
+            ctx.logger.log_tool_call(ctx.run_id, "expiry_scan", {"batches_found": 0}, "no batches", 0, "OK")
             return AgentResult(
-                status="SUCCESS",
-                outputs={"batches_scanned": 0, "transfers": 0, "expiry_alerts": 0},
-                step_count=1,
+                status="SUCCESS", outputs={"batches_scanned": 0, "transfers": 0, "expiry_alerts": 0}
             )
 
-        # 2. Forecasts for this run
-        forecasts = planning_repo.get_forecasts_by_run(ctx.run_id)
+        inputs = PlanningInputs.load(ctx.session, ctx.run_id, ctx.store_ids)
+        recs: list[Recommendation] = []
+        transfers: list[TransferOrder] = []
+        evidence_rows: list[DecisionEvidence] = []
 
-        # 3. StoreProduct and Inventory positions for receiver capacity
-        positions = {
-            (p.store_id, p.product_id): p
-            for p in ctx.session.scalars(
-                select(InventoryPosition).where(InventoryPosition.store_id.in_(ctx.store_ids))
-            ).all()
-        }
-        store_products = {
-            (sp.store_id, sp.product_id): sp
-            for sp in ctx.session.scalars(
-                select(StoreProduct).where(StoreProduct.store_id.in_(ctx.store_ids))
-            ).all()
-            if sp.is_listed
-        }
-        products = {p.product_id: p for p in ctx.session.scalars(select(Product)).all()}
-
-        # 4. Route matrix
-        routes_dict = transfer_repo.get_route_matrix()
-        tool_routes: dict[tuple[UUID, UUID], Route] = {
-            (r.from_store_id, r.to_store_id): Route(
-                fixed_cost=r.fixed_cost,
-                per_unit_cost=r.per_unit_cost,
-                handling_cost_per_unit=r.handling_cost_per_unit,
-                transit_days=r.transit_days,
-            )
-            for r in routes_dict.values()
-        }
-
-        recs_to_insert: list[Recommendation] = []
-        transfers_to_insert: list[TransferOrder] = []
-        transfers_count = 0
-        expiry_alerts_count = 0
-
-        # Group batches by (store_id, product_id)
-        batches_by_store_prod: dict[tuple[UUID, UUID], list[Batch]] = {}
-        for b in batches:
-            batches_by_store_prod.setdefault((b.store_id, b.product_id), []).append(b)
-
-        for (from_store_id, product_id), sp_batches in batches_by_store_prod.items():
-            fc = forecasts.get((from_store_id, product_id))
-            daily_demand = fc.daily_demand if fc else 0.0
-            prod = products.get(product_id)
-            unit_cost = prod.cost_price if prod else Decimal("10.00")
-
-            # Calculate FEFO batch risks
-            risks = FreshnessTools.at_risk_by_batch(sp_batches, daily_demand, ctx.run_date)
-
-            # Build states of all stores for this product
-            states: list[StoreState] = []
-            for s_id in ctx.store_ids:
-                s_sp = store_products.get((s_id, product_id))
-                if not s_sp:
-                    continue
-                s_fc = forecasts.get((s_id, product_id))
-                s_pos = positions.get((s_id, product_id))
-                states.append(
-                    StoreState(
-                        store_id=s_id,
-                        requirement=0,
-                        available=s_pos.available if s_pos else 0,
-                        daily_demand=s_fc.daily_demand if s_fc else 0.0,
-                        review_period_days=s_sp.review_period_days,
-                    )
-                )
-
-            for risk in risks:
-                at_risk = risk.at_risk
-                if at_risk <= 0:
-                    continue
-
-                # Try to find expiry receivers
-                proposals = TransferDecisionEngine.find_expiry_receivers(
+        def add_rec(
+            store_id: Any, product_id: Any, rec_type: str, qty: int, evidence: BaseModel, **kw: Any
+        ) -> Any:
+            rec_id = uuid.uuid4()
+            data = evidence.model_dump(mode="json")
+            recs.append(
+                Recommendation(
+                    rec_id=rec_id,
+                    run_id=ctx.run_id,
+                    store_id=store_id,
                     product_id=product_id,
-                    qty=at_risk,
-                    days_left=risk.days_left,
-                    from_store=from_store_id,
-                    states=states,
-                    routes=tool_routes,
-                    unit_cost=unit_cost,
+                    rec_type=rec_type,
+                    qty=qty,
+                    evidence=data,
+                    status=RecStatus.PENDING.value,
+                    priority=kw.get("priority", Priority.HIGH.value),
+                    reason=kw.get("reason"),
+                    lost_sales_value=kw.get("lost_revenue"),
                 )
+            )
+            evidence_rows.append(
+                DecisionEvidence(run_id=ctx.run_id, rec_id=rec_id, data=data, validation_result="VALID")
+            )
+            return rec_id
 
-                for prop in proposals:
-                    rec_id = uuid.uuid4()
-                    rec = Recommendation(
-                        rec_id=rec_id,
-                        run_id=ctx.run_id,
-                        store_id=prop.to_store,
-                        product_id=product_id,
-                        rec_type=RecType.TRANSFER.value,
-                        qty=prop.qty,
-                        priority=Priority.HIGH.value,
-                        status=RecStatus.PENDING.value,
-                        evidence={
-                            "batch_id": str(risk.batch_id),
-                            "expiry_date": risk.expiry_date.isoformat(),
-                            "days_left": risk.days_left,
-                            "at_risk": risk.at_risk,
-                            "transfer_cost": str(prop.transfer_cost),
-                            "from_store_id": str(from_store_id),
-                        },
+        by_store_product: dict[tuple[Any, Any], list[Batch]] = {}
+        for b in batches:
+            by_store_product.setdefault((b.store_id, b.product_id), []).append(b)
+
+        for (store_id, product_id), held in sorted(
+            by_store_product.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))
+        ):
+            if (store_id, product_id) not in inputs.listings:
+                continue
+            demand = inputs.demand(store_id, product_id)
+            by_id = {b.batch_id: b for b in held}
+            for risk in FreshnessTools.at_risk_by_batch(held, demand, ctx.run_date):
+                if risk.at_risk <= 0:
+                    continue
+                ref = BatchRiskRef(
+                    batch_no=by_id[risk.batch_id].batch_no,
+                    expiry_date=risk.expiry_date,
+                    days_left=risk.days_left,
+                    batch_qty=risk.qty,
+                    at_risk_qty=risk.at_risk,
+                )
+                receivers = inputs.receiver_states(product_id, exclude=store_id)
+                proposals = TransferDecisionEngine.find_expiry_receivers(
+                    product_id,
+                    risk.at_risk,
+                    risk.days_left,
+                    store_id,
+                    receivers,
+                    inputs.routes,
+                    inputs.unit_cost(store_id, product_id),
+                )
+                left = risk.at_risk
+                for t in proposals:
+                    left -= t.qty
+                    receiver = next(s for s in receivers if s.store_id == t.to_store)
+                    rec_id = add_rec(
+                        t.to_store,
+                        product_id,
+                        RecType.TRANSFER.value,
+                        t.qty,
+                        TransferEvidence(
+                            kind="TRANSFER",
+                            destination_shortage=0,
+                            donor=Counterpart(store=inputs.store_ref(store_id), qty=t.qty),
+                            donor_surplus=risk.at_risk,
+                            donor_protected_requirement=inputs.state(store_id, product_id).requirement,
+                            donor_keeps_requirement=True,
+                            transfer_qty=t.qty,
+                            po_remainder_qty=0,
+                            transfer_cost=money(t.transfer_cost),
+                            po_incremental_cost=None,
+                            expected_delivery=ctx.run_date + timedelta(days=t.transit_days),
+                            days_of_cover_before=round(receiver.days_of_cover, 1),
+                            days_of_cover_after=round(
+                                (receiver.available + t.qty) / max(receiver.daily_demand, 0.01), 1
+                            ),
+                            expiring_batch=ref,
+                        ),
+                        reason="EXPIRY_RISK",
                     )
-                    recs_to_insert.append(rec)
-
-                    transfer = TransferOrder(
-                        transfer_id=uuid.uuid4(),
-                        from_store_id=from_store_id,
-                        to_store_id=prop.to_store,
-                        product_id=product_id,
-                        batch_id=risk.batch_id,
-                        qty=prop.qty,
-                        transfer_cost=prop.transfer_cost,
-                        transit_days=prop.transit_days,
-                        is_expiry_aware=True,
-                        source_rec_id=rec_id,
-                        status=TransferStatus.PROPOSED.value,
+                    transfers.append(
+                        TransferOrder(
+                            transfer_id=uuid.uuid4(),
+                            from_store_id=store_id,
+                            to_store_id=t.to_store,
+                            product_id=product_id,
+                            batch_id=risk.batch_id,
+                            qty=t.qty,
+                            transfer_cost=money(t.transfer_cost),
+                            transit_days=t.transit_days,
+                            is_expiry_aware=True,
+                            source_rec_id=rec_id,
+                            status=TransferStatus.PROPOSED.value,
+                            expected_qty=t.qty,
+                        )
                     )
-                    transfers_to_insert.append(transfer)
-                    at_risk -= prop.qty
-                    transfers_count += 1
-
-                if at_risk > 0:
-                    rec_id = uuid.uuid4()
-                    rec = Recommendation(
-                        rec_id=rec_id,
-                        run_id=ctx.run_id,
-                        store_id=from_store_id,
-                        product_id=product_id,
-                        rec_type=RecType.EXPIRY_ALERT.value,
-                        qty=at_risk,
-                        priority=Priority.HIGH.value,
-                        status=RecStatus.PENDING.value,
-                        evidence={
-                            "batch_id": str(risk.batch_id),
-                            "expiry_date": risk.expiry_date.isoformat(),
-                            "days_left": risk.days_left,
-                            "at_risk": at_risk,
-                            "daily_demand": daily_demand,
-                        },
+                if left > 0:
+                    price = inputs.products[product_id].selling_price
+                    add_rec(
+                        store_id,
+                        product_id,
+                        RecType.EXPIRY_ALERT.value,
+                        left,
+                        ExpiryEvidence(
+                            kind="EXPIRY",
+                            batch=ref.model_copy(update={"at_risk_qty": left}),
+                            daily_demand=round(demand, 3),
+                            receivers_checked=len(receivers),
+                        ),
+                        priority=Priority.HIGH.value if ref.days_left <= 3 else Priority.NORMAL.value,
+                        reason="EXPIRY_RISK",
+                        lost_revenue=money(left * price),
                     )
-                    recs_to_insert.append(rec)
-                    expiry_alerts_count += 1
 
-        planning_repo.insert_recommendations(recs_to_insert)
-        transfer_repo.insert_transfers(transfers_to_insert)
-
+        PlanningRepo(ctx.session).insert_recommendations(recs)
+        ctx.session.add_all(evidence_rows)
+        ctx.session.flush()
+        TransferRepo(ctx.session).insert_transfers(transfers)
+        alerts = sum(1 for r in recs if r.rec_type == RecType.EXPIRY_ALERT.value)
         ctx.logger.log_tool_call(
             ctx.run_id,
             "expiry_scan",
             {"batches_scanned": len(batches)},
-            f"{transfers_count} transfers, {expiry_alerts_count} expiry alerts",
+            f"{len(transfers)} transfers, {alerts} expiry alerts",
             0,
             "OK",
         )
-
         return AgentResult(
             status="SUCCESS",
-            outputs={
-                "batches_scanned": len(batches),
-                "transfers": transfers_count,
-                "expiry_alerts": expiry_alerts_count,
-            },
-            step_count=1,
+            outputs={"batches_scanned": len(batches), "transfers": len(transfers), "expiry_alerts": alerts},
         )

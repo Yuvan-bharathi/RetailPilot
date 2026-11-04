@@ -73,7 +73,7 @@ class GroqClient:
                 return self._call(model, system, user, schema_name, schema)
             except (httpx.HTTPError, LLMError, ValueError, KeyError) as exc:
                 errors.append(f"{model}: {type(exc).__name__}: {exc}")
-                logger.warning("LLM call failed on %s: %s", model, type(exc).__name__)
+                logger.warning("LLM call failed on %s: %s: %s", model, type(exc).__name__, str(exc)[:160])
         raise LLMError("; ".join(errors))
 
     def _call(self, model: str, system: str, user: str, schema_name: str, schema: dict[str, Any]) -> LLMReply:

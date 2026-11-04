@@ -12,3 +12,6 @@ data/synthetic/output/
 *.tsbuildinfo
 .coverage
 htmlcov/
+
+# local overrides (e.g. frontend/.env.development.local with VITE_USE_MOCKS=true)
+*.local

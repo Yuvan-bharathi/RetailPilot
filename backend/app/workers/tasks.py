@@ -16,7 +16,7 @@ from celery import shared_task
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.agents.orchestrator import WorkflowOrchestrator
+from app.agents.orchestrator import WorkflowOrchestrator, next_run_date
 from app.core.db import get_sync_engine
 from app.services.approval_service import ApprovalService
 
@@ -25,11 +25,14 @@ logger = logging.getLogger(__name__)
 
 @shared_task(name="nightly_run_task")
 def nightly_run_task(run_date_str: str | None = None) -> dict[str, Any]:
-    run_date = datetime.strptime(run_date_str, "%Y-%m-%d").date() if run_date_str else date.today()
     engine = get_sync_engine()
     with Session(engine) as session:
+        run_date = (
+            datetime.strptime(run_date_str, "%Y-%m-%d").date() if run_date_str else next_run_date(session)
+        )
         orchestrator = WorkflowOrchestrator(session)
         summary = orchestrator.run_nightly(run_date=run_date)
+        session.commit()  # the run's outputs AND a FAILED status must persist (was never committed)
         return {
             "run_id": str(summary.run_id),
             "status": summary.status,
