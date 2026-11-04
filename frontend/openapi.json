@@ -1079,6 +1079,7 @@
           "inventory"
         ],
         "summary": "List Store Movements",
+        "description": "Movement ledger, newest first (occurred_at DESC, movement_id DESC), keyset-paged (D-37).",
         "operationId": "list_store_movements",
         "parameters": [
           {
@@ -1092,14 +1093,21 @@
             }
           },
           {
-            "name": "page",
+            "name": "cursor",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1,
-              "title": "Page"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
             }
           },
           {
@@ -1112,23 +1120,6 @@
               "minimum": 1,
               "default": 25,
               "title": "Page Size"
-            }
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "pattern": "^-?[a-z_]{1,40}$"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Sort"
             }
           },
           {
@@ -1204,8 +1195,10 @@
                   "type": "null"
                 }
               ],
+              "description": "First business_date (IST), inclusive",
               "title": "From"
-            }
+            },
+            "description": "First business_date (IST), inclusive"
           },
           {
             "name": "to",
@@ -1221,8 +1214,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Last business_date (IST), inclusive",
               "title": "To"
-            }
+            },
+            "description": "Last business_date (IST), inclusive"
           }
         ],
         "responses": {
@@ -1231,7 +1226,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_InventoryMovementDTO_"
+                  "$ref": "#/components/schemas/CursorPage_InventoryMovementDTO_"
                 }
               }
             }
@@ -2408,6 +2403,43 @@
         "title": "Counterpart",
         "description": "Another store as a Store Supervisor may see it: name + offered/requested quantity only."
       },
+      "CursorPage_InventoryMovementDTO_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryMovementDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` to get the next page; null on the last page"
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "page_size"
+        ],
+        "title": "CursorPage[InventoryMovementDTO]"
+      },
       "DashboardSummary": {
         "properties": {
           "store": {
@@ -2749,10 +2781,17 @@
             ],
             "title": "Reason"
           },
-          "created_at": {
+          "occurred_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Occurred At",
+            "description": "When the stock moved (UTC); the ledger's order and cursor key"
+          },
+          "business_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Business Date",
+            "description": "The store's trading day (IST) the movement belongs to"
           }
         },
         "additionalProperties": false,
@@ -2765,7 +2804,8 @@
           "location",
           "reference",
           "reason",
-          "created_at"
+          "occurred_at",
+          "business_date"
         ],
         "title": "InventoryMovementDTO",
         "description": "One row of the inventory movement ledger (spec §3)."
@@ -3130,43 +3170,6 @@
           "page_size"
         ],
         "title": "Page[BatchDTO]"
-      },
-      "Page_InventoryMovementDTO_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/InventoryMovementDTO"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "total": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Total",
-            "description": "Total matching rows across all pages"
-          },
-          "page": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Page"
-          },
-          "page_size": {
-            "type": "integer",
-            "maximum": 200.0,
-            "minimum": 1.0,
-            "title": "Page Size"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "items",
-          "total",
-          "page",
-          "page_size"
-        ],
-        "title": "Page[InventoryMovementDTO]"
       },
       "Page_PurchaseOrderDTO_": {
         "properties": {

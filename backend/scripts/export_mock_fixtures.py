@@ -79,6 +79,9 @@ def uid(*parts: object) -> UUID:
     return uuid5(NAMESPACE, "mock/" + "/".join(str(p) for p in parts))
 
 
+IST_OFFSET = timedelta(hours=5, minutes=30)  # business_date = the IST calendar day of occurred_at
+
+
 def at(day: date, hour: int, minute: int = 0) -> datetime:
     return datetime.combine(day, time(hour, minute), tzinfo=UTC)
 
@@ -675,7 +678,8 @@ def _movements(b: Builder) -> dict[str, list[dict[str, Any]]]:
             location=location,  # type: ignore[arg-type]
             reference=ref,
             reason=reason,
-            created_at=when,
+            occurred_at=when,
+            business_date=(when + IST_OFFSET).date(),
         )
         out[str(store)].append(dto.model_dump(mode="json"))
 
@@ -730,7 +734,7 @@ def _movements(b: Builder) -> dict[str, list[dict[str, Any]]]:
             at(day + timedelta(days=1), 0, 5),
         )
     for rows in out.values():
-        rows.sort(key=lambda m: (m["created_at"], m["product"]["sku"], m["movement_type"]), reverse=True)
+        rows.sort(key=lambda m: (m["occurred_at"], m["movement_id"]), reverse=True)  # the API order (D-37)
     return out
 
 

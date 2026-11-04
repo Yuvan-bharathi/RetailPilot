@@ -12,7 +12,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query
 
 from app.core.errors import NotImplementedYet
-from app.domain.schemas.common import Page, PageParams, Priority
+from app.domain.schemas.common import CursorPage, CursorParams, Page, PageParams, Priority
 from app.domain.schemas.dtos import (
     BatchDTO,
     DashboardSummary,
@@ -38,6 +38,7 @@ from app.domain.schemas.dtos import (
 
 router = APIRouter()
 Paging = Annotated[PageParams, Query()]
+CursorPaging = Annotated[CursorParams, Query()]
 
 
 def _todo() -> NoReturn:
@@ -100,12 +101,17 @@ def get_store_inventory(
 @router.get("/stores/{store_id}/inventory/movements", tags=["inventory"])
 def list_store_movements(
     store_id: UUID,
-    paging: Paging,
+    paging: CursorPaging,
     product_id: UUID | None = None,
     movement_type: Annotated[MovementType | None, Query(alias="type")] = None,
-    date_from: Annotated[date | None, Query(alias="from")] = None,
-    date_to: Annotated[date | None, Query(alias="to")] = None,
-) -> Page[InventoryMovementDTO]:
+    date_from: Annotated[
+        date | None, Query(alias="from", description="First business_date (IST), inclusive")
+    ] = None,
+    date_to: Annotated[
+        date | None, Query(alias="to", description="Last business_date (IST), inclusive")
+    ] = None,
+) -> CursorPage[InventoryMovementDTO]:
+    """Movement ledger, newest first (occurred_at DESC, movement_id DESC), keyset-paged (D-37)."""
     _todo()
 
 

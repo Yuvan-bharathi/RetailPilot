@@ -291,7 +291,8 @@ class InventoryMovementDTO(DTO):
     location: Literal["SHELF", "BACKROOM"]
     reference: str | None
     reason: str | None
-    created_at: datetime
+    occurred_at: datetime = Field(description="When the stock moved (UTC); the ledger's order and cursor key")
+    business_date: date = Field(description="The store's trading day (IST) the movement belongs to")
 
 
 class BatchDTO(DTO):

@@ -1,7 +1,7 @@
 # RetailPilot AI — Technical Specification (implementation reference)
 
 Derived from business requirements v2.2, diagrams v3 (`docs/diagrams/`) and the decision log
-(`docs/05-decision-log.md`, D-01 … D-17). Use these names, formulas and states exactly. Values marked
+(`docs/05-decision-log.md`, D-01 … D-42). Use these names, formulas and states exactly. Values marked
 **(confirm)** are placeholder defaults stored in `BusinessRule` — never hard-code them.
 
 ## 1. Core formulas
@@ -114,6 +114,8 @@ are kept and their effect on `incoming` / `reserved` is counted by the new run.
 
 ## 3. Inventory movement ledger
 All stock changes are `InventoryMovement` rows; `InventoryPosition` is a maintained projection.
+Each movement records `occurred_at` (when the stock physically moved; the partition and paging key),
+`business_date` (the store's IST trading day) and `created_at` (insert/audit time only) (D-37).
 
 | movement_type | qty sign | location | created by |
 |---|---|---|---|
@@ -152,9 +154,10 @@ supervisor sees only name + quantity and "Donor keeps its full requirement".
 ## 5. API (FastAPI, prefix /api/v1, JWT bearer; all list endpoints paginated)
 
 Contract-first (D-32): every route below that is not built yet answers 501 `NOT_IMPLEMENTED` with the standard
-error body until its phase. List endpoints take `page` (≥ 1, default 1), `page_size` (1–200, default 25),
+error body until its phase. Bounded list endpoints take `page` (≥ 1, default 1), `page_size` (1–200, default 25),
 `sort` (`field` / `-field`; `priority` and `stockout_risk` sort by rank) and `q`, and return
-`Page[T] = {items, total, page, page_size}`. Supervisor-facing DTOs show another store only as
+`Page[T] = {items, total, page, page_size}`. Unbounded ledgers (movements) use cursor paging instead:
+`cursor` + `page_size` → `CursorPage[T] = {items, next_cursor, page_size}` (D-37, §11). Supervisor-facing DTOs show another store only as
 `Counterpart {store: {store_id, name}, qty}`. Scoping is **per viewer**: donor stock fields (donor surplus, protected
 requirement) are visible to the Super Admin and the donor store's own supervisor; the destination supervisor sees
 name + quantity plus the numberless assurance `donor_keeps_requirement`. Transfer and PO incremental costs are
@@ -170,7 +173,7 @@ business meaning, never alphabetically.
 | GET /runs/latest | latest successful run for "Data as of last run" (both roles, D-32) | SD-01 |
 | GET /dashboard?store_id&period | DashboardService.get_summary | SD-11 |
 | GET /stores/{store_id}/inventory?category&risk&refill_only | StoreInventoryService.get_view → StoreInventoryPage (rows + store-wide summary; no aisle filter, D-10/D-34) | SD-15 |
-| GET /stores/{store_id}/inventory/movements?product_id&type&from&to | ledger tab → Page[InventoryMovementDTO] | – |
+| GET /stores/{store_id}/inventory/movements?product_id&type&from&to&cursor&page_size | ledger tab → CursorPage[InventoryMovementDTO], newest first (D-37) | – |
 | GET /stores/{store_id}/inventory/batches?product_id | batches tab → Page[BatchDTO] (FEFO rank, at-risk qty) | – |
 | GET /stores/{store_id}/inventory/expiring?within_days | expiring-soon tab → Page[BatchDTO] | – |
 | GET /recommendations?store_id&status&type&priority&product_id | RecommendationService.list_inbox | – |
@@ -339,8 +342,36 @@ Placeholder defaults to confirm with the business: `holding_cost_rate_per_day = 
   `product_key` = product_id or the nil UUID for store-level KPIs, `lost_sales_estimate (run_id, store_id, product_id)`,
   `transfer_route (from_store_id, to_store_id)`, `inventory_daily_snapshot (store_id, product_id, snapshot_date)`.
 - Partition `sales_line` by month on `txn_date` (PK `(bill_id, line_no, txn_date)`; a bill line is identified by
-  `(bill_id, line_no)`) and `inventory_movement` by month on `created_at` (PK `(movement_id, created_at)`);
-  index `(store_id, product_id, date)` on both.
+  `(bill_id, line_no)`) and `inventory_movement` by month on `occurred_at` (PK `(movement_id, occurred_at)`, D-37).
+  `inventory_movement.occurred_at` (timestamptz) is when the stock moved and `business_date` is the store's IST
+  trading day; `created_at` is insert/audit time only. Phase 4b backfill writes historical `occurred_at` values.
+- Partitions (D-35): monthly from 2026-01 to 2027-12 plus a `DEFAULT` partition as a safety net. A Phase 5 job
+  creates future months before data reaches the default partition. **Indexes on partitioned tables are created on
+  the parent**, so every partition, including one created later, inherits them (D-38).
+- Status columns are `text` + `CHECK (status IN (…))`, not native enum types, so adding a value is a one-line
+  migration (D-35). Python side: `StrEnum` per status in `app/domain/models/enums.py`.
+- `business_rule`: surrogate PK `rule_id`; `UNIQUE NULLS NOT DISTINCT (rule_key, scope_store_id)` so there is one
+  global row and at most one override per store (D-35).
+- `agent_run`: partial unique index `(run_date) WHERE agent_name = 'nightly' AND status IN ('RUNNING','SUCCESS',
+  'PARTIAL')` — at most one live or completed nightly run per date; a FAILED run can be re-run (D-35).
+- Columns added in D-35: `store.code`; `supplier.is_active`; `batch.received_date`; `recommendation.priority`,
+  `.reason`, `.lost_profit`, and the stored generated column `recommendation.priority_rank`
+  (`HIGH` → 0, `NORMAL` → 1) so the rank sort (§5) can use an index; `app_user.username`, `.password_hash`, `.is_active`; `agent_run.run_date`;
+  `tool_call.status` gains `WARN`; `decision_evidence.rec_id` is nullable.
+- Indexes for the real query patterns (D-38), all FKs indexed in addition:
+
+  | Query | Index |
+  |---|---|
+  | recommendation inbox | partial `recommendation (store_id, priority_rank, created_at)` WHERE `status = 'PENDING'` |
+  | L1 queue / deadline job | partial `po_line (store_id, po_id)` WHERE `line_status = 'PENDING'`; partial `purchase_order (l1_deadline)` WHERE `status = 'PENDING_L1'` |
+  | active transfers | partial `transfer_order (from_store_id)` and `(to_store_id)` WHERE status not final |
+  | movements tab (cursor) | `inventory_movement (store_id, occurred_at DESC, movement_id DESC)`, `(store_id, product_id, occurred_at DESC)` |
+  | demand history | `sales_line (store_id, product_id, txn_date)` |
+  | expiring batches | partial `batch (store_id, expiry_date)` WHERE `qty > 0` |
+  | unread notifications | partial `notification (user_id, created_at)` WHERE `read_at IS NULL` |
+  | `q` product search | `pg_trgm` GIN on `product.name` and `product.sku` (extension enabled in migration 0001) |
+- Seeding (D-35): BusinessRule defaults (§9) in migration `0002`; stores and PoC users in the idempotent
+  `python -m scripts.seed` (password from `SEED_USER_PASSWORD`; `demo` only when `APP_ENV=local`).
 - New columns (D-02, D-05, D-06, D-07, D-08): `store_product.preferred_supplier_id`;
   `sales_line.txn_date`, `sales_line.line_no`, `sales_line.store_id` (denormalised for partition-local queries);
   `replenishment_need.reason`, `.lift`, `.rec_id`; `transfer_order.expected_qty`, `.received_qty`, `.loss_value`;
@@ -349,6 +380,9 @@ Placeholder defaults to confirm with the business: `holding_cost_rate_per_day = 
 - New tables: `inventory_daily_snapshot` (D-09), `goods_receipt` + `goods_receipt_line` (D-08),
   `notification` (D-08).
 - Materialized views: `mv_dashboard_store_day`, `mv_inbox_counts`; refreshed CONCURRENTLY after each run (needs unique index).
+  `mv_dashboard_store_day` holds calendar-day figures only (revenue, gross profit, units, stockout share);
+  per-run figures (lost revenue/profit, near-expiry value, pending counts) come from the run tables and
+  `mv_inbox_counts` (D-35, SD-11 v3.1).
 - Row locks: `SELECT … FOR UPDATE` for PO approval and transfer transitions; `SKIP LOCKED` in the deadline job.
 - Tables (CD-1, CD-2): store, product, store_product, supplier, supplier_product, supplier_store_terms,
   supplier_scheme(ext), calendar_event, sales_transaction, sales_line, inventory_position, inventory_movement,
@@ -356,3 +390,64 @@ Placeholder defaults to confirm with the business: `holding_cost_rate_per_day = 
   lost_sales_estimate, app_user, purchase_order, po_line, goods_receipt, goods_receipt_line, transfer_order,
   transfer_route, approval, business_rule, notification, agent_run, tool_call, decision_evidence, llm_usage,
   store_layout(ext), shelf_location(ext).
+
+## 11. Performance requirements
+Decisions D-36 … D-42. Budgets are verified, not assumed: each item names where it is measured.
+
+**Budgets (D-42)**
+
+| What | Budget | Verified |
+|---|---|---|
+| API read, served from Redis | p95 < 200 ms | k6 or Locust load test, Phase 9 |
+| API read, uncached (DB) | p95 < 500 ms | same load test, Phase 9 |
+| Nightly run, `full` synthetic dataset | **to be measured in Phase 5**, then a limit is proposed and recorded here | Phase 5 timing run |
+| Top-10 queries | plan recorded with EXPLAIN (ANALYZE, BUFFERS) on the `full` dataset; no sequential scan on a table > 10k rows without a written reason | `docs/notes/query-plans.md`, end of Phase 4b |
+
+**Database access (D-36)**
+- The API uses async SQLAlchemy (`create_async_engine`, `postgresql+psycopg://`, psycopg 3 async) with a pooled
+  engine: `pool_size` 10, `max_overflow` 10, `pool_pre_ping`, `pool_recycle` 1800 s, `pool_timeout` 5 s, and a
+  server-side `statement_timeout` of **5 s** (API engine only). Sessions use `expire_on_commit=False`.
+- Celery tasks and Alembic use a **separate sync engine** with its own pool (`pool_size` 2, `max_overflow` 3 per
+  worker process) and its own `statement_timeout`, default **10 minutes**, so the nightly run and the
+  materialized-view refresh are not cut off.
+- All values are settings (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_STATEMENT_TIMEOUT_MS`,
+  `WORKER_DB_POOL_SIZE`, `WORKER_DB_MAX_OVERFLOW`, `WORKER_DB_STATEMENT_TIMEOUT_MS`).
+- On Windows, psycopg async needs the selector event loop (not the default Proactor loop); tests and the local run
+  command set it. Linux deployments are unaffected.
+
+**Connection budget (D-36)**
+
+`total = api_workers × (pool_size + max_overflow) + celery_processes × (worker_pool_size + worker_max_overflow)
++ headroom (migrations, psql, monitoring)` must stay **below PostgreSQL `max_connections`** (default 100).
+PoC example: 2 API workers × 20 + 4 Celery processes × 5 + 10 headroom = 70 < 100. Raising workers or pool sizes
+requires recomputing this. Production option: PgBouncer in transaction mode in front of PostgreSQL (then the
+psycopg prepared-statement cache must be disabled, `prepare_threshold=None`).
+
+**Paging (D-37)**
+- Bounded lists (one store's active rows: stores, inventory, batches, expiring, recommendations, transfers, POs)
+  use offset paging: `Page[T]` (§5).
+- Unbounded, append-only tables use keyset (cursor) paging: `CursorPage[T] = {items, next_cursor, page_size}` —
+  **no `total`** (counting an unbounded table defeats the purpose). Request: `cursor` (opaque, omitted for the
+  first page) and `page_size`. Applies now to `GET /stores/{id}/inventory/movements`; later also to audit,
+  tool-call, notification and run-history lists. The movements cursor encodes `(occurred_at, movement_id)` with a
+  fixed order `occurred_at DESC, movement_id DESC`; `next_cursor` is null on the last page; a malformed cursor is
+  422 `VALIDATION`. `from`/`to` filter `business_date` and are also turned into an `occurred_at` range so
+  partitions are pruned.
+
+**Queries (D-38, D-39, D-40)**
+- Every list/detail query has an index matching its filter and order (§10 table). Indexes on partitioned tables
+  are created on the parent so new partitions inherit them; a test creates a partition and checks its indexes.
+- No N+1: ORM relationships default to `lazy="raise"`; repositories load related rows explicitly
+  (`selectinload` for collections, `joinedload` for many-to-one). Phase 6 adds an integration test per list
+  endpoint asserting that its query count is the same for 1 row and for N rows (`count_queries` fixture).
+- List queries select only the columns the DTO needs (`select(Model.col_a, …)` or `load_only`), never whole
+  rows with JSONB evidence.
+- Responses are serialised by Pydantic through the declared response model / return type (FastAPI writes JSON
+  bytes on the Rust side). No `ORJSONResponse` / `orjson` (deprecated in FastAPI). A test fails if any route
+  lacks a response model.
+- `GZipMiddleware(minimum_size=1000)` compresses larger responses.
+
+**Bulk loads (D-41)**
+- Phase 4b ingestion loads sales, movements and snapshots with PostgreSQL `COPY` (psycopg `cursor.copy`) into
+  staging tables, then `INSERT … SELECT` into the partitioned tables in one transaction per file; row-by-row ORM
+  inserts are not used for bulk data.

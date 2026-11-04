@@ -116,6 +116,38 @@ describe("mock API — inventory endpoints", () => {
     expect(adjustments.items.map((m) => m.qty)).toEqual([-3]);
   });
 
+  it("pages the ledger by cursor, newest first, without gaps, overlaps or a total (D-37)", async () => {
+    const admin = as("admin");
+    const storeId = store("A").store_id;
+    const all = FIXTURES.movements[storeId]!;
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const page = await admin.listStoreMovements(storeId, { cursor, page_size: 40 });
+      expect(page).not.toHaveProperty("total");
+      expect(page.items.length).toBeLessThanOrEqual(40);
+      seen.push(...page.items.map((m) => m.movement_id));
+      cursor = page.next_cursor ?? undefined;
+      pages += 1;
+    } while (cursor);
+    expect(pages).toBeGreaterThan(1);
+    expect(seen).toEqual(all.map((m) => m.movement_id)); // fixture order is the API order
+    const times = all.map((m) => Date.parse(m.occurred_at));
+    expect(times.every((t, i) => i === 0 || t <= times[i - 1]!)).toBe(true);
+  });
+
+  it("filters the ledger by business date and rejects a malformed cursor", async () => {
+    const admin = as("admin");
+    const day = FIXTURES.movements[store("A").store_id]![0]!.business_date;
+    const page = await admin.listStoreMovements(store("A").store_id, { from: day, to: day, page_size: 200 });
+    expect(page.items.length).toBeGreaterThan(0);
+    expect(page.items.every((m) => m.business_date === day)).toBe(true);
+    await expect(admin.listStoreMovements(store("A").store_id, { cursor: "bm90IGpzb24" })).rejects.toMatchObject({
+      status: 422,
+    });
+  });
+
   it("lists batches and the ones expiring soon", async () => {
     const admin = as("admin");
     const batches = await admin.listStoreBatches(store("A").store_id, { page_size: 200 });

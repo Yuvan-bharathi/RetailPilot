@@ -1,6 +1,6 @@
 @startuml
 !include style.iuml
-title SD-11 v3  Dashboard Read with Cache Layer\n<size:11>GET /api/v1/dashboard?store_id=&period=  ·  cache-aside, fail-open</size>
+title SD-11 v3.1  Dashboard Read with Cache Layer\n<size:11>GET /api/v1/dashboard?store_id=&period=  ·  cache-aside, fail-open  ·  v3.1 = D-35 (daily vs per-run figures)</size>
 autonumber "<b>00"
 actor "User" as U
 participant "DashboardPage\n(React Query)" as UI
@@ -9,7 +9,7 @@ participant "DashboardService" as DS
 participant "CacheService" as CS
 database "Redis" as R
 participant "DashboardRepo" as DR
-database "PostgreSQL\nmv_dashboard_store_day" as DB
+database "PostgreSQL\nmv_dashboard_store_day ·\nlost_sales_estimate · batch ·\nmv_inbox_counts" as DB
 
 U -> UI : open Executive Dashboard
 UI -> UI : useDashboard(storeId?: string, period: Period) →\n useQuery({queryKey: ["dashboard", storeId, period],\n queryFn: () => apiClient.getDashboard({storeId, period}), staleTime: 300_000})
@@ -37,10 +37,13 @@ else stale or empty
   alt hit
     DS -> DS : DashboardSummary.model_validate_json(cached)
   else miss
-    DS -> DR : fetch_summary(store_id: Optional[UUID], start: date, end: date) → DashboardRow
-    DR -> DB : SELECT revenue, gross_profit, margin_pct, stockout_rate, lost_revenue, lost_profit,\n near_expiry_value, pending_recs, pending_pos FROM mv_dashboard_store_day\n WHERE (:store_id IS NULL OR store_id = :store_id) AND day BETWEEN :start AND :end
-    DB --> DR : rows
-    DS -> DS : summary = DashboardSummary.from_row(row, top_movers=DR.fetch_movers(...))
+    DS -> DR : fetch_daily(store_id: Optional[UUID], start: date, end: date) → DailyKpiRow
+    DR -> DB : SELECT SUM(revenue), SUM(gross_profit), SUM(units), AVG(stockout_share)\n FROM mv_dashboard_store_day\n WHERE (:store_id IS NULL OR store_id = :store_id) AND day BETWEEN :start AND :end
+    DB --> DR : calendar-day figures
+    DS -> DR : fetch_run_figures(run_id: UUID, store_id: Optional[UUID]) → RunKpiRow
+    DR -> DB : lost revenue, lost profit FROM lost_sales_estimate WHERE run_id = :run_id;\n near-expiry value FROM batch (at-risk);\n pending recs / POs / transfers FROM mv_inbox_counts
+    DB --> DR : per-run figures (belong to the nightly run, not a calendar day; D-35)
+    DS -> DS : summary = DashboardSummary.from_rows(daily, run_figures, top_movers=DR.fetch_movers(...))
     DS -> CS : set(key, summary.model_dump_json(), ttl=seconds_until_next_run()) → bool
     CS -> R : SET key value EX ttl
   end

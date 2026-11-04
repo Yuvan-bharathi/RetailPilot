@@ -1,12 +1,13 @@
 @startuml
 !include style.iuml
 skinparam linetype ortho
-title CD-1  Domain Model (1/2) v3.1: Master Data, Sales & Inventory, Planning Outputs\n<size:11>SQLAlchemy models mapped to PostgreSQL tables · v3.1 = decision log D-02 … D-09</size>
+title CD-1  Domain Model (1/2) v3.2: Master Data, Sales & Inventory, Planning Outputs\n<size:11>SQLAlchemy models mapped to PostgreSQL tables · v3.2 = decision log D-02 … D-09, D-35, D-37</size>
 hide empty methods
 
 package "Master data" {
   class Store {
     +store_id: UUID <<PK>>
+    +code: str <<unique>> (D-35)
     +name: str
     +region: str
     +store_type: str
@@ -39,6 +40,7 @@ package "Master data" {
     +supplier_id: UUID <<PK>>
     +name: str
     +default_lead_time_days: int
+    +is_active: bool (D-35)
   }
   class SupplierProduct {
     +supplier_id: UUID <<PK,FK>>
@@ -112,7 +114,9 @@ package "Sales & inventory" {
   }
   class InventoryMovement {
     +movement_id: UUID <<PK>>
-    +created_at: datetime <<PK>> (partition key, monthly)
+    +occurred_at: datetime <<PK>> (when stock moved; partition key, monthly; D-37)
+    +business_date: date (store trading day, IST)
+    +created_at: datetime (insert / audit time only)
     +store_id: UUID <<FK>>
     +product_id: UUID <<FK>>
     +batch_id: UUID <<FK, nullable>>
@@ -130,6 +134,7 @@ package "Sales & inventory" {
     +product_id: UUID <<FK>>
     +batch_no: str
     +qty: int
+    +received_date: date (D-35)
     +expiry_date: date
   }
 }
@@ -161,7 +166,11 @@ package "Planning outputs (written by nightly run)" {
     +product_id: UUID <<FK>>
     +rec_type: REORDER|TRANSFER|CO_REPLENISH|MARKDOWN|EXPIRY_ALERT|ASSORTMENT_GAP
     +qty: int
+    +priority: HIGH|NORMAL (D-35)
+    +priority_rank: smallint (generated: HIGH 0, NORMAL 1)
+    +reason: str (D-35)
     +lost_sales_value: Decimal
+    +lost_profit: Decimal (D-35)
     +explanation: text
     +evidence: JSONB
     +status: PENDING|ACCEPTED|EDITED|REJECTED|NEEDS_REVIEW|SUPERSEDED

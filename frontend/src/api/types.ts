@@ -56,6 +56,8 @@ export type LineStatus = POLineDTO["line_status"];
 
 /** Page[T] (backend generic) — derived from a generated page type, with the item type swapped in. */
 export type Page<T> = Omit<Schemas["Page_RecommendationDTO_"], "items"> & { items: T[] };
+/** CursorPage[T] (D-37) — keyset-paged ledgers: no total, `next_cursor` is null on the last page. */
+export type CursorPage<T> = Omit<Schemas["CursorPage_InventoryMovementDTO_"], "items"> & { items: T[] };
 
 type Query<Op extends keyof operations> = NonNullable<operations[Op]["parameters"]["query"]>;
 export type RecommendationQuery = Query<"list_recommendations">;

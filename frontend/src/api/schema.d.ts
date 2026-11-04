@@ -164,7 +164,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Store Movements */
+        /**
+         * List Store Movements
+         * @description Movement ledger, newest first (occurred_at DESC, movement_id DESC), keyset-paged (D-37).
+         */
         get: operations["list_store_movements"];
         put?: never;
         post?: never;
@@ -389,6 +392,18 @@ export interface components {
             /** Qty */
             qty: number;
         };
+        /** CursorPage[InventoryMovementDTO] */
+        CursorPage_InventoryMovementDTO_: {
+            /** Items */
+            items: components["schemas"]["InventoryMovementDTO"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` to get the next page; null on the last page
+             */
+            next_cursor: string | null;
+            /** Page Size */
+            page_size: number;
+        };
         /** DashboardSummary */
         DashboardSummary: {
             /** @description null = all stores (Super Admin) */
@@ -546,10 +561,17 @@ export interface components {
             /** Reason */
             reason: string | null;
             /**
-             * Created At
+             * Occurred At
              * Format: date-time
+             * @description When the stock moved (UTC); the ledger's order and cursor key
              */
-            created_at: string;
+            occurred_at: string;
+            /**
+             * Business Date
+             * Format: date
+             * @description The store's trading day (IST) the movement belongs to
+             */
+            business_date: string;
         };
         /** InventoryRowDTO */
         InventoryRowDTO: {
@@ -699,20 +721,6 @@ export interface components {
         Page_BatchDTO_: {
             /** Items */
             items: components["schemas"]["BatchDTO"][];
-            /**
-             * Total
-             * @description Total matching rows across all pages
-             */
-            total: number;
-            /** Page */
-            page: number;
-            /** Page Size */
-            page_size: number;
-        };
-        /** Page[InventoryMovementDTO] */
-        Page_InventoryMovementDTO_: {
-            /** Items */
-            items: components["schemas"]["InventoryMovementDTO"][];
             /**
              * Total
              * @description Total matching rows across all pages
@@ -1803,13 +1811,14 @@ export interface operations {
     list_store_movements: {
         parameters: {
             query?: {
-                page?: number;
+                cursor?: string | null;
                 page_size?: number;
-                sort?: string | null;
                 q?: string | null;
                 product_id?: string | null;
                 type?: ("SALE" | "PO_RECEIPT" | "TRANSFER_OUT" | "TRANSFER_IN" | "SHELF_REFILL" | "ADJUSTMENT" | "EXPIRY_WRITE_OFF") | null;
+                /** @description First business_date (IST), inclusive */
                 from?: string | null;
+                /** @description Last business_date (IST), inclusive */
                 to?: string | null;
             };
             header?: never;
@@ -1826,7 +1835,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_InventoryMovementDTO_"];
+                    "application/json": components["schemas"]["CursorPage_InventoryMovementDTO_"];
                 };
             };
             /** @description Unauthorized */

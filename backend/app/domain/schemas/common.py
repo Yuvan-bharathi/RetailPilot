@@ -77,5 +77,31 @@ class PageParams(BaseModel):
     q: str | None = Field(None, max_length=100)
 
 
+class CursorPage[T](DTO):
+    """One page of a keyset (cursor) paged list over an unbounded table (D-37).
+
+    There is no `total`: counting an unbounded, append-only table on every request is what keyset paging avoids.
+    The order is fixed per endpoint (movements: newest first).
+    """
+
+    items: list[T]
+    next_cursor: str | None = Field(
+        description="Pass as `cursor` to get the next page; null on the last page"
+    )
+    page_size: int = Field(ge=1, le=200)
+
+
+class CursorParams(BaseModel):
+    """Query parameters of a cursor-paged list: ?cursor=&page_size=&q=
+
+    `cursor` is opaque (taken from the previous page's `next_cursor`; omitted for the first page). A malformed
+    cursor is rejected with 422 VALIDATION.
+    """
+
+    cursor: str | None = Field(None, max_length=200, pattern=r"^[A-Za-z0-9_-]+$")
+    page_size: int = Field(25, ge=1, le=200)
+    q: str | None = Field(None, max_length=100)
+
+
 Role = Literal["STORE_SUPERVISOR", "SUPER_ADMIN"]
 Priority = Literal["HIGH", "NORMAL"]

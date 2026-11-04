@@ -397,3 +397,103 @@ frontend/scripts/check-no-hex.mjs.
 - The synthetic data has no NEEDS_REVIEW (the planted stale SKU is not short) and no ASSORTMENT_GAP (all products
   are listed in every store); those evidence views are covered by component tests with typed examples.
 **Changed.** Spec §5; backend DTOs and contract routes; frontend api/mocks/pages; data/synthetic scenarios.
+
+---
+
+## D-35 Phase 2 schema decisions (approved 2026-11-04)
+**Decision.**
+1. **Status columns** are `text` + `CHECK (status IN (…))`, not native PostgreSQL enum types; Python uses one
+   `StrEnum` per status (`app/domain/models/enums.py`). Adding a value (as `SUPERSEDED` was) is a one-line
+   migration.
+2. **Partitions:** `sales_line` and `inventory_movement` monthly from 2026-01 to 2027-12 plus a `DEFAULT`
+   partition. **Phase 5 must add a job that creates future monthly partitions before data reaches the default
+   partition** (and alerts if the default partition holds rows).
+3. **Dashboard view scope:** `mv_dashboard_store_day` holds calendar-day figures only (revenue, gross profit, units,
+   stockout share). Lost revenue/profit, near-expiry value and pending counts belong to a nightly run and are read
+   from the run tables and `mv_inbox_counts`. SD-11 updated to v3.1.
+4. **Seed split:** BusinessRule defaults (spec §9) in migration `0002`; stores A/B/C (the generator's fixed UUIDv5
+   ids) and the PoC users in the idempotent `python -m scripts.seed`, password from `SEED_USER_PASSWORD`,
+   defaulting to `demo` only when `APP_ENV=local`. Passwords never appear in migrations.
+5. **`business_rule` key:** surrogate PK `rule_id` + `UNIQUE NULLS NOT DISTINCT (rule_key, scope_store_id)`
+   (PostgreSQL 15+), so one global row and at most one override per store.
+6. **Columns the contract and diagrams need:** `recommendation.priority`, `.reason`, `.lost_profit` (plus the
+   generated `priority_rank` for the indexed rank sort); `app_user.username`, `.password_hash`, `.is_active`;
+   `supplier.is_active`; `store.code`; `batch.received_date`; `agent_run.run_date`; `tool_call.status` gains `WARN`
+   (SD-02); `decision_evidence.rec_id` nullable (SD-02 logs evidence without a recommendation).
+   **Nightly-run idempotency guard (changed on approval):** partial unique index
+   `agent_run (run_date) WHERE agent_name = 'nightly' AND status IN ('RUNNING','SUCCESS','PARTIAL')` — a FAILED
+   run can be re-run for the same date; a second running or completed run cannot be started.
+**Changed.** Spec §10; CD-1 v3.2, CD-2 v3.2, SD-11 v3.1; PROMPTS.md Phase 5.
+
+---
+
+## D-36 Async API database access, separate worker engine, connection budget (approved 2026-11-04)
+**Decision.** `app/core/db.py` builds two engines:
+- **API:** async SQLAlchemy over psycopg 3 (`create_async_engine("postgresql+psycopg://…")`), `pool_size` 10,
+  `max_overflow` 10, `pool_pre_ping`, `pool_recycle` 1800 s, `pool_timeout` 5 s, server-side
+  `statement_timeout` **5 s** (API engine only), `async_sessionmaker(expire_on_commit=False)`.
+- **Celery / Alembic:** a separate sync engine with its own pool (2 + 3 overflow per worker process) and its own
+  `statement_timeout`, default **10 minutes**, so the nightly run and the MV refresh are not cut off.
+- **Connection budget** (spec §11): `api_workers × (pool_size + max_overflow) + celery_processes ×
+  (worker pool + overflow) + headroom` must stay below PostgreSQL `max_connections` (default 100). PgBouncer
+  (transaction mode, prepared statements off) is the production option.
+No new dependency: psycopg 3 already provides the async driver.
+**Changed.** Spec §11; `app/core/db.py`, `app/core/config.py`, `/health` (Phase 2).
+
+---
+
+## D-37 Cursor paging for unbounded ledgers; movement time columns (approved 2026-11-04)
+**Decision.**
+- Bounded lists keep offset paging (`Page[T]`, D-32). Unbounded, append-only tables use keyset paging:
+  `CursorPage[T] = {items, next_cursor, page_size}` with request `cursor` + `page_size` and **no `total`**.
+  Now: `GET /stores/{id}/inventory/movements`; later audit, tool-call, notification and run-history lists.
+- **`inventory_movement` gets `occurred_at`** (timestamptz, when the stock moved) and **`business_date`** (store
+  trading day, IST). The table is partitioned, indexed and cursor-paged on `occurred_at`; `created_at` is
+  insert/audit time only. PK `(movement_id, occurred_at)`. Phase 4b backfill writes the historical `occurred_at`.
+- The cursor is opaque (base64url of `(occurred_at, movement_id)`), order `occurred_at DESC, movement_id DESC`;
+  `next_cursor` null on the last page; malformed cursor → 422 `VALIDATION`. `from`/`to` filter `business_date`
+  and are also converted to an `occurred_at` range for partition pruning.
+**Changed.** Spec §3, §5, §10, §11; CD-1 v3.2; DTOs (`CursorPage`, `CursorParams`), contract route, openapi.json,
+frontend generated types and mock client.
+
+---
+
+## D-38 Indexes for the real query patterns (approved 2026-11-04)
+**Decision.** Every list/detail query has an index matching its filter and order (spec §10 table), including
+partial indexes for PENDING recommendations and PENDING PO lines, active transfers, unread notifications and
+batches with stock, and a `pg_trgm` GIN index on product name and SKU for `q` search (extension enabled in
+migration `0001`). Indexes on partitioned tables are **created on the parent table** so every future partition
+inherits them; a test creates a new partition and checks its indexes. At the end of Phase 4b the top-10 queries
+are run with `EXPLAIN (ANALYZE, BUFFERS)` against the `full` synthetic dataset and the plans are recorded in
+`docs/notes/query-plans.md`.
+
+---
+
+## D-39 No N+1 queries (approved 2026-11-04)
+**Decision.** ORM relationships default to `lazy="raise"`, so an implicit lazy load fails instead of issuing a
+hidden query; repositories load related rows explicitly (`selectinload` for collections, `joinedload` for
+many-to-one). A `count_queries` test fixture (SQLAlchemy `before_cursor_execute`) is built in Phase 2; Phase 6
+adds, per list endpoint, an integration test asserting the query count does not grow with the number of rows.
+
+---
+
+## D-40 Response serialisation, compression, column selection (approved 2026-11-04)
+**Decision.** Responses are serialised by Pydantic through the declared response model / return type (FastAPI
+writes JSON bytes on the Rust side). **No `ORJSONResponse` / `orjson`** — FastAPI marks them deprecated because
+the response-model path is faster. A test fails if any route lacks a response model. `GZipMiddleware
+(minimum_size=1000)` is added. List queries select only the columns the DTO needs.
+*(Replaces the original request "ORJSONResponse", agreed 2026-11-04.)*
+
+---
+
+## D-41 Bulk loads with COPY (approved 2026-11-04)
+**Decision.** Phase 4b ingestion loads sales lines, movements and snapshots with PostgreSQL `COPY` (psycopg
+`cursor.copy`) into staging tables, then `INSERT … SELECT` into the partitioned tables, one transaction per file.
+Row-by-row ORM inserts are not used for bulk data.
+
+---
+
+## D-42 Performance budgets (approved 2026-11-04)
+**Decision.** p95 < 200 ms for cached reads and < 500 ms for uncached reads, verified by a k6 or Locust load test
+in Phase 9 (tool chosen then). The nightly-run time limit on the `full` dataset is **measured in Phase 5** and
+then proposed for approval; it is recorded in spec §11.

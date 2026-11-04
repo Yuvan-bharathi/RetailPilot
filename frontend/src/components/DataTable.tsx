@@ -1,5 +1,6 @@
 /**
  * DataTable — TanStack Table v9 with SERVER-side paging and sorting (Page[T] / PageParams, D-32).
+ * With `paging="cursor"` it pages a CursorPage[T] (D-37): Previous / Next only, no total, no page count.
  * Sticky header, pinned first column with horizontal scroll, search, filter slot, sort, pagination, row selection,
  * column chooser, loading / empty / error states, keyboard reachable (design doc §3).
  */
@@ -21,7 +22,7 @@ import {
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Columns3, Search } from "lucide-react";
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
-import type { Page } from "../api/types";
+import type { CursorPage, Page } from "../api/types";
 import { formatNumber } from "../lib/format";
 import { Button } from "./Button";
 import { EmptyState, ErrorState, SkeletonLine } from "./StateViews";
@@ -47,7 +48,9 @@ export interface TableQuery {
 export interface DataTableProps<T extends RowData> {
   caption: string;
   columns: Column<T>[];
-  page: Page<T> | undefined;
+  page: Page<T> | CursorPage<T> | undefined;
+  /** "cursor": the parent maps `query.page` to a cursor (useCursorPaging); Next is enabled while next_cursor is set. */
+  paging?: "offset" | "cursor";
   query: TableQuery;
   onQueryChange: (next: TableQuery) => void;
   getRowId: (row: T) => string;
@@ -79,6 +82,7 @@ export function DataTable<T extends RowData>({
   caption,
   columns,
   page,
+  paging = "offset",
   query,
   onQueryChange,
   getRowId,
@@ -146,7 +150,7 @@ export function DataTable<T extends RowData>({
     getRowId: (row) => getRowId(row),
     manualSorting: true,
     manualPagination: true,
-    rowCount: page?.total ?? 0,
+    rowCount: page && "total" in page ? page.total : (page?.items.length ?? 0),
     state: { sorting, pagination, columnVisibility, rowSelection: selection?.value ?? {} },
     onSortingChange: (updater) => {
       const next = typeof updater === "function" ? updater(sorting) : updater;
@@ -163,10 +167,20 @@ export function DataTable<T extends RowData>({
     },
   });
 
-  const total = page?.total ?? 0;
-  const first = total === 0 ? 0 : (query.page - 1) * query.pageSize + 1;
-  const last = Math.min(query.page * query.pageSize, total);
-  const pageCount = Math.max(1, Math.ceil(total / query.pageSize));
+  const cursorMode = paging === "cursor";
+  const rows = page?.items.length ?? 0;
+  const total = page && "total" in page ? page.total : null;
+  const first = rows === 0 ? 0 : (query.page - 1) * query.pageSize + 1;
+  const last = total === null ? first + rows - 1 : Math.min(query.page * query.pageSize, total);
+  const pageCount = total === null ? null : Math.max(1, Math.ceil(total / query.pageSize));
+  const hasNext = cursorMode ? Boolean(page && "next_cursor" in page && page.next_cursor) : query.page < (pageCount ?? 1);
+  let rangeText = "No rows";
+  if (rows > 0) {
+    rangeText =
+      total === null
+        ? `Showing ${formatNumber(first)}–${formatNumber(last)}`
+        : `Showing ${formatNumber(first)}–${formatNumber(last)} of ${formatNumber(total)}`;
+  }
   const visibleColumns = table.getVisibleLeafColumns().length;
   const pinnedIndex = selection ? 1 : 0; // the first data column stays visible while scrolling sideways
 
@@ -334,7 +348,7 @@ export function DataTable<T extends RowData>({
 
       <div className="flex flex-wrap items-center gap-3 border-t border-divider px-3 py-2 text-sm text-ink-secondary">
         <span className="tabular" aria-live="polite">
-          {total === 0 ? "No rows" : `Showing ${formatNumber(first)}–${formatNumber(last)} of ${formatNumber(total)}`}
+          {rangeText}
         </span>
         <label className="ml-auto flex items-center gap-2">
           Rows per page
@@ -351,14 +365,14 @@ export function DataTable<T extends RowData>({
           </select>
         </label>
         <span className="tabular">
-          Page {query.page} of {pageCount}
+          {pageCount === null ? `Page ${query.page}` : `Page ${query.page} of ${pageCount}`}
         </span>
         <Button
           variant="secondary"
           size="sm"
           aria-label="Previous page"
           disabled={query.page <= 1}
-          onClick={() => table.previousPage()}
+          onClick={() => onQueryChange({ ...query, page: query.page - 1 })}
         >
           <ChevronLeft aria-hidden="true" size={16} />
         </Button>
@@ -366,8 +380,8 @@ export function DataTable<T extends RowData>({
           variant="secondary"
           size="sm"
           aria-label="Next page"
-          disabled={query.page >= pageCount}
-          onClick={() => table.nextPage()}
+          disabled={!hasNext}
+          onClick={() => onQueryChange({ ...query, page: query.page + 1 })}
         >
           <ChevronRight aria-hidden="true" size={16} />
         </Button>

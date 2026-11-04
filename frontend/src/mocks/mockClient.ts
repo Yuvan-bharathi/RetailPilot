@@ -5,7 +5,16 @@
  * donor store's own supervisor may open a transfer it donates to and sees its own stock; other stores → 403.
  */
 import { ApiError, type ApiClient } from "../api/client";
-import type { Evidence, Page, PageQuery, PurchaseOrderDTO, StoreDTO, StoreRef } from "../api/types";
+import type {
+  CursorPage,
+  Evidence,
+  InventoryMovementDTO,
+  Page,
+  PageQuery,
+  PurchaseOrderDTO,
+  StoreDTO,
+  StoreRef,
+} from "../api/types";
 import { FIXTURES, MOCK_PASSWORD, type MockFixtures, type MockUser } from "./fixtures";
 
 const TOKEN_PREFIX = "mock-token:";
@@ -49,6 +58,51 @@ export function applyPage<T>(items: T[], query: PageQuery, searchText: (item: T)
   const page = query.page ?? 1;
   const size = query.page_size ?? 25;
   return { items: rows.slice((page - 1) * size, page * size), total: rows.length, page, page_size: size };
+}
+
+/** Opaque movement cursor, same format as the backend (base64url JSON of the last row's sort key, D-37). */
+export function encodeMovementCursor(m: Pick<InventoryMovementDTO, "occurred_at" | "movement_id">): string {
+  return btoa(JSON.stringify({ t: m.occurred_at, id: m.movement_id }))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+}
+
+function decodeMovementCursor(token: string): { t: string; id: string } {
+  try {
+    const key = JSON.parse(atob(token.replaceAll("-", "+").replaceAll("_", "/"))) as { t?: unknown; id?: unknown };
+    if (typeof key.t === "string" && typeof key.id === "string") return { t: key.t, id: key.id };
+  } catch {
+    // fall through to the 422 below
+  }
+  throw new ApiError(422, "VALIDATION", "Invalid cursor");
+}
+
+/** Newest first, then movement_id descending: the API order of the ledger (D-37). */
+function compareMovements(a: InventoryMovementDTO, b: InventoryMovementDTO): number {
+  const byTime = Date.parse(b.occurred_at) - Date.parse(a.occurred_at);
+  if (byTime !== 0) return byTime;
+  return a.movement_id < b.movement_id ? 1 : a.movement_id > b.movement_id ? -1 : 0;
+}
+
+/** Keyset paging over movements: rows strictly after the cursor's key, no total (D-37). */
+export function applyMovementCursor(
+  items: InventoryMovementDTO[],
+  query: { cursor?: string | null; page_size?: number; q?: string | null },
+  searchText: (item: InventoryMovementDTO) => string,
+): CursorPage<InventoryMovementDTO> {
+  const q = query.q?.trim().toLowerCase();
+  const size = query.page_size ?? 25;
+  let rows = (q ? items.filter((m) => searchText(m).toLowerCase().includes(q)) : [...items]).sort(compareMovements);
+  if (query.cursor) {
+    const key = decodeMovementCursor(query.cursor);
+    const after = { occurred_at: key.t, movement_id: key.id } as InventoryMovementDTO;
+    rows = rows.filter((m) => compareMovements(after, m) < 0); // strictly after the cursor row in API order
+  }
+  const pageRows = rows.slice(0, size);
+  const last = pageRows.at(-1);
+  const next_cursor = rows.length > size && last ? encodeMovementCursor(last) : null;
+  return { items: pageRows, next_cursor, page_size: size };
 }
 
 export function createMockClient(
@@ -188,10 +242,10 @@ export function createMockClient(
         (m) =>
           (!query.product_id || m.product.product_id === query.product_id) &&
           (!query.type || m.movement_type === query.type) &&
-          (!query.from || m.created_at.slice(0, 10) >= query.from) &&
-          (!query.to || m.created_at.slice(0, 10) <= query.to),
+          (!query.from || m.business_date >= query.from) &&
+          (!query.to || m.business_date <= query.to),
       );
-      return applyPage(rows, query, productText);
+      return applyMovementCursor(rows, query, productText);
     },
     async listStoreBatches(storeId, query) {
       await wait();

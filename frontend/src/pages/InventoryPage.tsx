@@ -22,6 +22,7 @@ import { StatusBadge, StatusPill } from "../components/StatusBadge";
 import { Tabs } from "../components/Tabs";
 import { formatDateIST, formatDateTimeIST, formatDays, formatNumber } from "../lib/format";
 import { categoryLabel, KNOWN_CATEGORIES, MOVEMENT_LABEL, REC_TYPE_LABEL } from "../lib/labels";
+import { useCursorPaging } from "../lib/useCursorPaging";
 
 const LAST_STORE_KEY = "retailpilot.inventory.lastStore";
 
@@ -225,13 +226,13 @@ function ProductsTab({ storeId, onOpen }: { storeId: string; onOpen: (row: Inven
 // --- stock moves tab ------------------------------------------------------------------------------------------
 
 const MOVEMENT_COLUMNS: Column<InventoryMovementDTO>[] = [
-  { id: "created_at", header: "When", sortable: true, hideable: false, cell: (m) => formatDateTimeIST(m.created_at) },
-  { id: "name", header: "Product", sortable: true, cell: (m) => m.product.name },
-  { id: "movement_type", header: "Movement", sortable: true, cell: (m) => MOVEMENT_LABEL[m.movement_type] },
+  // Fixed order, newest first (cursor paging, D-37): no column is sortable.
+  { id: "occurred_at", header: "When", hideable: false, cell: (m) => formatDateTimeIST(m.occurred_at) },
+  { id: "name", header: "Product", cell: (m) => m.product.name },
+  { id: "movement_type", header: "Movement", cell: (m) => MOVEMENT_LABEL[m.movement_type] },
   {
     id: "qty",
     header: "Quantity",
-    sortable: true,
     align: "right",
     cell: (m) => <span className={m.qty < 0 ? "text-danger" : "text-success"}>{signed(m.qty)}</span>,
   },
@@ -241,14 +242,13 @@ const MOVEMENT_COLUMNS: Column<InventoryMovementDTO>[] = [
 ];
 
 function MovesTab({ storeId }: { storeId: string }) {
-  const [query, setQuery] = useState<TableQuery>({ page: 1, pageSize: 25, sort: "-created_at" });
+  const paging = useCursorPaging();
   const [type, setType] = useState<MovementType | "">("");
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search);
   const result = useStoreMovements(storeId, {
-    page: query.page,
-    page_size: query.pageSize,
-    sort: query.sort,
+    cursor: paging.cursor,
+    page_size: paging.query.pageSize,
     q: q || undefined,
     type: type || undefined,
   });
@@ -257,8 +257,9 @@ function MovesTab({ storeId }: { storeId: string }) {
       caption="Stock moves (movement ledger)"
       columns={MOVEMENT_COLUMNS}
       page={result.data}
-      query={query}
-      onQueryChange={setQuery}
+      paging="cursor"
+      query={paging.query}
+      onQueryChange={(next) => paging.onQueryChange(next, result.data?.next_cursor)}
       getRowId={(m) => m.movement_id}
       isLoading={result.isPending}
       isFetching={result.isFetching}
@@ -268,7 +269,7 @@ function MovesTab({ storeId }: { storeId: string }) {
         value: search,
         onChange: (v) => {
           setSearch(v);
-          setQuery((p) => ({ ...p, page: 1 }));
+          paging.reset();
         },
         placeholder: "Search product or SKU",
       }}
@@ -280,7 +281,7 @@ function MovesTab({ storeId }: { storeId: string }) {
             value={type}
             onChange={(e) => {
               setType(e.target.value as MovementType | "");
-              setQuery((p) => ({ ...p, page: 1 }));
+              paging.reset();
             }}
           >
             <option value="">All movements</option>

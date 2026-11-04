@@ -73,6 +73,29 @@ describe("Store Inventory", () => {
     expect(await screen.findByRole("region", { name: "Batches (earliest expiry first)" })).toBeTruthy();
   });
 
+  it("pages the stock-move ledger forwards and back by cursor, without a total", async () => {
+    const user = userEvent.setup();
+    renderApp("/inventory", "sup.a");
+    await screen.findByRole("region", { name: "Store inventory" });
+    await user.click(screen.getByRole("tab", { name: "Stock moves" }));
+    const ledger = await screen.findByRole("region", { name: "Stock moves (movement ledger)" });
+    const firstRow = FIXTURES.movements[store("A").store_id]![0]!;
+    const row26 = FIXTURES.movements[store("A").store_id]![25]!;
+    await waitFor(() => expect(within(ledger).getAllByRole("row")).toHaveLength(26)); // header + 25
+    expect(screen.getByText("Showing 1–25")).toBeTruthy();
+    expect(screen.getByText("Page 1")).toBeTruthy();
+    expect(within(ledger).queryByRole("button", { name: /When/ })).toBeNull(); // fixed order: not sortable
+
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    expect(await screen.findByText("Showing 26–50")).toBeTruthy();
+    expect(screen.getByText("Page 2")).toBeTruthy();
+    expect(within(ledger).getAllByRole("row")[1]!.textContent).toContain(row26.product.name);
+
+    await user.click(screen.getByRole("button", { name: "Previous page" }));
+    expect(await screen.findByText("Showing 1–25")).toBeTruthy();
+    expect(within(ledger).getAllByRole("row")[1]!.textContent).toContain(firstRow.product.name);
+  });
+
   it("opens a read-only product drawer with recommendations, transfers and batches", async () => {
     const user = userEvent.setup();
     renderApp("/inventory", "sup.c");

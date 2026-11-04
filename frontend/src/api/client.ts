@@ -1,6 +1,7 @@
 import type {
   BatchDTO,
   BatchQuery,
+  CursorPage,
   DashboardQuery,
   DashboardSummary,
   ErrorResponse,
@@ -34,7 +35,7 @@ export interface ApiClient {
   listRecommendations(query: RecommendationQuery): Promise<Page<RecommendationDTO>>;
   getRecommendation(recId: string): Promise<RecommendationDetailDTO>;
   getStoreInventory(storeId: string, query: InventoryQuery): Promise<StoreInventoryPage>;
-  listStoreMovements(storeId: string, query: MovementQuery): Promise<Page<InventoryMovementDTO>>;
+  listStoreMovements(storeId: string, query: MovementQuery): Promise<CursorPage<InventoryMovementDTO>>;
   listStoreBatches(storeId: string, query: BatchQuery): Promise<Page<BatchDTO>>;
   listStoreExpiring(storeId: string, query: ExpiringQuery): Promise<Page<BatchDTO>>;
   listTransfers(query: TransferQuery): Promise<Page<TransferOrderDTO>>;

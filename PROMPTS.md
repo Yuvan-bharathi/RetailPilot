@@ -47,6 +47,9 @@ the materialized views mv_dashboard_store_day and mv_inbox_counts (with unique i
 and a seed for BusinessRule defaults (spec §9) and two roles of PoC users (1 Super Admin, 1 supervisor per store).
 Skip extension tables' logic but create store_layout / shelf_location / supplier_scheme tables.
 Acceptance: `alembic upgrade head` and `downgrade base` both work on a clean DB; a test asserts every table exists.
+Also (D-35 … D-40): async API engine + separate sync worker engine in app/core/db.py; inventory_movement
+occurred_at/business_date; indexes created on partitioned parents (test: a new partition inherits them);
+pg_trgm GIN on product name/SKU; count_queries fixture; lazy="raise" relationships; GZip; response-model test.
 ```
 
 ## Phase 3 — Deterministic tools (test-first)
@@ -74,6 +77,9 @@ per-store lead times, transfer routes, and the five scenarios of docs/04-demo-sc
 deterministically (fixed seed). Output CSVs that a PosSource adapter reads.
 Acceptance: ingestion loads the synthetic data; reconciliation test creates an ADJUSTMENT for a planted mismatch;
 stale-SKU detection test passes.
+Also (4b): bulk loads use PostgreSQL COPY into staging tables (D-41); backfill writes historical
+inventory_movement.occurred_at; then run EXPLAIN (ANALYZE, BUFFERS) on the top-10 queries against the `full`
+dataset and record the plans in docs/notes/query-plans.md (D-38).
 ```
 
 ## Phase 5 — Agents and orchestrator
@@ -86,6 +92,9 @@ numbers in the text match evidence, and falls back to deterministic templates wh
 is invalid. Register nightly_run_task and approval_deadline_task in Celery Beat.
 Acceptance: `uv run pytest tests/scenarios` runs the pipeline on synthetic data and asserts the recommendation
 outcomes of scenarios 1–5; agent_run/tool_call/decision_evidence rows exist for every agent.
+Also: a Beat job that creates future monthly partitions of sales_line and inventory_movement before data reaches
+the DEFAULT partition, and alerts if the default partition holds rows (D-35). Measure the nightly run on the `full`
+dataset and propose its time limit (D-42). Workers use the sync engine (statement_timeout 10 min, D-36).
 ```
 
 ## Phase 6 — API, approvals, transfers, cache
@@ -97,6 +106,8 @@ receive, ledger postings, discrepancy), sd11_dashboard_cache.puml (cache-aside, 
 sd15_store_inventory_2d.puml. Cross-store data must be limited to store name + quantity for supervisors.
 Acceptance: integration tests cover every edge case in docs/04-demo-scenarios.md; 403/404/409/422 return the
 standard error body; OpenAPI spec exported to frontend/openapi.json.
+Also: per list endpoint, an integration test that the query count does not grow with row count (D-39); list
+queries select only DTO columns (D-40); cursor paging for movements (D-37).
 ```
 
 ## Phase 7 — Frontend shell and design system
@@ -133,6 +144,7 @@ Add Playwright end-to-end tests for the five demo scenarios, a historical-replay
 for the last 28 days of synthetic data and reports forecast WMAPE and recommendation accuracy, seed/reset commands
 for demos, and a docs/DEMO_SCRIPT.md. Fix all lint/type warnings. Produce a short gap list against
 docs/01-business-requirements-v2.2.md section 9.
+Also: k6 or Locust load test verifying p95 < 200 ms cached / < 500 ms uncached reads (D-42, spec §11).
 ```
 
 ## Later (only when asked): 3D twin (sd13), statsforecast models + calendar uplift, scheme slabs, markdown rules,

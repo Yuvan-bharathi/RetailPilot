@@ -2,6 +2,7 @@
 of the OpenAPI spec is up to date."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -9,7 +10,9 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app.domain.schemas.common import Counterpart, PageParams, StoreRef
+from app.core.errors import ValidationError as AppValidationError
+from app.domain.schemas.common import Counterpart, CursorParams, PageParams, StoreRef
+from app.domain.schemas.cursor import MovementCursor, decode_movement_cursor, encode_movement_cursor
 from app.domain.schemas.dtos import RecommendationDTO, TransferEvidence
 from app.main import create_app
 
@@ -25,6 +28,7 @@ STUBS = [
     ("get", "/api/v1/recommendations?page=2&page_size=10&sort=-priority&type=TRANSFER", None),
     ("get", f"/api/v1/recommendations/{ANY_ID}", None),
     ("get", f"/api/v1/stores/{ANY_ID}/inventory?risk=HIGH", None),
+    ("get", f"/api/v1/stores/{ANY_ID}/inventory/movements?page_size=50&type=SALE&from=2026-10-01", None),
     ("get", "/api/v1/transfers?status=PROPOSED", None),
     ("get", f"/api/v1/transfers/{ANY_ID}", None),
     ("get", "/api/v1/purchase-orders", None),
@@ -111,3 +115,70 @@ def test_frontend_openapi_json_is_up_to_date() -> None:
         "frontend/openapi.json is stale — run: uv run python -m scripts.export_openapi ../frontend/openapi.json "
         "&& (cd ../frontend && npm run gen:api)"
     )
+
+
+# --- cursor paging (D-37) and response models (D-40) ---------------------------------------------------------
+
+
+def test_movements_are_cursor_paged_without_a_total() -> None:
+    spec = create_app().openapi()
+    op = spec["paths"]["/api/v1/stores/{store_id}/inventory/movements"]["get"]
+    params = {p["name"] for p in op["parameters"]}
+    assert {"cursor", "page_size", "q", "type", "from", "to", "product_id"} <= params
+    assert not {"page", "sort"} & params  # fixed newest-first order, no offset
+    page = spec["components"]["schemas"]["CursorPage_InventoryMovementDTO_"]
+    assert set(page["properties"]) == {"items", "next_cursor", "page_size"}
+    movement = spec["components"]["schemas"]["InventoryMovementDTO"]["properties"]
+    assert {"occurred_at", "business_date"} <= set(movement) and "created_at" not in movement
+
+
+@pytest.mark.parametrize("query", ["cursor=not%20base64!", "page_size=0", "page_size=201"])
+def test_cursor_parameters_are_validated(client: TestClient, query: str) -> None:
+    response = client.get(f"/api/v1/stores/{ANY_ID}/inventory/movements?{query}")
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION"
+
+
+def test_cursor_params_defaults() -> None:
+    assert CursorParams() == CursorParams(cursor=None, page_size=25, q=None)
+
+
+def test_movement_cursor_round_trips() -> None:
+    cursor = MovementCursor(datetime(2026, 11, 2, 15, 30, tzinfo=UTC), UUID(ANY_ID))
+    token = encode_movement_cursor(cursor)
+
+    assert token.replace("-", "").replace("_", "").isalnum()  # URL-safe, no padding
+    assert decode_movement_cursor(token) == cursor
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "x",
+        "bm90IGpzb24",  # "not json"
+        "eyJ0IjoiMjAyNi0xMS0wMlQxNTozMDowMCIsImlkIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAxIn0",  # naive t
+        "eyJ0IjoiMjAyNi0xMS0wMlQxNTozMDowMCswMDowMCJ9",  # no id
+    ],
+)
+def test_malformed_cursor_is_a_422(token: str) -> None:
+    with pytest.raises(AppValidationError) as raised:
+        decode_movement_cursor(token)
+    assert raised.value.details[0].field == "cursor"
+
+
+def test_naive_cursor_time_is_refused_when_encoding() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        encode_movement_cursor(MovementCursor(datetime(2026, 11, 2), UUID(ANY_ID)))
+
+
+def test_every_route_declares_a_response_model() -> None:
+    """D-40: responses are serialised by Pydantic through the declared model, never by ad-hoc JSON encoding."""
+    from fastapi.routing import APIRoute
+
+    missing = [
+        route.path
+        for route in create_app().routes
+        if isinstance(route, APIRoute) and route.response_model is None and route.status_code != 204
+    ]
+    assert missing == []

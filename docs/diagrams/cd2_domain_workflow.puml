@@ -1,12 +1,15 @@
 @startuml
 !include style.iuml
 skinparam linetype ortho
-title CD-2  Domain Model (2/2) v3.1: Purchasing, Transfers, Approvals, Users, Observability, Digital Twin\n<size:11>v3.1 = decision log D-01, D-03, D-06, D-08</size>
+title CD-2  Domain Model (2/2) v3.2: Purchasing, Transfers, Approvals, Users, Observability, Digital Twin\n<size:11>v3.2 = decision log D-01, D-03, D-06, D-08, D-35</size>
 hide empty methods
 
 package "Users & access" {
   class User {
     +user_id: UUID <<PK>>
+    +username: str <<unique>> (D-35)
+    +password_hash: str (bcrypt)
+    +is_active: bool
     +name: str
     +role: STORE_SUPERVISOR|SUPER_ADMIN
     +store_id: UUID <<FK, nullable>>
@@ -111,9 +114,11 @@ package "Purchasing & transfers" {
     +transit_days: int
   }
   class BusinessRule {
-    +rule_key: str <<PK>>
+    +rule_id: UUID <<PK>> (D-35)
+    +rule_key: str
     +value: JSONB
     +scope_store_id: UUID <<nullable>>
+    unique (rule_key, scope_store_id) NULLS NOT DISTINCT
     ..
     po_l2_threshold, weekly_budget, order_fixed_cost,
     holding_cost_rate_per_day, l1_deadline_hours,
@@ -130,6 +135,7 @@ package "Observability" {
     +run_id: UUID <<PK>>
     +parent_run_id: UUID <<nullable>>
     +agent_name: str
+    +run_date: date <<nullable>> (D-35)
     +status: RUNNING|SUCCESS|FAILED|PARTIAL
     +started_at: datetime
     +ended_at: datetime
@@ -137,6 +143,8 @@ package "Observability" {
     +output_summary: text
     +error: text
     +step_count: int
+    unique (run_date) WHERE agent_name='nightly'
+    AND status IN (RUNNING, SUCCESS, PARTIAL)
   }
   class ToolCall {
     +call_id: UUID <<PK>>
@@ -146,12 +154,12 @@ package "Observability" {
     +result_summary: text
     +duration_ms: int
     +retries: int
-    +status: OK|ERROR
+    +status: OK|WARN|ERROR (D-35)
   }
   class DecisionEvidence {
     +evidence_id: UUID <<PK>>
     +run_id: UUID <<FK>>
-    +rec_id: UUID <<FK>>
+    +rec_id: UUID <<FK, nullable>> (D-35)
     +data: JSONB
     +validation_result: str
   }
