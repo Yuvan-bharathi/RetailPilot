@@ -12,7 +12,7 @@ const store = (code: string) => FIXTURES.stores.find((s) => s.code === code)!;
 describe("Dashboard", () => {
   it("Super Admin, all stores: KPIs, store performance and widgets come from the API data", async () => {
     renderApp("/", "admin");
-    expect(await screen.findByRole("heading", { name: "Business Overview" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "Business overview" })).toBeTruthy();
     const summary = FIXTURES.dashboard.all!;
     const insights = FIXTURES.dashboard_insights.all!;
     const revenue = await screen.findByRole("region", { name: "Revenue" });
@@ -26,7 +26,7 @@ describe("Dashboard", () => {
 
   it("Store Supervisor sees only their store, no store comparison and no role switcher", async () => {
     renderApp("/", "sup.c");
-    expect(await screen.findByRole("heading", { name: "Store Dashboard" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "Store overview" })).toBeTruthy();
     expect((await screen.findAllByText(new RegExp(store("C").name))).length).toBeGreaterThan(0);
     const summary = FIXTURES.dashboard[store("C").store_id]!;
     const value = await screen.findByRole("region", { name: "Inventory value" });

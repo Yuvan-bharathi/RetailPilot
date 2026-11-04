@@ -5,3 +5,5 @@ package-lock.json
 openapi.json
 src/api/schema.d.ts
 src/mocks/data
+test-results
+playwright-report

@@ -15,3 +15,7 @@ htmlcov/
 
 # local overrides (e.g. frontend/.env.development.local with VITE_USE_MOCKS=true)
 *.local
+
+# Playwright output
+frontend/test-results/
+frontend/playwright-report/

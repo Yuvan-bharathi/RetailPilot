@@ -6,7 +6,7 @@ import { renderApp } from "./render";
 describe("E2E Demo Scenarios Suite (Spec §9.8)", () => {
   it("Scenario 1: Super Admin opens the business overview", async () => {
     renderApp("/", "admin");
-    expect(await screen.findByRole("heading", { name: "Business Overview" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "Business overview" })).toBeTruthy();
   });
 
   it("Scenario 2: Line-level approval and PO resolution workflow", async () => {

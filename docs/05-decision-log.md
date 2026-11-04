@@ -657,3 +657,14 @@ and per-viewer scoping through the HTTP API. Fixes needed to get there:
   pages no longer add a second `<h1>` under the shell's title.
 **Changed.** Spec §5; `app/services/{analytics_service,business_rule_service}.py`; routers; DTOs; mock fixtures
 (computed from the synthetic data); frontend Analytics / Settings pages, client, hooks, tests.
+
+---
+
+## D-49 Browser end-to-end tests of the demo scenarios (2026-11-04)
+**Decision.** Phase 9's Playwright tests: `frontend/e2e/demo-scenarios.spec.ts` logs in as each demo user and checks
+scenarios 1–5 (quantities, the donor shown as name + quantity to the destination, the donor's own surplus, the third
+store refused) and the dashboards, in Chromium against the real API and the data produced by `seed_demo` — read-only,
+so it can be repeated. `@playwright/test` 1.64.1 is pinned (dev dependency). The run starts its own uvicorn (:8077)
+and Vite (:5177) and never reuses an existing server: during setup another project's dev server was answering on
+:5173 (IPv6) and the tests silently talked to it. The Vite proxy target is configurable (`RETAILPILOT_API`).
+The earlier "E2E" vitest file only checked that headings render; it remains as a smoke test.

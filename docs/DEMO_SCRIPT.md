@@ -68,6 +68,10 @@ The nightly run is for **3 Nov 2026** (history ends 2 Nov). The header shows "Da
 - **Monitoring** (`admin`): the run, its six agents, tool calls and LLM usage; *Trigger nightly pipeline* runs the
   next day.
 
-## 4. Edge cases planted in the data
+## 4. Automated walkthrough
+`cd frontend && npm run e2e` drives Chromium through scenarios 1–5 and the dashboards as `admin`, `sup.a`, `sup.b`
+and `sup.c` against the real API (Playwright; needs the demo loaded).
+
+## 5. Edge cases planted in the data
 - **Stock mismatch** (Store B, 23 Oct): the import posts a reconciliation ADJUSTMENT of −3 (rule 8).
 - **Stale SKU** (Store C): no sales for 5 days while stock is held → LOW confidence, never transferred (D-04).

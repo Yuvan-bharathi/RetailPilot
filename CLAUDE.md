@@ -100,6 +100,8 @@ infra/docker-compose.yml
 - Demo (from backend/): `uv run python -m scripts.reset_demo` then `uv run python -m scripts.seed_demo`
   (generate + COPY-load + users + real nightly run, D-47) · next run: `uv run python -m scripts.run_agents` ·
   evaluation: `uv run python -m scripts.replay_evaluation` (writes docs/EVALUATION_REPORT.md)
+- End-to-end (after seed_demo): `cd frontend && npm run e2e` — Playwright 1.64.1, Chromium; starts its own uvicorn
+  (:8077) and Vite (:5177), never reuses other servers; asserts the five demo scenarios in the browser (D-49)
 - Frontend: `cd frontend && npm install && npm run dev` (real API via the Vite proxy to :8000; UI-only work: `VITE_USE_MOCKS=true` in `.env.development.local`;
   demo users admin / sup.a / sup.b / sup.c, password `demo`) · all checks: `npm run check`
   (lint, typecheck, check:no-hex, check:api, vitest incl. axe) · build: `npm run build` ·
