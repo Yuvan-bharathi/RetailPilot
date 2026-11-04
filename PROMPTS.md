@@ -95,6 +95,9 @@ outcomes of scenarios 1–5; agent_run/tool_call/decision_evidence rows exist fo
 Also: a Beat job that creates future monthly partitions of sales_line and inventory_movement before data reaches
 the DEFAULT partition, and alerts if the default partition holds rows (D-35). Measure the nightly run on the `full`
 dataset and propose its time limit (D-42). Workers use the sync engine (statement_timeout 10 min, D-36).
+Windows note: Celery does not support Windows' default pool (prefork). Locally run the worker with `--pool=solo`;
+also provide a Dockerfile and docker-compose service for the worker (Linux) so the production-like path is tested.
+Plan this in Phase 5.
 ```
 
 ## Phase 6 — API, approvals, transfers, cache
