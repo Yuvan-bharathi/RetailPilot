@@ -1083,6 +1083,140 @@
         }
       }
     },
+    "/api/v1/analytics": {
+      "get": {
+        "tags": [
+          "dashboard",
+          "analytics"
+        ],
+        "summary": "Get Analytics",
+        "description": "Classification, category performance, forecast mix and top lost sales (D-48). Supervisors: own store.",
+        "operationId": "get_analytics",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Store Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "TODAY",
+                "LAST_7_DAYS",
+                "LAST_28_DAYS",
+                "MONTH_TO_DATE"
+              ],
+              "type": "string",
+              "default": "LAST_28_DAYS",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
     "/api/v1/recommendations": {
       "get": {
         "tags": [
@@ -4288,10 +4422,267 @@
           }
         }
       }
+    },
+    "/api/v1/admin/business-rules": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Business Rules",
+        "description": "The editable global business rules with their current values (spec §9).",
+        "operationId": "list_business_rules",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BusinessRuleDTO"
+                  },
+                  "title": "Response List Business Rules"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/business-rules/{key}": {
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Business Rule",
+        "description": "Change one global rule (validated by type and range). Takes effect at the next nightly run.",
+        "operationId": "update_business_rule",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BusinessRuleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessRuleDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AbcXyzCellDTO": {
+        "properties": {
+          "abc": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C"
+            ],
+            "title": "Abc"
+          },
+          "xyz": {
+            "type": "string",
+            "enum": [
+              "X",
+              "Y",
+              "Z"
+            ],
+            "title": "Xyz"
+          },
+          "skus": {
+            "type": "integer",
+            "title": "Skus"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "abc",
+          "xyz",
+          "skus"
+        ],
+        "title": "AbcXyzCellDTO"
+      },
       "AgentRunDetailDTO": {
         "properties": {
           "run_id": {
@@ -4404,6 +4795,83 @@
           "error"
         ],
         "title": "AgentRunDetailDTO"
+      },
+      "AnalyticsDTO": {
+        "properties": {
+          "store": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoreRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "TODAY",
+              "LAST_7_DAYS",
+              "LAST_28_DAYS",
+              "MONTH_TO_DATE"
+            ],
+            "title": "Period"
+          },
+          "data_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          },
+          "abc_xyz": {
+            "items": {
+              "$ref": "#/components/schemas/AbcXyzCellDTO"
+            },
+            "type": "array",
+            "title": "Abc Xyz"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryPerformanceDTO"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "forecast_mix": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastMixDTO"
+            },
+            "type": "array",
+            "title": "Forecast Mix"
+          },
+          "top_lost_sales": {
+            "items": {
+              "$ref": "#/components/schemas/LostSalesItemDTO"
+            },
+            "type": "array",
+            "title": "Top Lost Sales"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "store",
+          "period",
+          "data_as_of",
+          "abc_xyz",
+          "categories",
+          "forecast_mix",
+          "top_lost_sales"
+        ],
+        "title": "AnalyticsDTO",
+        "description": "Analytics screen (D-48): classification, category performance, forecast mix and lost sales — all computed."
       },
       "ApprovalRequest": {
         "properties": {
@@ -4626,6 +5094,178 @@
         ],
         "title": "BatchRiskRef",
         "description": "A batch at risk of expiring before it sells (FEFO, D-31)."
+      },
+      "BusinessRuleDTO": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Rule key; keys inside basket / co_replenish are dotted, e.g. basket.min_support"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "money",
+              "decimal",
+              "integer",
+              "number",
+              "boolean",
+              "choice"
+            ],
+            "title": "Kind"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "choices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choices"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "group",
+          "label",
+          "description",
+          "kind",
+          "value"
+        ],
+        "title": "BusinessRuleDTO"
+      },
+      "BusinessRuleUpdate": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "BusinessRuleUpdate"
+      },
+      "CategoryPerformanceDTO": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "revenue": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Revenue",
+            "description": "Amount in ₹ (INR), 2 decimals"
+          },
+          "gross_profit": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Gross Profit",
+            "description": "Amount in ₹ (INR), 2 decimals"
+          },
+          "margin_pct": {
+            "type": "number",
+            "title": "Margin Pct"
+          },
+          "units": {
+            "type": "integer",
+            "title": "Units"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "category",
+          "revenue",
+          "gross_profit",
+          "margin_pct",
+          "units"
+        ],
+        "title": "CategoryPerformanceDTO"
       },
       "CategoryValueDTO": {
         "properties": {
@@ -5158,6 +5798,34 @@
         "title": "ExpiryEvidence",
         "description": "EXPIRY_ALERT / MARKDOWN — batch that will not sell in time and no store can take it (SD-08)."
       },
+      "ForecastMixDTO": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "HIGH",
+              "LOW"
+            ],
+            "title": "Confidence"
+          },
+          "skus": {
+            "type": "integer",
+            "title": "Skus"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "method",
+          "confidence",
+          "skus"
+        ],
+        "title": "ForecastMixDTO"
+      },
       "GoodsReceiptRequest": {
         "properties": {
           "lines": {
@@ -5515,6 +6183,42 @@
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "LostSalesItemDTO": {
+        "properties": {
+          "store": {
+            "$ref": "#/components/schemas/StoreRef"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductRef"
+          },
+          "lost_units": {
+            "type": "number",
+            "title": "Lost Units"
+          },
+          "lost_revenue": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Lost Revenue",
+            "description": "Amount in ₹ (INR), 2 decimals"
+          },
+          "lost_profit": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Lost Profit",
+            "description": "Amount in ₹ (INR), 2 decimals"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "store",
+          "product",
+          "lost_units",
+          "lost_revenue",
+          "lost_profit"
+        ],
+        "title": "LostSalesItemDTO"
       },
       "MeDTO": {
         "properties": {

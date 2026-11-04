@@ -50,7 +50,6 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
 
-    anthropic_api_key: SecretStr | None = None
     # LLM explanations (D-44): Groq, OpenAI open-weight models. Numbers are never taken from the LLM — every
     # number in its text must appear in the evidence, else the deterministic template is used (rule 11).
     groq_api_key: SecretStr | None = None

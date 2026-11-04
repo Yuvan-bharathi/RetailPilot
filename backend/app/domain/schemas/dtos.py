@@ -442,3 +442,46 @@ class DashboardInsights(DTO):
     store_performance: list[StorePerformanceDTO] = Field(
         description="Super Admin, all stores only; else empty"
     )
+
+
+# --- analytics (D-48) --------------------------------------------------------------------------------------------------
+
+
+class AbcXyzCellDTO(DTO):
+    abc: Literal["A", "B", "C"]
+    xyz: Literal["X", "Y", "Z"]
+    skus: int
+
+
+class CategoryPerformanceDTO(DTO):
+    category: str
+    revenue: Money
+    gross_profit: Money
+    margin_pct: float
+    units: int
+
+
+class ForecastMixDTO(DTO):
+    method: str
+    confidence: Literal["HIGH", "LOW"]
+    skus: int
+
+
+class LostSalesItemDTO(DTO):
+    store: StoreRef
+    product: ProductRef
+    lost_units: float
+    lost_revenue: Money
+    lost_profit: Money
+
+
+class AnalyticsDTO(DTO):
+    """Analytics screen (D-48): classification, category performance, forecast mix and lost sales — all computed."""
+
+    store: StoreRef | None
+    period: Period
+    data_as_of: date | None
+    abc_xyz: list[AbcXyzCellDTO]
+    categories: list[CategoryPerformanceDTO]
+    forecast_mix: list[ForecastMixDTO]
+    top_lost_sales: list[LostSalesItemDTO]

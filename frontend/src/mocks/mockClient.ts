@@ -112,6 +112,7 @@ export function createMockClient(
 ): ApiClient {
   const wait = () => new Promise<void>((resolve) => setTimeout(resolve, delayMs));
   const storeById = new Map(data.stores.map((s) => [s.store_id, s]));
+  const rules = data.business_rules.map((r) => ({ ...r })); // editable per mock client instance
   const ref = (s: StoreDTO): StoreRef => ({ store_id: s.store_id, name: s.name });
 
   function currentUser(): MockUser {
@@ -183,6 +184,32 @@ export function createMockClient(
       const summary = data.dashboard[store ?? "all"];
       if (!summary) throw new ApiError(404, "NOT_FOUND", "No dashboard for this store");
       return { ...summary, period: query.period ?? "LAST_28_DAYS" };
+    },
+    async getAnalytics(query) {
+      await wait();
+      const store = scopeStore(query.store_id);
+      const analytics = data.analytics[store ?? "all"];
+      if (!analytics) throw new ApiError(404, "NOT_FOUND", "No analytics for this store");
+      return { ...analytics, period: query.period ?? "LAST_28_DAYS" };
+    },
+    async listBusinessRules() {
+      await wait();
+      if (!isAdmin()) throw new ApiError(403, "FORBIDDEN", "Super Admin only");
+      return rules.map((r) => ({ ...r }));
+    },
+    async updateBusinessRule(key, value) {
+      await wait();
+      if (!isAdmin()) throw new ApiError(403, "FORBIDDEN", "Super Admin only");
+      const rule = rules.find((r) => r.key === key);
+      if (!rule) throw new ApiError(404, "NOT_FOUND", `Unknown business rule ${key}`);
+      const n = Number(value);
+      const numeric = rule.kind !== "boolean" && rule.kind !== "choice";
+      if (numeric && (Number.isNaN(n) || (rule.min != null && n < rule.min) || (rule.max != null && n > rule.max)))
+        throw new ApiError(422, "VALIDATION", "Invalid business rule value");
+      if (rule.kind === "choice" && !rule.choices?.includes(String(value)))
+        throw new ApiError(422, "VALIDATION", "Invalid business rule value");
+      rule.value = rule.kind === "money" ? n.toFixed(2) : rule.kind === "decimal" ? String(value) : value;
+      return { ...rule };
     },
     async getDashboardInsights(query) {
       await wait();

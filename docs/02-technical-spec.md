@@ -189,7 +189,8 @@ business meaning, never alphabetically.
 | GET /notifications?unread · POST /notifications/{id}/read | NotificationService | SD-14 |
 | GET /agent-runs · GET /agent-runs/{run_id} | ObservabilityService | – |
 | POST /admin/runs (trigger nightly run manually, Super Admin) | nightly_run_task.delay | SD-01 |
-| GET/PUT /admin/business-rules | BusinessRuleRepo | – |
+| GET /admin/business-rules · PUT /admin/business-rules/{key} | BusinessRuleService — typed, range-checked registry of the editable global rules; dotted keys inside basket / co_replenish (Super Admin, D-48) | – |
+| GET /analytics?store_id&period | AnalyticsService — ABC-XYZ counts, category revenue / margin, forecast method mix, top lost sales (D-48) | – |
 | GET /stores/{store_id}/twin (later extension) | DigitalTwinService | SD-13 |
 
 Error body: `{"error": {"code": "CONFLICT|FORBIDDEN|NOT_FOUND|VALIDATION|UNAUTHORIZED|INTERNAL|NOT_IMPLEMENTED", "message": str, "details": []}}`

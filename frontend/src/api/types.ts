@@ -21,6 +21,8 @@ export type RunInfoDTO = Schemas["RunInfoDTO"];
 
 export type DashboardSummary = Schemas["DashboardSummary"];
 export type DashboardInsights = Schemas["DashboardInsights"];
+export type AnalyticsDTO = Schemas["AnalyticsDTO"];
+export type BusinessRuleDTO = Schemas["BusinessRuleDTO"];
 export type Period = DashboardSummary["period"];
 export type MoverDTO = Schemas["MoverDTO"];
 

@@ -399,9 +399,9 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">
+        <h2 className="text-xl font-bold tracking-tight text-ink">
           {isAdmin ? "Business Overview" : "Store Dashboard"}
-        </h1>
+        </h2>
         <p className="mt-1 text-sm text-ink-secondary">
           {scopeName ?? ""}
           {ins?.data_as_of ? ` · Data as of ${formatDateIST(ins.data_as_of)}` : ""}

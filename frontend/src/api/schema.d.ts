@@ -195,6 +195,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Analytics
+         * @description Classification, category performance, forecast mix and top lost sales (D-48). Supervisors: own store.
+         */
+        get: operations["get_analytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/recommendations": {
         parameters: {
             query?: never;
@@ -635,10 +655,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/business-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Business Rules
+         * @description The editable global business rules with their current values (spec §9).
+         */
+        get: operations["list_business_rules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/business-rules/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Business Rule
+         * @description Change one global rule (validated by type and range). Takes effect at the next nightly run.
+         */
+        put: operations["update_business_rule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AbcXyzCellDTO */
+        AbcXyzCellDTO: {
+            /**
+             * Abc
+             * @enum {string}
+             */
+            abc: "A" | "B" | "C";
+            /**
+             * Xyz
+             * @enum {string}
+             */
+            xyz: "X" | "Y" | "Z";
+            /** Skus */
+            skus: number;
+        };
         /** AgentRunDetailDTO */
         AgentRunDetailDTO: {
             /**
@@ -673,6 +748,28 @@ export interface components {
             tool_calls?: components["schemas"]["ToolCallDTO"][];
             /** Llm Usages */
             llm_usages?: components["schemas"]["LLMUsageDTO"][];
+        };
+        /**
+         * AnalyticsDTO
+         * @description Analytics screen (D-48): classification, category performance, forecast mix and lost sales — all computed.
+         */
+        AnalyticsDTO: {
+            store: components["schemas"]["StoreRef"] | null;
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "TODAY" | "LAST_7_DAYS" | "LAST_28_DAYS" | "MONTH_TO_DATE";
+            /** Data As Of */
+            data_as_of: string | null;
+            /** Abc Xyz */
+            abc_xyz: components["schemas"]["AbcXyzCellDTO"][];
+            /** Categories */
+            categories: components["schemas"]["CategoryPerformanceDTO"][];
+            /** Forecast Mix */
+            forecast_mix: components["schemas"]["ForecastMixDTO"][];
+            /** Top Lost Sales */
+            top_lost_sales: components["schemas"]["LostSalesItemDTO"][];
         };
         /** ApprovalRequest */
         ApprovalRequest: {
@@ -783,6 +880,59 @@ export interface components {
             batch_qty: number;
             /** At Risk Qty */
             at_risk_qty: number;
+        };
+        /** BusinessRuleDTO */
+        BusinessRuleDTO: {
+            /**
+             * Key
+             * @description Rule key; keys inside basket / co_replenish are dotted, e.g. basket.min_support
+             */
+            key: string;
+            /** Group */
+            group: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "money" | "decimal" | "integer" | "number" | "boolean" | "choice";
+            /** Value */
+            value: string | number | boolean;
+            /** Unit */
+            unit?: string | null;
+            /** Min */
+            min?: number | null;
+            /** Max */
+            max?: number | null;
+            /** Choices */
+            choices?: string[] | null;
+        };
+        /** BusinessRuleUpdate */
+        BusinessRuleUpdate: {
+            /** Value */
+            value: string | number | boolean;
+        };
+        /** CategoryPerformanceDTO */
+        CategoryPerformanceDTO: {
+            /** Category */
+            category: string;
+            /**
+             * Revenue
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            revenue: string;
+            /**
+             * Gross Profit
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            gross_profit: string;
+            /** Margin Pct */
+            margin_pct: number;
+            /** Units */
+            units: number;
         };
         /** CategoryValueDTO */
         CategoryValueDTO: {
@@ -1016,6 +1166,18 @@ export interface components {
              */
             markdown_pct?: number | null;
         };
+        /** ForecastMixDTO */
+        ForecastMixDTO: {
+            /** Method */
+            method: string;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "HIGH" | "LOW";
+            /** Skus */
+            skus: number;
+        };
         /** GoodsReceiptRequest */
         GoodsReceiptRequest: {
             /** Lines */
@@ -1170,6 +1332,23 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /** LostSalesItemDTO */
+        LostSalesItemDTO: {
+            store: components["schemas"]["StoreRef"];
+            product: components["schemas"]["ProductRef"];
+            /** Lost Units */
+            lost_units: number;
+            /**
+             * Lost Revenue
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            lost_revenue: string;
+            /**
+             * Lost Profit
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            lost_profit: string;
         };
         /** MeDTO */
         MeDTO: {
@@ -2542,6 +2721,85 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardInsights"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_analytics: {
+        parameters: {
+            query?: {
+                store_id?: string | null;
+                period?: "TODAY" | "LAST_7_DAYS" | "LAST_28_DAYS" | "MONTH_TO_DATE";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsDTO"];
                 };
             };
             /** @description Unauthorized */
@@ -4333,6 +4591,164 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_business_rules: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessRuleDTO"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_business_rule: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BusinessRuleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessRuleDTO"];
                 };
             };
             /** @description Unauthorized */

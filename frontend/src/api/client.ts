@@ -6,6 +6,8 @@ import type {
   BatchQuery,
   CloseShortRequest,
   CursorPage,
+  AnalyticsDTO,
+  BusinessRuleDTO,
   DashboardInsights,
   DashboardQuery,
   DashboardSummary,
@@ -43,6 +45,9 @@ export interface ApiClient {
   getLatestRun(): Promise<RunInfoDTO>;
   getDashboard(query: DashboardQuery): Promise<DashboardSummary>;
   getDashboardInsights(query: DashboardQuery): Promise<DashboardInsights>;
+  getAnalytics(query: DashboardQuery): Promise<AnalyticsDTO>;
+  listBusinessRules(): Promise<BusinessRuleDTO[]>;
+  updateBusinessRule(key: string, value: BusinessRuleDTO["value"]): Promise<BusinessRuleDTO>;
   listRecommendations(query: RecommendationQuery): Promise<Page<RecommendationDTO>>;
   getRecommendation(recId: string): Promise<RecommendationDetailDTO>;
   actOnRecommendation(recId: string, body: RecActionRequest): Promise<RecommendationDTO>;
@@ -94,7 +99,7 @@ export function toQueryString(query: Record<string, QueryValue> | undefined): st
 
 /** Real backend client (FastAPI, /api/v1, JWT bearer). */
 export function createHttpClient(getToken: () => string | null, baseUrl = "/api/v1"): ApiClient {
-  async function request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
     const token = getToken();
     const response = await fetch(`${baseUrl}${path}`, {
       method,
@@ -123,6 +128,9 @@ export function createHttpClient(getToken: () => string | null, baseUrl = "/api/
     getLatestRun: () => request("GET", "/runs/latest"),
     getDashboard: (query) => request("GET", `/dashboard${toQueryString(query)}`),
     getDashboardInsights: (query) => request("GET", `/dashboard/insights${toQueryString(query)}`),
+    getAnalytics: (query) => request("GET", `/analytics${toQueryString(query)}`),
+    listBusinessRules: () => request("GET", "/admin/business-rules"),
+    updateBusinessRule: (key, value) => request("PUT", `/admin/business-rules/${encodeURIComponent(key)}`, { value }),
     listRecommendations: (query) => request("GET", `/recommendations${toQueryString(query)}`),
     getRecommendation: (recId) => request("GET", `/recommendations/${encodeURIComponent(recId)}`),
     actOnRecommendation: (recId, body) => request("POST", `/recommendations/${encodeURIComponent(recId)}/action`, body),

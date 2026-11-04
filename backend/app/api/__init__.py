@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.routers import (
     approvals,
     auth,
+    business_rules,
     dashboard,
     inventory,
     notifications,
@@ -28,3 +29,4 @@ api_router.include_router(approvals.router)
 api_router.include_router(transfers.router)
 api_router.include_router(inventory.router)
 api_router.include_router(notifications.router)
+api_router.include_router(business_rules.router)

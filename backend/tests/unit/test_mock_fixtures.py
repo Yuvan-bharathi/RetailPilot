@@ -7,7 +7,9 @@ from typing import Any
 import pytest
 from pydantic import TypeAdapter
 
+from app.api.routers.business_rules import BusinessRuleDTO
 from app.domain.schemas.dtos import (
+    AnalyticsDTO,
     BatchDTO,
     DashboardInsights,
     DashboardSummary,
@@ -40,6 +42,8 @@ def test_every_section_validates_against_the_dtos(fixtures: dict[str, Any]) -> N
     TypeAdapter(list[PurchaseOrderDTO]).validate_python(fixtures["purchase_orders"])
     TypeAdapter(dict[str, DashboardSummary]).validate_python(fixtures["dashboard"])
     TypeAdapter(dict[str, DashboardInsights]).validate_python(fixtures["dashboard_insights"])
+    TypeAdapter(dict[str, AnalyticsDTO]).validate_python(fixtures["analytics"])
+    TypeAdapter(list[BusinessRuleDTO]).validate_python(fixtures["business_rules"])
     for section, model in (
         ("inventory", InventoryRowDTO),
         ("movements", InventoryMovementDTO),

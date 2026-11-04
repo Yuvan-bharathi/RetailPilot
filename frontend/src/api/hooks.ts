@@ -44,6 +44,16 @@ export function useDashboardInsights(query: DashboardQuery) {
   });
 }
 
+export function useAnalytics(query: DashboardQuery) {
+  const api = useApi();
+  return useQuery({ queryKey: ["analytics", query], queryFn: () => api.getAnalytics(query), staleTime: FIVE_MINUTES });
+}
+
+export function useBusinessRules(enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: ["business-rules"], queryFn: () => api.listBusinessRules(), enabled });
+}
+
 export function useRecommendations(query: RecommendationQuery) {
   const api = useApi();
   return useQuery({

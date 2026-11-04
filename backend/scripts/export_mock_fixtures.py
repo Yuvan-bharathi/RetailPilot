@@ -27,8 +27,11 @@ from pydantic import TypeAdapter
 
 from app.domain.schemas.common import Counterpart, ProductRef, StoreRef, SupplierRef
 from app.domain.schemas.dtos import (
+    AbcXyzCellDTO,
+    AnalyticsDTO,
     BatchDTO,
     BatchRiskRef,
+    CategoryPerformanceDTO,
     CategoryValueDTO,
     CoReplenishEvidence,
     DashboardInsights,
@@ -36,8 +39,10 @@ from app.domain.schemas.dtos import (
     Evidence,
     ExpiryDayDTO,
     ExpiryEvidence,
+    ForecastMixDTO,
     InventoryMovementDTO,
     InventoryRowDTO,
+    LostSalesItemDTO,
     MoverDTO,
     NeedsReviewEvidence,
     POLineDTO,
@@ -53,7 +58,9 @@ from app.domain.schemas.dtos import (
     TransferEvidence,
     TransferOrderDTO,
 )
+from app.services.business_rule_service import RULES, coerce
 from app.tools.basket import BasketTools
+from app.tools.forecast import ForecastTools
 from app.tools.freshness import FreshnessTools
 from app.tools.lost_sales import LostSalesCalculator
 from app.tools.numeric import money
@@ -994,6 +1001,109 @@ def _insights(b: Builder, pos: Sequence[PurchaseOrderDTO]) -> dict[str, Any]:
     return out
 
 
+def _analytics(b: Builder, lost: pd.DataFrame) -> dict[str, Any]:
+    """AnalyticsDTO per scope (D-48) with the service's definitions, from the synthetic data (28 days)."""
+    pl, ds = b.pl, b.ds
+    start = pl.end_date - timedelta(days=27)
+    lines = ds.sales_lines.loc[
+        ~ds.sales_lines["is_voided"] & ~ds.sales_lines["is_return"] & (ds.sales_lines["txn_date"] >= start)
+    ]
+    lookback = pl.daily.loc[pl.daily["snapshot_date"] > pl.end_date - timedelta(days=180)].copy()
+    lookback["revenue"] = [
+        float(y) * float(pl.product(p).selling_price)
+        for y, p in zip(lookback["y"], lookback["product_id"], strict=True)
+    ]
+    classes = ForecastTools.classify_abc_xyz(lookback[["unique_id", "ds", "y", "revenue"]]).set_index(
+        "unique_id"
+    )
+    out: dict[str, Any] = {}
+    for key in [None, *pl.store_ids]:
+        stores = pl.store_ids if key is None else [key]
+        cells: dict[tuple[str, str], int] = defaultdict(int)
+        for s in stores:
+            for p in pl.listed_products():
+                uid_ = f"{s}:{p}"
+                if uid_ in classes.index:
+                    cells[(str(classes.at[uid_, "abc"]), str(classes.at[uid_, "xyz"]))] += 1
+        scope = lines if key is None else lines.loc[lines["store_id"] == key]
+        cats: dict[str, list[Decimal]] = defaultdict(lambda: [Decimal(0), Decimal(0), Decimal(0)])
+        for q, pr, d, p in zip(
+            scope["qty"], scope["unit_price"], scope["discount"], scope["product_id"], strict=True
+        ):
+            prod = pl.product(p)
+            rev = q * pr - d
+            entry = cats[str(prod.category)]
+            entry[0] += rev
+            entry[1] += rev - q * prod.cost_price
+            entry[2] += q
+        mix: dict[tuple[str, str], int] = defaultdict(int)
+        for s in stores:
+            for p in pl.listed_products():
+                mix[("BASELINE", "LOW" if (s, p) in b.stale else "HIGH")] += 1
+        scoped_lost = lost if key is None else lost.loc[[k for k in lost.index if k[0] == key]]
+        top = (
+            scoped_lost.loc[scoped_lost["lost_revenue"] > 0]
+            .sort_values("lost_revenue", ascending=False)
+            .head(10)
+        )
+        dto = AnalyticsDTO(
+            store=None if key is None else b.store_ref(key),
+            period="LAST_28_DAYS",
+            data_as_of=pl.end_date,
+            abc_xyz=[AbcXyzCellDTO(abc=a, xyz=x, skus=n) for (a, x), n in sorted(cells.items())],  # type: ignore[arg-type]
+            categories=[
+                CategoryPerformanceDTO(
+                    category=c,
+                    revenue=money(v[0]),
+                    gross_profit=money(v[1]),
+                    margin_pct=float(round(v[1] / v[0] * 100, 2)) if v[0] else 0.0,
+                    units=int(v[2]),
+                )
+                for c, v in sorted(cats.items(), key=lambda kv: (-kv[1][0], kv[0]))
+            ],
+            forecast_mix=[
+                ForecastMixDTO(method=m, confidence=c, skus=n)  # type: ignore[arg-type]
+                for (m, c), n in sorted(mix.items(), key=lambda kv: (-kv[1], kv[0]))
+            ],
+            top_lost_sales=[
+                LostSalesItemDTO(
+                    store=b.store_ref(s),
+                    product=b.product_ref(p),
+                    lost_units=round(float(r.lost_units), 1),
+                    lost_revenue=money(r.lost_revenue),
+                    lost_profit=money(r.lost_profit),
+                )
+                for (s, p), r in top.iterrows()
+            ],
+        )
+        out["all" if key is None else str(key)] = dto.model_dump(mode="json")
+    return out
+
+
+def _business_rules(ds: Dataset) -> list[dict[str, Any]]:
+    """The editable rules (D-48) with the dataset's values — the same registry the API uses."""
+    rules = ds.business_rules
+    out = []
+    for spec in RULES:
+        head, _, tail = spec.key.partition(".")
+        value = rules[head][tail] if tail else rules[head]
+        out.append(
+            {
+                "key": spec.key,
+                "group": spec.group,
+                "label": spec.label,
+                "description": spec.description,
+                "kind": spec.kind,
+                "value": coerce(spec, value),
+                "unit": spec.unit,
+                "min": spec.min,
+                "max": spec.max,
+                "choices": list(spec.choices) if spec.choices else None,
+            }
+        )
+    return out
+
+
 # --- scenarios -------------------------------------------------------------------------------------------------------------
 
 
@@ -1141,6 +1251,8 @@ def build_fixtures(dataset_dir: Path) -> dict[str, Any]:
         "purchase_orders": [po.model_dump(mode="json") for po in pos],
         "dashboard": _dashboard(b, lost, inventory, pos),
         "dashboard_insights": _insights(b, pos),
+        "analytics": _analytics(b, lost),
+        "business_rules": _business_rules(ds),
         "scenarios": _scenarios(b),
     }
 

@@ -636,3 +636,24 @@ and per-viewer scoping through the HTTP API. Fixes needed to get there:
 - **Measured (D-42):** full profile — load 81 s; agents ≈ 25 s; explanations ≈ 4.7 min (22 Groq batches, rate
   limits → fallback model); small profile end to end 57 s. **Proposed nightly limit: 15 minutes** on the full
   dataset with the LLM (≈ 2 minutes without it).
+
+---
+
+## D-48 Analytics and Settings on real data; business-rules API (2026-11-04)
+**Decision.**
+- **`GET /analytics`** (supervisors: own store): ABC-XYZ counts of listed store-SKUs, revenue / gross profit / margin /
+  units by category for the period, forecast method × confidence mix of the latest run, top-10 lost sales (revenue
+  and profit separately, rule 9). The Analytics page shows only these; the previous page was entirely sample data
+  (and a "forecast accuracy trajectory" with no data behind it — real accuracy is in docs/EVALUATION_REPORT.md).
+- **`GET /admin/business-rules`, `PUT /admin/business-rules/{key}`** (Super Admin, spec §5): a registry of the 22
+  editable global rules with type, range and allowed values; `basket.*` / `co_replenish.*` are dotted keys. Money is
+  stored as a 2-decimal string, rates as exact decimal strings. Invalid values → 422 with the field; unknown key →
+  404. Changes apply from the next nightly run (RunParams.load). Per-store overrides are not offered: nothing reads
+  them yet.
+- **Settings page:** the Super Admin edits exactly these rules (one at a time); a supervisor sees a read-only
+  profile. The previous page showed invented values (e.g. holding cost 0.05 vs the rule's 0.0005, a "service level
+  target" and a 16:00 cut-off that are not business rules) and "saved" only to local state.
+- **Cleanup:** the unmounted contract-stub router was deleted; the unused `anthropic` dependency removed (D-44);
+  pages no longer add a second `<h1>` under the shell's title.
+**Changed.** Spec §5; `app/services/{analytics_service,business_rule_service}.py`; routers; DTOs; mock fixtures
+(computed from the synthetic data); frontend Analytics / Settings pages, client, hooks, tests.

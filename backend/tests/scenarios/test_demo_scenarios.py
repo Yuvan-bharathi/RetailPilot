@@ -305,3 +305,21 @@ def test_api_dashboard_and_inventory_answer_for_each_role(run: dict[str, Any], a
     inventory = client.get(f"/api/v1/stores/{_store(run, 'C')}/inventory?page_size=5", headers=sup)
     assert inventory.status_code == 200 and inventory.json()["total"] > 0
     assert client.get(f"/api/v1/stores/{_store(run, 'A')}/inventory", headers=sup).status_code == 403
+
+
+def test_api_analytics_is_computed_and_scoped(run: dict[str, Any], api: Any) -> None:
+    client, as_user = api
+    admin = client.get("/api/v1/analytics?period=LAST_28_DAYS", headers=as_user("admin")).json()
+    assert admin["data_as_of"] == "2026-11-02"
+    assert sum(c["skus"] for c in admin["abc_xyz"]) > 0
+    assert admin["forecast_mix"] and all(m["skus"] > 0 for m in admin["forecast_mix"])
+    revenue = [float(c["revenue"]) for c in admin["categories"]]
+    assert revenue == sorted(revenue, reverse=True) and revenue[0] > 0
+    for c in admin["categories"]:
+        assert c["margin_pct"] == pytest.approx(float(c["gross_profit"]) / float(c["revenue"]) * 100, abs=0.01)
+    lost = [float(x["lost_revenue"]) for x in admin["top_lost_sales"]]
+    assert lost == sorted(lost, reverse=True)
+    store_c = client.get("/api/v1/analytics", headers=as_user("sup.c")).json()
+    assert store_c["store"]["name"].startswith("Store C")
+    assert all(x["store"]["name"].startswith("Store C") for x in store_c["top_lost_sales"])
+    assert client.get(f"/api/v1/analytics?store_id={_store(run, 'A')}", headers=as_user("sup.c")).status_code == 403

@@ -8,6 +8,8 @@ import rawFixtures from "./data/fixtures.json";
 
 import type {
   BatchDTO,
+  AnalyticsDTO,
+  BusinessRuleDTO,
   DashboardInsights,
   DashboardSummary,
   Evidence,
@@ -52,6 +54,8 @@ export interface MockFixtures {
   /** keyed by store_id, plus "all" */
   dashboard: Record<string, DashboardSummary>;
   dashboard_insights: Record<string, DashboardInsights>;
+  analytics: Record<string, AnalyticsDTO>;
+  business_rules: BusinessRuleDTO[];
   scenarios: Record<"1" | "2" | "3" | "4" | "5", ScenarioIndex>;
 }
 
