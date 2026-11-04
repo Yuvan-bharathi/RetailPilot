@@ -1,28 +1,37 @@
 import type {
+  AgentRunDetailDTO,
+  ApprovalRequest,
+  ApprovalResult,
   BatchDTO,
   BatchQuery,
+  CloseShortRequest,
   CursorPage,
   DashboardQuery,
   DashboardSummary,
   ErrorResponse,
   ExpiringQuery,
+  GoodsReceiptRequest,
   InventoryMovementDTO,
   InventoryQuery,
   LoginRequest,
   MeDTO,
   MovementQuery,
+  NotificationDTO,
   Page,
   PurchaseOrderDTO,
   PurchaseOrderQuery,
+  RecActionRequest,
   RecommendationDetailDTO,
   RecommendationDTO,
   RecommendationQuery,
+  ResolvePORequest,
   RunInfoDTO,
   StoreDTO,
   StoreInventoryPage,
   TokenResponse,
   TransferOrderDTO,
   TransferQuery,
+  TriggerRunRequest,
 } from "./types";
 
 /** Every call the UI makes, typed by the generated OpenAPI contract. */
@@ -34,12 +43,29 @@ export interface ApiClient {
   getDashboard(query: DashboardQuery): Promise<DashboardSummary>;
   listRecommendations(query: RecommendationQuery): Promise<Page<RecommendationDTO>>;
   getRecommendation(recId: string): Promise<RecommendationDetailDTO>;
+  actOnRecommendation(recId: string, body: RecActionRequest): Promise<RecommendationDTO>;
   getStoreInventory(storeId: string, query: InventoryQuery): Promise<StoreInventoryPage>;
   listStoreMovements(storeId: string, query: MovementQuery): Promise<CursorPage<InventoryMovementDTO>>;
   listStoreBatches(storeId: string, query: BatchQuery): Promise<Page<BatchDTO>>;
   listStoreExpiring(storeId: string, query: ExpiringQuery): Promise<Page<BatchDTO>>;
   listTransfers(query: TransferQuery): Promise<Page<TransferOrderDTO>>;
+  getTransfer(transferId: string): Promise<TransferOrderDTO>;
+  acceptTransfer(transferId: string): Promise<TransferOrderDTO>;
+  approveReleaseTransfer(transferId: string): Promise<TransferOrderDTO>;
+  rejectTransfer(transferId: string, reason: string): Promise<TransferOrderDTO>;
+  dispatchTransfer(transferId: string): Promise<TransferOrderDTO>;
+  receiveTransfer(transferId: string, receivedQty: number): Promise<TransferOrderDTO>;
   listPurchaseOrders(query: PurchaseOrderQuery): Promise<Page<PurchaseOrderDTO>>;
+  getPurchaseOrder(poId: string): Promise<PurchaseOrderDTO>;
+  createApproval(body: ApprovalRequest): Promise<ApprovalResult>;
+  receiveGoods(poId: string, body: GoodsReceiptRequest): Promise<PurchaseOrderDTO>;
+  resolvePurchaseOrder(poId: string, body: ResolvePORequest): Promise<PurchaseOrderDTO>;
+  closeShortPurchaseOrder(poId: string, body: CloseShortRequest): Promise<PurchaseOrderDTO>;
+  listNotifications(unreadOnly?: boolean): Promise<NotificationDTO[]>;
+  markNotificationRead(id: string): Promise<NotificationDTO>;
+  listAgentRuns(limit?: number): Promise<AgentRunDetailDTO[]>;
+  getAgentRun(runId: string): Promise<AgentRunDetailDTO>;
+  triggerNightlyRun(body?: TriggerRunRequest): Promise<{ message: string; run_id?: string; run_date: string }>;
 }
 
 export class ApiError extends Error {
@@ -96,6 +122,7 @@ export function createHttpClient(getToken: () => string | null, baseUrl = "/api/
     getDashboard: (query) => request("GET", `/dashboard${toQueryString(query)}`),
     listRecommendations: (query) => request("GET", `/recommendations${toQueryString(query)}`),
     getRecommendation: (recId) => request("GET", `/recommendations/${encodeURIComponent(recId)}`),
+    actOnRecommendation: (recId, body) => request("POST", `/recommendations/${encodeURIComponent(recId)}/action`, body),
     getStoreInventory: (storeId, query) =>
       request("GET", `/stores/${encodeURIComponent(storeId)}/inventory${toQueryString(query)}`),
     listStoreMovements: (storeId, query) =>
@@ -105,6 +132,27 @@ export function createHttpClient(getToken: () => string | null, baseUrl = "/api/
     listStoreExpiring: (storeId, query) =>
       request("GET", `/stores/${encodeURIComponent(storeId)}/inventory/expiring${toQueryString(query)}`),
     listTransfers: (query) => request("GET", `/transfers${toQueryString(query)}`),
+    getTransfer: (transferId) => request("GET", `/transfers/${encodeURIComponent(transferId)}`),
+    acceptTransfer: (transferId) => request("POST", `/transfers/${encodeURIComponent(transferId)}/accept`),
+    approveReleaseTransfer: (transferId) =>
+      request("POST", `/transfers/${encodeURIComponent(transferId)}/approve-release`),
+    rejectTransfer: (transferId, reason) =>
+      request("POST", `/transfers/${encodeURIComponent(transferId)}/reject`, { reason }),
+    dispatchTransfer: (transferId) => request("POST", `/transfers/${encodeURIComponent(transferId)}/dispatch`),
+    receiveTransfer: (transferId, receivedQty) =>
+      request("POST", `/transfers/${encodeURIComponent(transferId)}/receive`, { received_qty: receivedQty }),
     listPurchaseOrders: (query) => request("GET", `/purchase-orders${toQueryString(query)}`),
+    getPurchaseOrder: (poId) => request("GET", `/purchase-orders/${encodeURIComponent(poId)}`),
+    createApproval: (body) => request("POST", "/approvals", body),
+    receiveGoods: (poId, body) => request("POST", `/purchase-orders/${encodeURIComponent(poId)}/receipts`, body),
+    resolvePurchaseOrder: (poId, body) => request("POST", `/purchase-orders/${encodeURIComponent(poId)}/resolve`, body),
+    closeShortPurchaseOrder: (poId, body) =>
+      request("POST", `/purchase-orders/${encodeURIComponent(poId)}/close-short`, body),
+    listNotifications: (unreadOnly) =>
+      request("GET", `/notifications${toQueryString(unreadOnly ? { unread: true } : undefined)}`),
+    markNotificationRead: (id) => request("POST", `/notifications/${encodeURIComponent(id)}/read`),
+    listAgentRuns: (limit) => request("GET", `/agent-runs${toQueryString(limit ? { limit } : undefined)}`),
+    getAgentRun: (runId) => request("GET", `/agent-runs/${encodeURIComponent(runId)}`),
+    triggerNightlyRun: (body) => request("POST", "/admin/runs", body ?? {}),
   };
 }

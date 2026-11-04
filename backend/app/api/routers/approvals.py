@@ -19,3 +19,4 @@ async def create_approval(
     """Decides line-level L1 or PO-level L2 purchase order approval (SD-10)."""
     service = ApprovalService()
     return await service.decide(session, body, current_user)
+

@@ -54,6 +54,16 @@ export type POLineDTO = Schemas["POLineDTO"];
 export type POStatus = PurchaseOrderDTO["status"];
 export type LineStatus = POLineDTO["line_status"];
 
+export type ApprovalRequest = Schemas["ApprovalRequest"];
+export type ApprovalResult = Schemas["ApprovalResult"];
+export type GoodsReceiptRequest = Schemas["GoodsReceiptRequest"];
+export type ResolvePORequest = Schemas["ResolvePORequest"];
+export type CloseShortRequest = Schemas["CloseShortRequest"];
+export type RecActionRequest = Schemas["RecActionRequest"];
+export type AgentRunDetailDTO = Schemas["AgentRunDetailDTO"];
+export type TriggerRunRequest = Schemas["TriggerRunRequest"];
+export type NotificationDTO = Schemas["NotificationDTO"];
+
 /** Page[T] (backend generic) — derived from a generated page type, with the item type swapped in. */
 export type Page<T> = Omit<Schemas["Page_RecommendationDTO_"], "items"> & { items: T[] };
 /** CursorPage[T] (D-37) — keyset-paged ledgers: no total, `next_cursor` is null on the last page. */

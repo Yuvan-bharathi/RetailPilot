@@ -5,12 +5,19 @@ import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation, typ
 import { api, ApiError, tokenStore, USE_MOCKS } from "../api";
 import type { ApiClient } from "../api/client";
 import { AppShell } from "../components/AppShell";
+import { ApprovalsPage } from "../pages/ApprovalsPage";
 import { ComponentsPage } from "../pages/ComponentsPage";
+import { DashboardPage } from "../pages/DashboardPage";
+import { GoodsReceiptPage } from "../pages/GoodsReceiptPage";
 import { InventoryPage } from "../pages/InventoryPage";
 import { LoginPage } from "../pages/LoginPage";
+import { MonitoringPage } from "../pages/MonitoringPage";
+import { PurchaseOrdersPage } from "../pages/PurchaseOrdersPage";
 import { RecommendationDetailPage } from "../pages/RecommendationDetailPage";
 import { RecommendationsPage } from "../pages/RecommendationsPage";
 import { ForbiddenPage, NotFoundPage, PlaceholderPage } from "../pages/SimplePages";
+import { StoresPage } from "../pages/StoresPage";
+import { TransfersPage } from "../pages/TransfersPage";
 import { ApiProvider } from "./ApiContext";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { canAccess, NAV_ITEMS } from "./nav";
@@ -46,10 +53,17 @@ function Placeholder() {
   return <PlaceholderPage title={(user && item?.label[user.role]) ?? "Coming soon"} />;
 }
 
-/** Screens built so far (Phase 8a: read-only inventory and recommendations); the rest are placeholders. */
+/** Built screens wired into navigation routes. */
 const BUILT_PAGES: Record<string, ReactNode> = {
+  "/": <DashboardPage />,
+  "/stores": <StoresPage />,
   "/inventory": <InventoryPage />,
   "/recommendations": <RecommendationsPage />,
+  "/transfers": <TransfersPage />,
+  "/purchase-orders": <PurchaseOrdersPage />,
+  "/approvals": <ApprovalsPage />,
+  "/goods-receipt": <GoodsReceiptPage />,
+  "/monitoring": <MonitoringPage />,
 };
 
 // eslint-disable-next-line react-refresh/only-export-components

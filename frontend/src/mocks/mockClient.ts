@@ -285,5 +285,131 @@ export function createMockClient(
         .map((po) => scopePurchaseOrder(po, store));
       return applyPage(rows, query, (po) => po.supplier.name);
     },
+    async getPurchaseOrder(poId) {
+      await wait();
+      const po = data.purchase_orders.find((p) => p.po_id === poId);
+      if (!po) throw new ApiError(404, "NOT_FOUND", "Purchase order not found");
+      const user = currentUser();
+      return scopePurchaseOrder(po, user.role === "STORE_SUPERVISOR" ? user.store_id : null);
+    },
+    async createApproval(body) {
+      await wait();
+      return {
+        po_id: body.entity_id,
+        status: body.decision === "APPROVED" ? "APPROVED" : "REJECTED",
+        approval_id: "00000000-0000-0000-0000-000000000001",
+      };
+    },
+    async getTransfer(transferId) {
+      await wait();
+      const t = data.transfers.find((tr) => tr.transfer_id === transferId);
+      if (!t) throw new ApiError(404, "NOT_FOUND", "Transfer not found");
+      return t;
+    },
+    async acceptTransfer(transferId) {
+      await wait();
+      const t = data.transfers.find((tr) => tr.transfer_id === transferId);
+      if (!t) throw new ApiError(404, "NOT_FOUND", "Transfer not found");
+      t.status = "DEST_ACCEPTED";
+      return t;
+    },
+    async approveReleaseTransfer(transferId) {
+      await wait();
+      const t = data.transfers.find((tr) => tr.transfer_id === transferId);
+      if (!t) throw new ApiError(404, "NOT_FOUND", "Transfer not found");
+      t.status = "DONOR_APPROVED";
+      return t;
+    },
+    async rejectTransfer(transferId) {
+      await wait();
+      const t = data.transfers.find((tr) => tr.transfer_id === transferId);
+      if (!t) throw new ApiError(404, "NOT_FOUND", "Transfer not found");
+      t.status = "REJECTED";
+      return t;
+    },
+    async dispatchTransfer(transferId) {
+      await wait();
+      const t = data.transfers.find((tr) => tr.transfer_id === transferId);
+      if (!t) throw new ApiError(404, "NOT_FOUND", "Transfer not found");
+      t.status = "DISPATCHED";
+      return t;
+    },
+    async receiveTransfer(transferId, receivedQty) {
+      await wait();
+      const t = data.transfers.find((tr) => tr.transfer_id === transferId);
+      if (!t) throw new ApiError(404, "NOT_FOUND", "Transfer not found");
+      t.status = "RECEIVED";
+      t.received_qty = receivedQty;
+      return t;
+    },
+    async receiveGoods(poId) {
+      await wait();
+      const po = data.purchase_orders.find((p) => p.po_id === poId);
+      if (!po) throw new ApiError(404, "NOT_FOUND", "Purchase order not found");
+      po.status = "RECEIVED";
+      return po;
+    },
+    async resolvePurchaseOrder(poId, body) {
+      await wait();
+      const po = data.purchase_orders.find((p) => p.po_id === poId);
+      if (!po) throw new ApiError(404, "NOT_FOUND", "Purchase order not found");
+      po.status = body.decision === "APPROVE" ? "PENDING_L1" : "REJECTED";
+      return po;
+    },
+    async closeShortPurchaseOrder(poId) {
+      await wait();
+      const po = data.purchase_orders.find((p) => p.po_id === poId);
+      if (!po) throw new ApiError(404, "NOT_FOUND", "Purchase order not found");
+      po.status = "RECEIVED";
+      return po;
+    },
+    async actOnRecommendation(recId, body) {
+      await wait();
+      const rec = data.recommendations.find((r) => r.rec_id === recId);
+      if (!rec) throw new ApiError(404, "NOT_FOUND", "Recommendation not found");
+      rec.status = body.action === "ACCEPT" ? "ACCEPTED" : body.action === "REJECT" ? "REJECTED" : "EDITED";
+      return rec;
+    },
+    async listNotifications() {
+      await wait();
+      return [];
+    },
+    async markNotificationRead(id) {
+      await wait();
+      return {
+        notification_id: id,
+        message: "Read",
+        read_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+    },
+    async listAgentRuns() {
+      await wait();
+      return [];
+    },
+    async getAgentRun(runId) {
+      await wait();
+      return {
+        run_id: runId,
+        parent_run_id: null,
+        agent_name: "nightly_orchestrator",
+        run_date: new Date().toISOString().slice(0, 10),
+        status: "SUCCESS",
+        started_at: new Date().toISOString(),
+        finished_at: new Date().toISOString(),
+        input_ref: {},
+        output_summary: "Completed successfully",
+        error: null,
+        tool_calls: [],
+        llm_usages: [],
+      };
+    },
+    async triggerNightlyRun() {
+      await wait();
+      return {
+        message: "Nightly run triggered",
+        run_date: new Date().toISOString().slice(0, 10),
+      };
+    },
   };
 }

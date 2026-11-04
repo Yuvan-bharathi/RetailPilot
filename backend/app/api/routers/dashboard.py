@@ -24,3 +24,4 @@ async def get_dashboard(
     scoped_store_id = resolve_store_id(current_user, store_id)
     service = DashboardService()
     return await service.get_summary(session, scoped_store_id, period)
+

@@ -107,3 +107,48 @@ export function usePurchaseOrders(query: PurchaseOrderQuery) {
     placeholderData: keepPreviousData,
   });
 }
+
+export function usePurchaseOrder(poId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["purchase-order", poId],
+    queryFn: () => api.getPurchaseOrder(poId as string),
+    enabled: poId !== null,
+  });
+}
+
+export function useTransfer(transferId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["transfer", transferId],
+    queryFn: () => api.getTransfer(transferId as string),
+    enabled: transferId !== null,
+  });
+}
+
+export function useNotifications(unreadOnly = false) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["notifications", unreadOnly],
+    queryFn: () => api.listNotifications(unreadOnly),
+    staleTime: 30_000,
+  });
+}
+
+export function useAgentRuns(limit = 20) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["agent-runs", limit],
+    queryFn: () => api.listAgentRuns(limit),
+    staleTime: 10_000,
+  });
+}
+
+export function useAgentRun(runId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["agent-run", runId],
+    queryFn: () => api.getAgentRun(runId as string),
+    enabled: runId !== null,
+  });
+}
