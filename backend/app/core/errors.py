@@ -33,6 +33,7 @@ class ErrorCode(StrEnum):
     # Not listed in spec §5; used only for statuses the spec does not cover.
     UNAUTHORIZED = "UNAUTHORIZED"
     INTERNAL = "INTERNAL"
+    NOT_IMPLEMENTED = "NOT_IMPLEMENTED"  # contract stubs until Phase 6 (D-32)
 
 
 class ErrorDetail(BaseModel):
@@ -101,6 +102,14 @@ class Unauthorized(AppError):
     code = ErrorCode.UNAUTHORIZED
     status_code = status.HTTP_401_UNAUTHORIZED
     default_message = "Not authenticated"
+
+
+class NotImplementedYet(AppError):
+    """501 — the endpoint is part of the API contract but not implemented yet (D-32)."""
+
+    code = ErrorCode.NOT_IMPLEMENTED
+    status_code = status.HTTP_501_NOT_IMPLEMENTED
+    default_message = "Not implemented yet (planned for Phase 6)"
 
 
 _STATUS_TO_CODE: dict[int, ErrorCode] = {

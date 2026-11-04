@@ -1,0 +1,34 @@
+/*
+ * RetailPilot AI design tokens — Design System v1.0 (frozen), docs/03-design-system.md §1.
+ * The ONLY file allowed to contain hex colour values (enforced by `npm run check:no-hex`).
+ * Do not change values without approval (contrast proposal: docs/notes/contrast-proposal.md).
+ */
+:root {
+  /* Brand */
+  --brand-primary: #873F52; --brand-hover: #6F3042; --brand-soft: #F3E9EC; --brand-muted: #D8BFC5;
+  /* Neutral */
+  --app-bg: #F7F6F5; --surface: #FFFFFF; --sidebar-bg: #F1EFEE; --surface-elevated: #FCFBFA;
+  --border: #E8E3E2; --divider: #EEEAE9;
+  /* Text */
+  --text-primary: #332D30; --text-secondary: #746A6D; --text-muted: #958B8D; --text-disabled: #C8C1C2;
+  /* Supporting accents */
+  --accent-blue: #7892A6; --accent-lavender: #A096B5; --accent-sand: #C5A779;
+  --accent-sage: #8DAE9A; --accent-stone: #A5A0A0;
+  /* Semantic status */
+  --success-bg: #E8F2EC; --success-text: #397653;
+  --warning-bg: #FBF1DF; --warning-text: #986F28;
+  --attention-bg: #F8EDE5; --attention-text: #A7653D;
+  --danger-bg: #F7E8E8; --danger-text: #A64F52;
+  --info-bg: #EAF0F5; --info-text: #56758F;
+  --neutral-bg: #EFEEED; --neutral-text: #706A6A;
+  /* Typography */
+  --font-family: "Inter", sans-serif;
+  /* Layout */
+  --sidebar-width: 248px; --sidebar-collapsed-width: 72px; --header-height: 64px;
+  --page-padding: 24px; --content-gap: 20px;
+  /* Components */
+  --radius-card: 10px; --radius-input: 7px; --radius-button: 7px; --radius-modal: 12px;
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(51, 45, 48, 0.04);
+  --shadow-dropdown: 0 8px 24px rgba(51, 45, 48, 0.10);
+}

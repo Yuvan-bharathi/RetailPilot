@@ -12,7 +12,211 @@ export interface paths {
             cookie?: never;
         };
         /** Get Health */
-        get: operations["get_health_health_get"];
+        get: operations["get_health"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Me */
+        get: operations["get_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Stores */
+        get: operations["list_stores"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Latest Run */
+        get: operations["get_latest_run"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Dashboard */
+        get: operations["get_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Recommendations */
+        get: operations["list_recommendations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recommendations/{rec_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Recommendation */
+        get: operations["get_recommendation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{store_id}/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Store Inventory */
+        get: operations["get_store_inventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Transfers */
+        get: operations["list_transfers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfers/{transfer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Transfer */
+        get: operations["get_transfer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Purchase Orders */
+        get: operations["list_purchase_orders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{po_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Purchase Order */
+        get: operations["get_purchase_order"];
         put?: never;
         post?: never;
         delete?: never;
@@ -25,6 +229,69 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * Counterpart
+         * @description Another store as a Store Supervisor may see it: name + offered/requested quantity only.
+         */
+        Counterpart: {
+            store: components["schemas"]["StoreRef"];
+            /** Qty */
+            qty: number;
+        };
+        /** DashboardSummary */
+        DashboardSummary: {
+            /** @description null = all stores (Super Admin) */
+            store: components["schemas"]["StoreRef"] | null;
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "TODAY" | "LAST_7_DAYS" | "LAST_28_DAYS" | "MONTH_TO_DATE";
+            /**
+             * Revenue
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            revenue: string;
+            /**
+             * Gross Profit
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            gross_profit: string;
+            /** Margin Pct */
+            margin_pct: number;
+            /** Stockout Rate */
+            stockout_rate: number;
+            /**
+             * Lost Revenue
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            lost_revenue: string;
+            /**
+             * Lost Profit
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            lost_profit: string;
+            /**
+             * Inventory Value
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            inventory_value: string;
+            /**
+             * Near Expiry Value
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            near_expiry_value: string;
+            /** Pending Recommendations */
+            pending_recommendations: number;
+            /** Pending Purchase Orders */
+            pending_purchase_orders: number;
+            /** Active Transfers */
+            active_transfers: number;
+            /** Fast Movers */
+            fast_movers: components["schemas"]["MoverDTO"][];
+            /** Slow Movers */
+            slow_movers: components["schemas"]["MoverDTO"][];
+        };
         /** ErrorBody */
         ErrorBody: {
             code: components["schemas"]["ErrorCode"];
@@ -37,7 +304,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "VALIDATION" | "UNAUTHORIZED" | "INTERNAL";
+        ErrorCode: "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "VALIDATION" | "UNAUTHORIZED" | "INTERNAL" | "NOT_IMPLEMENTED";
         /** ErrorDetail */
         ErrorDetail: {
             /** Field */
@@ -73,6 +340,424 @@ export interface components {
             version: string;
             checks: components["schemas"]["HealthChecks"];
         };
+        /** InventoryRowDTO */
+        InventoryRowDTO: {
+            product: components["schemas"]["ProductRef"];
+            /** Shelf Qty */
+            shelf_qty: number;
+            /** Shelf Min */
+            shelf_min: number;
+            /** Backroom Qty */
+            backroom_qty: number;
+            /** Incoming */
+            incoming: number;
+            /** Reserved */
+            reserved: number;
+            /** Available */
+            available: number;
+            /** Own Requirement */
+            own_requirement: number;
+            /**
+             * Surplus Or Shortage
+             * @description available − own requirement (negative = shortage)
+             */
+            surplus_or_shortage: number;
+            /** Days Of Cover */
+            days_of_cover: number;
+            /**
+             * Stockout Risk
+             * @enum {string}
+             */
+            stockout_risk: "HIGH" | "MEDIUM" | "LOW";
+            /** Near Expiry Qty */
+            near_expiry_qty: number;
+            /** Pending Transfer In */
+            pending_transfer_in: number;
+            /** Pending Transfer Out */
+            pending_transfer_out: number;
+            /** Refill From Backroom */
+            refill_from_backroom: boolean;
+        };
+        /** LoginRequest */
+        LoginRequest: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+        };
+        /** MeDTO */
+        MeDTO: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "STORE_SUPERVISOR" | "SUPER_ADMIN";
+            /** @description The supervisor's own store; null for Super Admin */
+            store: components["schemas"]["StoreRef"] | null;
+        };
+        /** MoverDTO */
+        MoverDTO: {
+            product: components["schemas"]["ProductRef"];
+            /** Units */
+            units: number;
+            /**
+             * Revenue
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            revenue: string;
+        };
+        /** POLineDTO */
+        POLineDTO: {
+            /**
+             * Po Line Id
+             * Format: uuid
+             */
+            po_line_id: string;
+            store: components["schemas"]["StoreRef"];
+            product: components["schemas"]["ProductRef"];
+            /** Qty */
+            qty: number;
+            /**
+             * Unit Price
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            unit_price: string;
+            /**
+             * Line Value
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            line_value: string;
+            /**
+             * Line Status
+             * @enum {string}
+             */
+            line_status: "PENDING" | "APPROVED" | "EDITED" | "REJECTED" | "EXPIRED" | "ESCALATED" | "SUPERSEDED";
+            /**
+             * Received Qty
+             * @default 0
+             */
+            received_qty: number;
+        };
+        /** Page[InventoryRowDTO] */
+        Page_InventoryRowDTO_: {
+            /** Items */
+            items: components["schemas"]["InventoryRowDTO"][];
+            /**
+             * Total
+             * @description Total matching rows across all pages
+             */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** Page[PurchaseOrderDTO] */
+        Page_PurchaseOrderDTO_: {
+            /** Items */
+            items: components["schemas"]["PurchaseOrderDTO"][];
+            /**
+             * Total
+             * @description Total matching rows across all pages
+             */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** Page[RecommendationDTO] */
+        Page_RecommendationDTO_: {
+            /** Items */
+            items: components["schemas"]["RecommendationDTO"][];
+            /**
+             * Total
+             * @description Total matching rows across all pages
+             */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** Page[TransferOrderDTO] */
+        Page_TransferOrderDTO_: {
+            /** Items */
+            items: components["schemas"]["TransferOrderDTO"][];
+            /**
+             * Total
+             * @description Total matching rows across all pages
+             */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** ProductRef */
+        ProductRef: {
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Sku */
+            sku: string;
+            /** Name */
+            name: string;
+            /** Category */
+            category: string;
+        };
+        /** PurchaseOrderDTO */
+        PurchaseOrderDTO: {
+            /**
+             * Po Id
+             * Format: uuid
+             */
+            po_id: string;
+            supplier: components["schemas"]["SupplierRef"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "DRAFT" | "NEEDS_REVIEW" | "PENDING_L1" | "PENDING_L2" | "APPROVED" | "REJECTED" | "SPLIT" | "SUBMITTED" | "RECEIVED" | "SUPERSEDED";
+            /**
+             * Required Level
+             * @enum {string}
+             */
+            required_level: "L1" | "L2";
+            /**
+             * Total Value
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            total_value: string;
+            /** L1 Deadline */
+            l1_deadline: string | null;
+            /** Parent Po Id */
+            parent_po_id: string | null;
+            /** Flags */
+            flags: string[];
+            /**
+             * Lines
+             * @description Lines the user may see (a supervisor: own store only)
+             */
+            lines: components["schemas"]["POLineDTO"][];
+            /**
+             * Other Store Lines
+             * @description Other stores on a consolidated PO: name + total qty only
+             */
+            other_store_lines?: components["schemas"]["Counterpart"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** RecommendationDTO */
+        RecommendationDTO: {
+            /**
+             * Rec Id
+             * Format: uuid
+             */
+            rec_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            store: components["schemas"]["StoreRef"];
+            product: components["schemas"]["ProductRef"];
+            /**
+             * Rec Type
+             * @enum {string}
+             */
+            rec_type: "REORDER" | "TRANSFER" | "CO_REPLENISH" | "MARKDOWN" | "EXPIRY_ALERT" | "ASSORTMENT_GAP";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "PENDING" | "ACCEPTED" | "EDITED" | "REJECTED" | "NEEDS_REVIEW" | "SUPERSEDED";
+            /**
+             * Priority
+             * @enum {string}
+             */
+            priority: "HIGH" | "NORMAL";
+            /** Qty */
+            qty: number;
+            /** Lost Revenue */
+            lost_revenue?: string | null;
+            /** Explanation */
+            explanation?: string | null;
+            /** @description Other store of a transfer (donor or destination): name + quantity only */
+            counterpart?: components["schemas"]["Counterpart"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** RecommendationDetailDTO */
+        RecommendationDetailDTO: {
+            recommendation: components["schemas"]["RecommendationDTO"];
+            evidence: components["schemas"]["TransferEvidenceDTO"] | null;
+            /**
+             * Reason
+             * @description NO_SURPLUS_IN_ANY_STORE, PARTIAL_SURPLUS, BUDGET, …
+             */
+            reason?: string | null;
+        };
+        /**
+         * RunInfoDTO
+         * @description Latest successful nightly run — the 'Data as of last run' in the header.
+         */
+        RunInfoDTO: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /**
+             * Run Date
+             * Format: date
+             */
+            run_date: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "SUCCESS" | "PARTIAL";
+            /**
+             * Finished At
+             * Format: date-time
+             */
+            finished_at: string;
+        };
+        /** StoreDTO */
+        StoreDTO: {
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Region */
+            region: string;
+            /** Store Type */
+            store_type: string;
+        };
+        /** StoreRef */
+        StoreRef: {
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Name */
+            name: string;
+        };
+        /** SupplierRef */
+        SupplierRef: {
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+            /** Name */
+            name: string;
+        };
+        /** TokenResponse */
+        TokenResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             * @constant
+             */
+            token_type: "bearer";
+            /** Expires In */
+            expires_in: number;
+        };
+        /**
+         * TransferEvidenceDTO
+         * @description Evidence panel of a transfer / PO-remainder recommendation (design doc §6).
+         *
+         *     donor_surplus and donor_protected_requirement describe ANOTHER store's stock: Super Admin only — null for
+         *     Store Supervisors (CLAUDE.md rule 10; they see the donor as `counterpart` name + offered qty).
+         */
+        TransferEvidenceDTO: {
+            /** Destination Shortage */
+            destination_shortage: number;
+            donor: components["schemas"]["Counterpart"] | null;
+            /**
+             * Donor Surplus
+             * @description Super Admin only
+             */
+            donor_surplus?: number | null;
+            /**
+             * Donor Protected Requirement
+             * @description Super Admin only
+             */
+            donor_protected_requirement?: number | null;
+            /** Transfer Qty */
+            transfer_qty: number;
+            /** Po Remainder Qty */
+            po_remainder_qty: number;
+            /** Transfer Cost */
+            transfer_cost: string | null;
+            /** Po Incremental Cost */
+            po_incremental_cost: string | null;
+            /** Expected Delivery */
+            expected_delivery: string | null;
+            /** Days Of Cover Before */
+            days_of_cover_before: number;
+            /** Days Of Cover After */
+            days_of_cover_after: number;
+        };
+        /** TransferOrderDTO */
+        TransferOrderDTO: {
+            /**
+             * Transfer Id
+             * Format: uuid
+             */
+            transfer_id: string;
+            product: components["schemas"]["ProductRef"];
+            from_store: components["schemas"]["StoreRef"];
+            to_store: components["schemas"]["StoreRef"];
+            /** Qty */
+            qty: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "PROPOSED" | "DEST_ACCEPTED" | "DONOR_APPROVED" | "DISPATCHED" | "RECEIVED" | "REJECTED" | "CANCELLED" | "SUPERSEDED";
+            /** Is Expiry Aware */
+            is_expiry_aware: boolean;
+            /** Transit Days */
+            transit_days: number;
+            /**
+             * Transfer Cost
+             * @description Incremental transfer cost; visible to both roles (not another store's stock data)
+             */
+            transfer_cost?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Received Qty */
+            received_qty?: number | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -82,7 +767,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    get_health_health_get: {
+    get_health: {
         parameters: {
             query?: never;
             header?: never;
@@ -98,6 +783,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Forbidden */
@@ -129,6 +823,947 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_stores: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreDTO"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_latest_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunInfoDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_dashboard: {
+        parameters: {
+            query?: {
+                store_id?: string | null;
+                period?: "TODAY" | "LAST_7_DAYS" | "LAST_28_DAYS" | "MONTH_TO_DATE";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_recommendations: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                sort?: string | null;
+                q?: string | null;
+                store_id?: string | null;
+                status?: ("PENDING" | "ACCEPTED" | "EDITED" | "REJECTED" | "NEEDS_REVIEW" | "SUPERSEDED") | null;
+                type?: ("REORDER" | "TRANSFER" | "CO_REPLENISH" | "MARKDOWN" | "EXPIRY_ALERT" | "ASSORTMENT_GAP") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RecommendationDTO_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_recommendation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rec_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationDetailDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_store_inventory: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                sort?: string | null;
+                q?: string | null;
+                category?: string | null;
+                risk?: ("HIGH" | "MEDIUM" | "LOW") | null;
+            };
+            header?: never;
+            path: {
+                store_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_InventoryRowDTO_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_transfers: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                sort?: string | null;
+                q?: string | null;
+                store_id?: string | null;
+                status?: ("PROPOSED" | "DEST_ACCEPTED" | "DONOR_APPROVED" | "DISPATCHED" | "RECEIVED" | "REJECTED" | "CANCELLED" | "SUPERSEDED") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TransferOrderDTO_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_transfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_purchase_orders: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                sort?: string | null;
+                q?: string | null;
+                store_id?: string | null;
+                status?: ("DRAFT" | "NEEDS_REVIEW" | "PENDING_L1" | "PENDING_L2" | "APPROVED" | "REJECTED" | "SPLIT" | "SUBMITTED" | "RECEIVED" | "SUPERSEDED") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_PurchaseOrderDTO_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_purchase_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                po_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };

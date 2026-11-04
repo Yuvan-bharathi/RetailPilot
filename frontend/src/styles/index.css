@@ -1,7 +1,80 @@
+@import "@fontsource-variable/inter";
 @import "tailwindcss";
+@import "./tokens.css";
 
 /*
- * Phase 7 adds tokens.css (docs/03-design-system.md §1) and maps the tokens into Tailwind here with an
- * @theme block, e.g.  @theme { --color-brand: var(--brand-primary); }  (decision D-11).
- * No hex values outside tokens.css.
+ * Tokens → Tailwind utilities (Tailwind v4, decision D-11). `inline` makes utilities use the token variables
+ * directly (bg-brand → background-color: var(--brand-primary)). No colour values here — only tokens.
  */
+@theme inline {
+  --font-sans: "Inter Variable", var(--font-family);
+
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-muted: var(--brand-muted);
+
+  --color-app: var(--app-bg);
+  --color-surface: var(--surface);
+  --color-sidebar: var(--sidebar-bg);
+  --color-elevated: var(--surface-elevated);
+  --color-border: var(--border);
+  --color-divider: var(--divider);
+
+  --color-ink: var(--text-primary);
+  --color-ink-secondary: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
+  --color-ink-disabled: var(--text-disabled);
+
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-lavender: var(--accent-lavender);
+  --color-accent-sand: var(--accent-sand);
+  --color-accent-sage: var(--accent-sage);
+  --color-accent-stone: var(--accent-stone);
+
+  --color-success-bg: var(--success-bg);
+  --color-success: var(--success-text);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning: var(--warning-text);
+  --color-attention-bg: var(--attention-bg);
+  --color-attention: var(--attention-text);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger: var(--danger-text);
+  --color-info-bg: var(--info-bg);
+  --color-info: var(--info-text);
+  --color-neutral-bg: var(--neutral-bg);
+  --color-neutral: var(--neutral-text);
+
+  --radius-card: var(--radius-card);
+  --radius-input: var(--radius-input);
+  --radius-button: var(--radius-button);
+  --radius-modal: var(--radius-modal);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-dropdown: var(--shadow-dropdown);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background-color: var(--app-bg);
+    color: var(--text-primary);
+    font-family: "Inter Variable", var(--font-family);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

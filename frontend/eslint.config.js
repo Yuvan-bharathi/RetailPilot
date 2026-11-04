@@ -19,5 +19,19 @@ export default defineConfig([
       ecmaVersion: 2022,
       globals: globals.browser,
     },
+    rules: {
+      // design doc §1: colours only via tokens (src/styles/tokens.css); see also `npm run check:no-hex`
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\\b/]",
+          message: "No hex colours in code — use a design token (Tailwind class or var(--token)).",
+        },
+        {
+          selector: "TemplateElement[value.raw=/#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\\b/]",
+          message: "No hex colours in code — use a design token (Tailwind class or var(--token)).",
+        },
+      ],
+    },
   },
 ]);

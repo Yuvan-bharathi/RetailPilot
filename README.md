@@ -33,7 +33,8 @@ npm run dev                                                  # http://localhost:
 | Celery worker + beat | `cd backend && uv run celery -A app.workers.celery_app worker -B -l info` |
 | Export OpenAPI spec | `cd backend && uv run python -m scripts.export_openapi ../frontend/openapi.json` |
 | Generate API types | `cd frontend && npm run gen:api` |
-| Frontend checks | `cd frontend && npm run lint && npm run typecheck && npm run build` |
+| Frontend checks | `cd frontend && npm run check && npm run build` (lint, typecheck, no-hex, API types, tests + axe) |
+| Design system demo | `cd frontend && npm run dev` → sign in (admin / sup.a / sup.b / sup.c, password `demo`) → `/components` |
 | Synthetic data (Phase 4+) | `uv run --project backend python -m data.synthetic.generate --scenarios all` (repo root) |
 | Pre-commit hooks | `uvx pre-commit install` |
 

@@ -148,11 +148,18 @@ Cross-store rule: a supervisor sees another store only as name + offered/request
 
 ## 5. API (FastAPI, prefix /api/v1, JWT bearer; all list endpoints paginated)
 
+Contract-first (D-32): every route below that is not built yet answers 501 `NOT_IMPLEMENTED` with the standard
+error body until its phase. List endpoints take `page` (≥ 1, default 1), `page_size` (1–200, default 25),
+`sort` (`field` / `-field`; `priority` and `stockout_risk` sort by rank) and `q`, and return
+`Page[T] = {items, total, page, page_size}`. Supervisor-facing DTOs show another store only as
+`Counterpart {store: {store_id, name}, qty}`; donor stock fields are Super Admin only.
+
 | Method & path | Handler → service | Diagram |
 |---|---|---|
 | POST /auth/login | issue JWT (seeded PoC users) | – |
 | GET /me | current user, role, store | – |
 | GET /stores | stores visible to the user (supervisor: own store only) | – |
+| GET /runs/latest | latest successful run for "Data as of last run" (both roles, D-32) | SD-01 |
 | GET /dashboard?store_id&period | DashboardService.get_summary | SD-11 |
 | GET /stores/{store_id}/inventory?category&status | StoreInventoryService.get_view (no aisle filter in PoC, D-10) | SD-15 |
 | GET /stores/{store_id}/inventory/movements?product_id&type&from&to | ledger tab | – |
@@ -173,7 +180,7 @@ Cross-store rule: a supervisor sees another store only as name + offered/request
 | GET/PUT /admin/business-rules | BusinessRuleRepo | – |
 | GET /stores/{store_id}/twin (later extension) | DigitalTwinService | SD-13 |
 
-Error body: `{"error": {"code": "CONFLICT|FORBIDDEN|NOT_FOUND|VALIDATION|UNAUTHORIZED|INTERNAL", "message": str, "details": []}}`
+Error body: `{"error": {"code": "CONFLICT|FORBIDDEN|NOT_FOUND|VALIDATION|UNAUTHORIZED|INTERNAL|NOT_IMPLEMENTED", "message": str, "details": []}}`
 — 409 / 403 / 404 / 422 as listed, plus `UNAUTHORIZED` (401, missing or invalid token) and `INTERNAL`
 (500, unhandled error, no internal details) (D-18). `details` items are `{"field": str|null, "message": str}`.
 

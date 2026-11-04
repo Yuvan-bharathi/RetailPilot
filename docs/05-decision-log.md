@@ -12,6 +12,8 @@ choose silently.
 | D-18 … D-26 | 2026-11-03 | Product owner (Phase 1 acceptance, Phase 3 approval) |
 | D-27 … D-29 | 2026-11-03 | Product owner (Phase 3 acceptance) |
 | D-30 | 2026-11-03 | Product owner (Phase 4a approval) |
+| D-31 | — | PROPOSED, awaiting approval (FEFO formula) |
+| D-32 | 2026-11-04 | Product owner (Phase 7 approval) + implementation choices to confirm |
 
 ---
 
@@ -308,3 +310,34 @@ actual FEFO write-offs are 11 / 16 / 21.
 **Proposal.** `qty_ahead += batch.qty − at_risk` (only the units that sell). Matches the simulator for every
 tested demand rate. Scenario 5 is unaffected (single batch). Until approved, the spec formula stays and the
 cross-check test is a strict xfail referencing this entry.
+
+---
+
+## D-32 Contract-first API, paging and store scoping in the DTOs (Phase 7)
+**Decision (approved).** The `/api/v1` request/response shapes are defined now as Pydantic DTOs
+(`app/domain/schemas/{common,dtos}.py`) and registered as routes that return **501 `NOT_IMPLEMENTED`** (standard
+error body) until Phase 6. The frontend generates its types from them (`npm run gen:api`) and runs on a typed mock
+client (`VITE_USE_MOCKS=true`). Two guards keep the contract in sync: backend test
+`tests/unit/test_contract.py::test_frontend_openapi_json_is_up_to_date` (openapi.json vs the FastAPI app) and
+`npm run check:api` (schema.d.ts vs openapi.json).
+- **Paging (approved).** Every list endpoint takes `page` (≥ 1, default 1), `page_size` (1–200, default 25),
+  `sort` (`field` or `-field`), `q` (free text) plus endpoint filters, and returns `Page[T]`
+  `{items, total, page, page_size}`. DataTable pages and sorts on the server.
+- **Store scoping in the DTOs (approved).** A Store Supervisor sees another store only as `Counterpart`
+  `{store: {store_id, name}, qty}`. DTOs forbid unknown fields. Fields that describe another store's stock are
+  nullable and filled for the Super Admin only: `TransferEvidenceDTO.donor_surplus`,
+  `.donor_protected_requirement`. A consolidated PO shows a supervisor only their own lines plus
+  `other_store_lines: [Counterpart]`. A supervisor asking for another store's data gets 403.
+
+**Implementation choices (to confirm).**
+- Design doc §6 lists "donor surplus" and "donor protected requirement" on the recommendation detail, while CLAUDE.md
+  rule 10 limits supervisors to name + quantity. Resolution: the rule wins for supervisors (fields null), the Super
+  Admin sees them.
+- Transfer cost and the transfer-vs-PO incremental cost are visible to **both** roles (they are not another store's
+  stock data, and §6 requires the comparison on the detail screen).
+- `sort` on `priority` and `stockout_risk` ranks by business meaning (HIGH > NORMAL; HIGH > MEDIUM > LOW), not
+  alphabetically; the Phase 6 queries must do the same.
+- New endpoint `GET /runs/latest` (RunInfoDTO) for "Data as of last run" — `GET /agent-runs` is Super Admin only.
+- New error code `NOT_IMPLEMENTED` (501) for the contract stubs; operation ids are handler names
+  (e.g. `list_recommendations`).
+**Changed.** Spec §5; backend `app/api/routers/contract.py`; frontend `src/api`, `src/mocks`.

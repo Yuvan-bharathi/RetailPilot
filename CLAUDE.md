@@ -92,7 +92,11 @@ infra/docker-compose.yml
   without it ruff falls back to its defaults; mypy already covers app/ and ../data via pyproject.toml)
 - Worker: `uv run celery -A app.workers.celery_app worker -B -l info`
 - Synthetic data (from the repo root): `uv run --project backend python -m data.synthetic.generate --scenarios all`
-- Frontend: `cd frontend && npm install && npm run dev` · types: `npm run gen:api` · checks: `npm run lint && npm run typecheck`
+- Frontend: `cd frontend && npm install && npm run dev` (mock API: `VITE_USE_MOCKS=true` in `.env.development`;
+  demo users admin / sup.a / sup.b / sup.c, password `demo`) · all checks: `npm run check`
+  (lint, typecheck, check:no-hex, check:api, vitest incl. axe) · build: `npm run build`
+- API contract: after changing a DTO/route run `cd backend && uv run python -m scripts.export_openapi ../frontend/openapi.json`
+  then `cd ../frontend && npm run gen:api` — both sides are checked (test_contract.py, check:api)
 
 ## How to work with me
 - Start each phase in plan mode: read the listed docs, propose a plan and file list, wait for approval.
