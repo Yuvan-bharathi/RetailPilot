@@ -950,6 +950,139 @@
         }
       }
     },
+    "/api/v1/dashboard/insights": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Dashboard Insights",
+        "description": "Series and breakdowns behind the dashboard widgets (D-46). Store supervisors are scoped to their store.",
+        "operationId": "get_dashboard_insights",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Store Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "TODAY",
+                "LAST_7_DAYS",
+                "LAST_28_DAYS",
+                "MONTH_TO_DATE"
+              ],
+              "type": "string",
+              "default": "LAST_28_DAYS",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardInsights"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
     "/api/v1/recommendations": {
       "get": {
         "tags": [
@@ -4494,6 +4627,27 @@
         "title": "BatchRiskRef",
         "description": "A batch at risk of expiring before it sells (FEFO, D-31)."
       },
+      "CategoryValueDTO": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "value": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Value",
+            "description": "On-hand units × cost price"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "category",
+          "value"
+        ],
+        "title": "CategoryValueDTO"
+      },
       "CloseShortRequest": {
         "properties": {
           "reason": {
@@ -4627,6 +4781,124 @@
           "page_size"
         ],
         "title": "CursorPage[InventoryMovementDTO]"
+      },
+      "DashboardInsights": {
+        "properties": {
+          "store": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoreRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "TODAY",
+              "LAST_7_DAYS",
+              "LAST_28_DAYS",
+              "MONTH_TO_DATE"
+            ],
+            "title": "Period"
+          },
+          "data_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of",
+            "description": "Run date of the latest successful nightly run"
+          },
+          "forecast_units_per_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Units Per Day",
+            "description": "Σ daily demand of the latest run's forecasts"
+          },
+          "sales_trend": {
+            "items": {
+              "$ref": "#/components/schemas/SalesDayDTO"
+            },
+            "type": "array",
+            "title": "Sales Trend"
+          },
+          "inventory_by_category": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryValueDTO"
+            },
+            "type": "array",
+            "title": "Inventory By Category"
+          },
+          "shelf_value": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Shelf Value",
+            "description": "Amount in ₹ (INR), 2 decimals"
+          },
+          "backroom_value": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Backroom Value",
+            "description": "Amount in ₹ (INR), 2 decimals"
+          },
+          "stock_health": {
+            "$ref": "#/components/schemas/StockHealthDTO"
+          },
+          "expiry_next_14_days": {
+            "items": {
+              "$ref": "#/components/schemas/ExpiryDayDTO"
+            },
+            "type": "array",
+            "title": "Expiry Next 14 Days"
+          },
+          "po_status": {
+            "items": {
+              "$ref": "#/components/schemas/POStatusCountDTO"
+            },
+            "type": "array",
+            "title": "Po Status"
+          },
+          "store_performance": {
+            "items": {
+              "$ref": "#/components/schemas/StorePerformanceDTO"
+            },
+            "type": "array",
+            "title": "Store Performance",
+            "description": "Super Admin, all stores only; else empty"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "store",
+          "period",
+          "data_as_of",
+          "forecast_units_per_day",
+          "sales_trend",
+          "inventory_by_category",
+          "shelf_value",
+          "backroom_value",
+          "stock_health",
+          "expiry_next_14_days",
+          "po_status",
+          "store_performance"
+        ],
+        "title": "DashboardInsights",
+        "description": "Series and breakdowns behind the dashboard widgets (D-46). Every list may be empty: the UI shows an empty\nstate, never sample figures."
       },
       "DashboardSummary": {
         "properties": {
@@ -4815,6 +5087,33 @@
           "error"
         ],
         "title": "ErrorResponse"
+      },
+      "ExpiryDayDTO": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "qty": {
+            "type": "integer",
+            "title": "Qty"
+          },
+          "value": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Value",
+            "description": "Amount in ₹ (INR), 2 decimals"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "day",
+          "qty",
+          "value"
+        ],
+        "title": "ExpiryDayDTO"
       },
       "ExpiryEvidence": {
         "properties": {
@@ -5457,6 +5756,44 @@
           "qty"
         ],
         "title": "POLineEdit"
+      },
+      "POStatusCountDTO": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "NEEDS_REVIEW",
+              "PENDING_L1",
+              "PENDING_L2",
+              "APPROVED",
+              "REJECTED",
+              "SPLIT",
+              "SUBMITTED",
+              "RECEIVED",
+              "SUPERSEDED"
+            ],
+            "title": "Status"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "value": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Value",
+            "description": "Amount in ₹ (INR), 2 decimals"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "count",
+          "value"
+        ],
+        "title": "POStatusCountDTO"
       },
       "Page_BatchDTO_": {
         "properties": {
@@ -6190,6 +6527,64 @@
         "title": "RunInfoDTO",
         "description": "Latest successful nightly run — the 'Data as of last run' in the header."
       },
+      "SalesDayDTO": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "revenue": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Revenue",
+            "description": "Amount in ₹ (INR), 2 decimals"
+          },
+          "units": {
+            "type": "integer",
+            "title": "Units"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "day",
+          "revenue",
+          "units"
+        ],
+        "title": "SalesDayDTO"
+      },
+      "StockHealthDTO": {
+        "properties": {
+          "high_risk": {
+            "type": "integer",
+            "title": "High Risk"
+          },
+          "medium_risk": {
+            "type": "integer",
+            "title": "Medium Risk"
+          },
+          "low_risk": {
+            "type": "integer",
+            "title": "Low Risk"
+          },
+          "out_of_stock": {
+            "type": "integer",
+            "title": "Out Of Stock",
+            "description": "Listed store-SKUs with nothing on hand"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "high_risk",
+          "medium_risk",
+          "low_risk",
+          "out_of_stock"
+        ],
+        "title": "StockHealthDTO",
+        "description": "Listed store-SKUs by stock-out risk (D-46): days of cover vs lead time and lead + review."
+      },
       "StoreDTO": {
         "properties": {
           "store_id": {
@@ -6270,6 +6665,36 @@
         ],
         "title": "StoreInventoryPage",
         "description": "Page of inventory rows plus store-wide counts for the summary chips (SD-15 totals)."
+      },
+      "StorePerformanceDTO": {
+        "properties": {
+          "store": {
+            "$ref": "#/components/schemas/StoreRef"
+          },
+          "revenue": {
+            "type": "string",
+            "pattern": "^-?\\d+\\.\\d{2}$",
+            "title": "Revenue",
+            "description": "Amount in ₹ (INR), 2 decimals"
+          },
+          "stockout_rate": {
+            "type": "number",
+            "title": "Stockout Rate"
+          },
+          "high_risk_skus": {
+            "type": "integer",
+            "title": "High Risk Skus"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "store",
+          "revenue",
+          "stockout_rate",
+          "high_risk_skus"
+        ],
+        "title": "StorePerformanceDTO"
       },
       "StoreRef": {
         "properties": {

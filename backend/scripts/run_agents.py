@@ -31,11 +31,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    target_date = (
-        datetime.strptime(args.run_date, "%Y-%m-%d").date()
-        if args.run_date
-        else date.today()
-    )
+    target_date = datetime.strptime(args.run_date, "%Y-%m-%d").date() if args.run_date else date.today()
 
     print("=================================================================")
     print("  RetailPilot AI — Autonomous Multi-Agent Replenishment Pipeline ")
@@ -52,14 +48,10 @@ def main() -> None:
 
         # Query LLM usages and tool calls for the run
         llm_usages = (
-            session.execute(select(LLMUsage).where(LLMUsage.run_id == summary.run_id))
-            .scalars()
-            .all()
+            session.execute(select(LLMUsage).where(LLMUsage.run_id == summary.run_id)).scalars().all()
         )
         tool_calls = (
-            session.execute(select(ToolCall).where(ToolCall.run_id == summary.run_id))
-            .scalars()
-            .all()
+            session.execute(select(ToolCall).where(ToolCall.run_id == summary.run_id)).scalars().all()
         )
 
     duration = time.perf_counter() - t0

@@ -120,3 +120,26 @@ def test_store_state_derived_values() -> None:
     assert state.surplus == 24
     assert state.days_of_cover == 18
     assert idle.days_of_cover == 500  # available / 0.01
+
+
+# --- days of cover and stockout risk (spec §1, D-46) ---------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("available", "daily", "risk"),
+    [
+        (20, 10.0, "HIGH"),  # 2 days of cover < lead 3
+        (30, 10.0, "MEDIUM"),  # 3 days: not < lead 3, but < lead + review 5
+        (49, 10.0, "MEDIUM"),
+        (50, 10.0, "LOW"),  # exactly lead + review
+        (0, 0.0, "HIGH"),  # nothing on hand and no demand: cover 0 < 3
+        (1, 0.0, "LOW"),  # demand floor 0.01 → 100 days of cover
+    ],
+)
+def test_stockout_risk_bands_follow_lead_time_and_review(available: int, daily: float, risk: str) -> None:
+    assert RC.stockout_risk(available, daily, lead_time_days=3, review_period_days=2) == risk
+
+
+def test_days_of_cover_uses_the_demand_floor() -> None:
+    assert RC.days_of_cover(30, 10.0) == 3.0
+    assert RC.days_of_cover(1, 0.0) == 100.0

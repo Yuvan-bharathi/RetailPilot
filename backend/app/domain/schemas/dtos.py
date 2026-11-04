@@ -380,3 +380,65 @@ class PurchaseOrderDTO(DTO):
         default_factory=list, description="Other stores on a consolidated PO: name + total qty only"
     )
     created_at: datetime
+
+
+# --- dashboard widgets (D-46) --------------------------------------------------------------------------------------
+
+
+class SalesDayDTO(DTO):
+    day: date
+    revenue: Money
+    units: int
+
+
+class CategoryValueDTO(DTO):
+    category: str
+    value: Money = Field(description="On-hand units × cost price")
+
+
+class StockHealthDTO(DTO):
+    """Listed store-SKUs by stock-out risk (D-46): days of cover vs lead time and lead + review."""
+
+    high_risk: int
+    medium_risk: int
+    low_risk: int
+    out_of_stock: int = Field(description="Listed store-SKUs with nothing on hand")
+
+
+class ExpiryDayDTO(DTO):
+    day: date
+    qty: int
+    value: Money
+
+
+class POStatusCountDTO(DTO):
+    status: POStatus
+    count: int
+    value: Money
+
+
+class StorePerformanceDTO(DTO):
+    store: StoreRef
+    revenue: Money
+    stockout_rate: float
+    high_risk_skus: int
+
+
+class DashboardInsights(DTO):
+    """Series and breakdowns behind the dashboard widgets (D-46). Every list may be empty: the UI shows an empty
+    state, never sample figures."""
+
+    store: StoreRef | None
+    period: Period
+    data_as_of: date | None = Field(description="Run date of the latest successful nightly run")
+    forecast_units_per_day: float | None = Field(description="Σ daily demand of the latest run's forecasts")
+    sales_trend: list[SalesDayDTO]
+    inventory_by_category: list[CategoryValueDTO]
+    shelf_value: Money
+    backroom_value: Money
+    stock_health: StockHealthDTO
+    expiry_next_14_days: list[ExpiryDayDTO]
+    po_status: list[POStatusCountDTO]
+    store_performance: list[StorePerformanceDTO] = Field(
+        description="Super Admin, all stores only; else empty"
+    )

@@ -128,7 +128,7 @@ def generate_puml() -> str:
         "@startuml erd",
         "!include style.iuml",
         "skinparam linetype ortho",
-        'title RetailPilot AI — Entity Relationship Diagram (ERD)\\n<size:11>Generated from SQLAlchemy models (app.domain.models)</size>',
+        "title RetailPilot AI — Entity Relationship Diagram (ERD)\\n<size:11>Generated from SQLAlchemy models (app.domain.models)</size>",
         "hide empty methods",
         "",
     ]
@@ -146,7 +146,7 @@ def generate_puml() -> str:
                 continue
             tbl = tables[tbl_name]
             cls_name = table_class_map[tbl_name]
-            lines.append(f"  class {cls_name} as \"{tbl_name}\" {{")
+            lines.append(f'  class {cls_name} as "{tbl_name}" {{')
             for col in tbl.columns:
                 tname = _type_name(col)
                 marker = _column_marker(col)

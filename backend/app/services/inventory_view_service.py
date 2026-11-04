@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import desc, func, select
@@ -11,7 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import NotFound, PermissionDenied
 from app.domain.models.enums import Role
 from app.domain.models.inventory import Batch, InventoryMovement, InventoryPosition
-from app.domain.models.master import Product, Store, StoreProduct
+from app.domain.models.master import (
+    Product,
+    Store,
+    StoreProduct,
+    Supplier,
+    SupplierProduct,
+    SupplierStoreTerms,
+)
+from app.domain.models.observability import NIGHTLY_AGENT, AgentRun
 from app.domain.models.planning import Forecast
 from app.domain.models.transfers import TransferOrder
 from app.domain.models.users import AppUser
@@ -25,6 +34,7 @@ from app.domain.schemas.dtos import (
     StockoutRisk,
     StoreInventoryPage,
 )
+from app.tools.requirement import RequirementCalculator
 
 
 class InventoryViewService:
@@ -67,22 +77,61 @@ class InventoryViewService:
 
         prod_ids = [sp.product_id for sp, _, _ in rows]
 
-        # Preload forecasts for daily demand
+        # Daily demand from the latest successful nightly run only (no run or no forecast → 0, never a guess)
         forecast_map: dict[UUID, float] = {}
-        if prod_ids:
-            f_stmt = (
-                select(Forecast.product_id, Forecast.daily_demand)
-                .where(Forecast.store_id == store_id, Forecast.product_id.in_(prod_ids))
-                .order_by(Forecast.created_at.desc())
+        latest_run = (
+            await session.execute(
+                select(AgentRun.run_id, AgentRun.run_date)
+                .where(AgentRun.agent_name == NIGHTLY_AGENT, AgentRun.status.in_(["SUCCESS", "PARTIAL"]))
+                .order_by(AgentRun.run_date.desc().nulls_last(), AgentRun.started_at.desc())
+                .limit(1)
             )
-            f_res = await session.execute(f_stmt)
-            for pid, dd in f_res.all():
-                if pid not in forecast_map:
-                    forecast_map[pid] = float(dd)
+        ).one_or_none()
+        if prod_ids and latest_run is not None:
+            f_res = await session.execute(
+                select(Forecast.product_id, Forecast.daily_demand).where(
+                    Forecast.run_id == latest_run.run_id,
+                    Forecast.store_id == store_id,
+                    Forecast.product_id.in_(prod_ids),
+                )
+            )
+            forecast_map = {pid: float(dd) for pid, dd in f_res.all()}
+
+        # Lead time of the supplier serving THIS store (rule 1): store terms → supplier-product → supplier default
+        lead_map: dict[UUID, int] = {}
+        if prod_ids:
+            lead_res = await session.execute(
+                select(
+                    StoreProduct.product_id,
+                    SupplierStoreTerms.lead_time_days,
+                    SupplierProduct.lead_time_days,
+                    Supplier.default_lead_time_days,
+                )
+                .select_from(StoreProduct)
+                .outerjoin(
+                    SupplierStoreTerms,
+                    (SupplierStoreTerms.supplier_id == StoreProduct.preferred_supplier_id)
+                    & (SupplierStoreTerms.store_id == StoreProduct.store_id),
+                )
+                .outerjoin(
+                    SupplierProduct,
+                    (SupplierProduct.supplier_id == StoreProduct.preferred_supplier_id)
+                    & (SupplierProduct.product_id == StoreProduct.product_id),
+                )
+                .outerjoin(Supplier, Supplier.supplier_id == StoreProduct.preferred_supplier_id)
+                .where(StoreProduct.store_id == store_id, StoreProduct.product_id.in_(prod_ids))
+            )
+            for pid, terms_lead, product_lead, default_lead in lead_res.all():
+                lead_map[pid] = RequirementCalculator.lead_time(
+                    terms_lead, product_lead, int(default_lead or 0)
+                )
+        data_day = (
+            latest_run.run_date - timedelta(days=1) if latest_run and latest_run.run_date else date.today()
+        )
 
         # Preload near-expiry batch quantities (<= 14 days)
         near_exp_map: dict[UUID, int] = {}
-        cutoff = date.today() + timedelta(days=14)
+        cutoff = data_day + timedelta(days=14)
         if prod_ids:
             b_stmt = (
                 select(Batch.product_id, func.sum(Batch.qty))
@@ -140,19 +189,17 @@ class InventoryViewService:
             reserved = pos.reserved if pos else 0
             available = shelf_qty + backroom_qty + incoming - reserved
 
-            daily_d = forecast_map.get(prod.product_id, 5.0)
-            doc = float(round(available / daily_d, 1)) if daily_d > 0 else 999.0
-
-            # Risk ranking
-            item_risk: StockoutRisk
-            if doc < 2.0:
-                item_risk = "HIGH"
+            daily_d = forecast_map.get(prod.product_id, 0.0)
+            lead_days = lead_map.get(prod.product_id, 0)
+            doc = float(round(RequirementCalculator.days_of_cover(available, daily_d), 1))
+            item_risk = cast(
+                StockoutRisk,
+                RequirementCalculator.stockout_risk(available, daily_d, lead_days, sp.review_period_days),
+            )
+            if item_risk == "HIGH":
                 high_risk_count += 1
-            elif doc < 5.0:
-                item_risk = "MEDIUM"
+            elif item_risk == "MEDIUM":
                 med_risk_count += 1
-            else:
-                item_risk = "LOW"
 
             shelf_min = sp.min_display_qty
             refill = (shelf_qty < shelf_min) and (backroom_qty > 0)
@@ -162,8 +209,9 @@ class InventoryViewService:
             n_exp = near_exp_map.get(prod.product_id, 0)
             near_exp_total += n_exp
 
-            lead_days = 2
-            own_req = round(daily_d * (lead_days + sp.review_period_days + sp.safety_stock_days))
+            own_req = RequirementCalculator.own_requirement(
+                daily_d, lead_days, sp.review_period_days, sp.safety_stock_days, sp.min_display_qty
+            )
             surplus_or_short = available - own_req
             if surplus_or_short < 0:
                 shortage_count += 1

@@ -575,3 +575,27 @@ previous version contained typed-in numbers).
 **Changed.** `app/tools/forecast.py`, `app/agents/forecasting.py`, `app/agents/base.py`, spec §8,
 `scripts/replay_evaluation.py`, `docs/EVALUATION_REPORT.md`; tests `test_forecast_models.py`,
 `test_replay_evaluation.py`.
+
+---
+
+## D-46 Dashboard data from the API only; stock-out risk rule; rule-1 requirement on the inventory screen (2026-11-04)
+**Decision.** Every dashboard figure comes from the API; a widget without data shows an empty state.
+- **New endpoint `GET /dashboard/insights?store_id&period`** → `DashboardInsights`: daily sales units/revenue,
+  Σ forecast daily demand of the latest run, inventory value by category (on hand × cost), shelf vs backroom value,
+  stock health, units/value expiring in the next 14 days, POs by status (value of the viewer's lines), and per-store
+  performance (Super Admin, all stores). Cached like `/dashboard` (key prefix `dashi`).
+- **Stock-out risk (formalises the Phase 8a rule):** `days_of_cover = available / max(d, 0.01)`; **HIGH** if cover <
+  lead time of the supplier serving that store, **MEDIUM** if < lead + review period, else **LOW**
+  (`RequirementCalculator.stockout_risk`). Used by the dashboard and the inventory screen.
+- **Periods end on the data day** (latest run date − 1, the last day of history), not on the run date.
+- **Fixes found:** the dashboard service queried `inventory_position.on_hand` and
+  `mv_inbox_counts.active_transfers_destination` (neither exists) inside `except Exception: pass`, so it returned
+  zeros and the page showed typed-in sample figures ("₹42.8L", "148", …) and a sample store name. Query errors now
+  propagate; only Redis is fail-open. Movers exclude returns. The inventory screen computed the own requirement with a
+  hard-coded 2-day lead time, no min display qty and 5 units/day when no forecast existed — it now uses rule 1
+  (`own_requirement` with the lead time of the supplier serving that store) and the latest run's forecasts only.
+- **UI:** the dashboard page no longer has a client-side role switcher (role comes from the signed-in user) nor
+  hidden screen-reader text added to satisfy old tests. Mock fixtures now include insights computed from the
+  synthetic data with the same definitions.
+**Changed.** Spec §5 (new route); DTOs; `dashboard_service.py`; `inventory_view_service.py`;
+`app/tools/requirement.py`; frontend Dashboard page, API client, mock; tests (backend integration, frontend).

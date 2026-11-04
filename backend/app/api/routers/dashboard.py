@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from app.api.deps import CurrentUser, DbSession, resolve_store_id
-from app.domain.schemas.dtos import DashboardSummary, Period
+from app.domain.schemas.dtos import DashboardInsights, DashboardSummary, Period
 from app.services.dashboard_service import DashboardService
 
 router = APIRouter(tags=["dashboard"])
@@ -24,3 +24,15 @@ async def get_dashboard(
     scoped_store_id = resolve_store_id(current_user, store_id)
     service = DashboardService()
     return await service.get_summary(session, scoped_store_id, period)
+
+
+@router.get("/dashboard/insights", response_model=DashboardInsights)
+async def get_dashboard_insights(
+    current_user: CurrentUser,
+    session: DbSession,
+    store_id: UUID | None = None,
+    period: Period = "LAST_28_DAYS",
+) -> DashboardInsights:
+    """Series and breakdowns behind the dashboard widgets (D-46). Store supervisors are scoped to their store."""
+    scoped_store_id = resolve_store_id(current_user, store_id)
+    return await DashboardService().get_insights(session, scoped_store_id, period)

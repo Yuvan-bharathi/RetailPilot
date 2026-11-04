@@ -184,6 +184,13 @@ export function createMockClient(
       if (!summary) throw new ApiError(404, "NOT_FOUND", "No dashboard for this store");
       return { ...summary, period: query.period ?? "LAST_28_DAYS" };
     },
+    async getDashboardInsights(query) {
+      await wait();
+      const store = scopeStore(query.store_id);
+      const insights = data.dashboard_insights[store ?? "all"];
+      if (!insights) throw new ApiError(404, "NOT_FOUND", "No dashboard for this store");
+      return { ...insights, period: query.period ?? "LAST_28_DAYS" };
+    },
     async listRecommendations(query) {
       await wait();
       const store = scopeStore(query.store_id);

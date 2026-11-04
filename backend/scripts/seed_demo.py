@@ -48,7 +48,9 @@ async def seed_demo_data() -> None:
     engine = get_sync_engine()
     pwd = seed_password(settings)
     seed_res = seed(engine, pwd)
-    print(f"[OK] Master data ready (stores created: {seed_res.stores_created}, users created: {seed_res.users_created})")
+    print(
+        f"[OK] Master data ready (stores created: {seed_res.stores_created}, users created: {seed_res.users_created})"
+    )
 
     session_factory = get_async_session_factory()
     async with session_factory() as session:

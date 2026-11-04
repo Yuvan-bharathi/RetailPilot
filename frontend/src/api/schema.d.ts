@@ -175,6 +175,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dashboard Insights
+         * @description Series and breakdowns behind the dashboard widgets (D-46). Store supervisors are scoped to their store.
+         */
+        get: operations["get_dashboard_insights"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/recommendations": {
         parameters: {
             query?: never;
@@ -764,6 +784,16 @@ export interface components {
             /** At Risk Qty */
             at_risk_qty: number;
         };
+        /** CategoryValueDTO */
+        CategoryValueDTO: {
+            /** Category */
+            category: string;
+            /**
+             * Value
+             * @description On-hand units × cost price
+             */
+            value: string;
+        };
         /** CloseShortRequest */
         CloseShortRequest: {
             /** Reason */
@@ -821,6 +851,53 @@ export interface components {
             next_cursor: string | null;
             /** Page Size */
             page_size: number;
+        };
+        /**
+         * DashboardInsights
+         * @description Series and breakdowns behind the dashboard widgets (D-46). Every list may be empty: the UI shows an empty
+         *     state, never sample figures.
+         */
+        DashboardInsights: {
+            store: components["schemas"]["StoreRef"] | null;
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "TODAY" | "LAST_7_DAYS" | "LAST_28_DAYS" | "MONTH_TO_DATE";
+            /**
+             * Data As Of
+             * @description Run date of the latest successful nightly run
+             */
+            data_as_of: string | null;
+            /**
+             * Forecast Units Per Day
+             * @description Σ daily demand of the latest run's forecasts
+             */
+            forecast_units_per_day: number | null;
+            /** Sales Trend */
+            sales_trend: components["schemas"]["SalesDayDTO"][];
+            /** Inventory By Category */
+            inventory_by_category: components["schemas"]["CategoryValueDTO"][];
+            /**
+             * Shelf Value
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            shelf_value: string;
+            /**
+             * Backroom Value
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            backroom_value: string;
+            stock_health: components["schemas"]["StockHealthDTO"];
+            /** Expiry Next 14 Days */
+            expiry_next_14_days: components["schemas"]["ExpiryDayDTO"][];
+            /** Po Status */
+            po_status: components["schemas"]["POStatusCountDTO"][];
+            /**
+             * Store Performance
+             * @description Super Admin, all stores only; else empty
+             */
+            store_performance: components["schemas"]["StorePerformanceDTO"][];
         };
         /** DashboardSummary */
         DashboardSummary: {
@@ -899,6 +976,21 @@ export interface components {
         /** ErrorResponse */
         ErrorResponse: {
             error: components["schemas"]["ErrorBody"];
+        };
+        /** ExpiryDayDTO */
+        ExpiryDayDTO: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Qty */
+            qty: number;
+            /**
+             * Value
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            value: string;
         };
         /**
          * ExpiryEvidence
@@ -1192,6 +1284,21 @@ export interface components {
             /** Qty */
             qty: number;
         };
+        /** POStatusCountDTO */
+        POStatusCountDTO: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "DRAFT" | "NEEDS_REVIEW" | "PENDING_L1" | "PENDING_L2" | "APPROVED" | "REJECTED" | "SPLIT" | "SUBMITTED" | "RECEIVED" | "SUPERSEDED";
+            /** Count */
+            count: number;
+            /**
+             * Value
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            value: string;
+        };
         /** Page[BatchDTO] */
         Page_BatchDTO_: {
             /** Items */
@@ -1472,6 +1579,38 @@ export interface components {
              */
             finished_at: string;
         };
+        /** SalesDayDTO */
+        SalesDayDTO: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /**
+             * Revenue
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            revenue: string;
+            /** Units */
+            units: number;
+        };
+        /**
+         * StockHealthDTO
+         * @description Listed store-SKUs by stock-out risk (D-46): days of cover vs lead time and lead + review.
+         */
+        StockHealthDTO: {
+            /** High Risk */
+            high_risk: number;
+            /** Medium Risk */
+            medium_risk: number;
+            /** Low Risk */
+            low_risk: number;
+            /**
+             * Out Of Stock
+             * @description Listed store-SKUs with nothing on hand
+             */
+            out_of_stock: number;
+        };
         /** StoreDTO */
         StoreDTO: {
             /**
@@ -1506,6 +1645,19 @@ export interface components {
             page_size: number;
             store: components["schemas"]["StoreRef"];
             summary: components["schemas"]["InventorySummary"];
+        };
+        /** StorePerformanceDTO */
+        StorePerformanceDTO: {
+            store: components["schemas"]["StoreRef"];
+            /**
+             * Revenue
+             * @description Amount in ₹ (INR), 2 decimals
+             */
+            revenue: string;
+            /** Stockout Rate */
+            stockout_rate: number;
+            /** High Risk Skus */
+            high_risk_skus: number;
         };
         /** StoreRef */
         StoreRef: {
@@ -2314,6 +2466,85 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_dashboard_insights: {
+        parameters: {
+            query?: {
+                store_id?: string | null;
+                period?: "TODAY" | "LAST_7_DAYS" | "LAST_28_DAYS" | "MONTH_TO_DATE";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardInsights"];
                 };
             };
             /** @description Unauthorized */

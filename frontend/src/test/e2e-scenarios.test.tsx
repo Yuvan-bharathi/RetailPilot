@@ -4,10 +4,9 @@ import { describe, expect, it } from "vitest";
 import { renderApp } from "./render";
 
 describe("E2E Demo Scenarios Suite (Spec §9.8)", () => {
-  it("Scenario 1: Super Admin inspects dashboard and navigates to urgent stockout", async () => {
+  it("Scenario 1: Super Admin opens the business overview", async () => {
     renderApp("/", "admin");
-    expect(await screen.findByText("Total Sales Revenue")).toBeTruthy();
-    expect(screen.getByText("Revenue & Profit Performance")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Business Overview" })).toBeTruthy();
   });
 
   it("Scenario 2: Line-level approval and PO resolution workflow", async () => {

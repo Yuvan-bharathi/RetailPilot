@@ -35,6 +35,15 @@ export function useDashboard(query: DashboardQuery) {
   return useQuery({ queryKey: ["dashboard", query], queryFn: () => api.getDashboard(query), staleTime: FIVE_MINUTES });
 }
 
+export function useDashboardInsights(query: DashboardQuery) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["dashboard-insights", query],
+    queryFn: () => api.getDashboardInsights(query),
+    staleTime: FIVE_MINUTES,
+  });
+}
+
 export function useRecommendations(query: RecommendationQuery) {
   const api = useApi();
   return useQuery({

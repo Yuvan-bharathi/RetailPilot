@@ -8,6 +8,7 @@ import rawFixtures from "./data/fixtures.json";
 
 import type {
   BatchDTO,
+  DashboardInsights,
   DashboardSummary,
   Evidence,
   InventoryMovementDTO,
@@ -50,6 +51,7 @@ export interface MockFixtures {
   purchase_orders: PurchaseOrderDTO[];
   /** keyed by store_id, plus "all" */
   dashboard: Record<string, DashboardSummary>;
+  dashboard_insights: Record<string, DashboardInsights>;
   scenarios: Record<"1" | "2" | "3" | "4" | "5", ScenarioIndex>;
 }
 

@@ -9,6 +9,7 @@ from pydantic import TypeAdapter
 
 from app.domain.schemas.dtos import (
     BatchDTO,
+    DashboardInsights,
     DashboardSummary,
     Evidence,
     InventoryMovementDTO,
@@ -38,6 +39,7 @@ def test_every_section_validates_against_the_dtos(fixtures: dict[str, Any]) -> N
     TypeAdapter(list[TransferOrderDTO]).validate_python(fixtures["transfers"])
     TypeAdapter(list[PurchaseOrderDTO]).validate_python(fixtures["purchase_orders"])
     TypeAdapter(dict[str, DashboardSummary]).validate_python(fixtures["dashboard"])
+    TypeAdapter(dict[str, DashboardInsights]).validate_python(fixtures["dashboard_insights"])
     for section, model in (
         ("inventory", InventoryRowDTO),
         ("movements", InventoryMovementDTO),

@@ -172,6 +172,7 @@ business meaning, never alphabetically.
 | GET /stores | stores visible to the user (supervisor: own store only) | – |
 | GET /runs/latest | latest successful run for "Data as of last run" (both roles, D-32) | SD-01 |
 | GET /dashboard?store_id&period | DashboardService.get_summary | SD-11 |
+| GET /dashboard/insights?store_id&period | DashboardService.get_insights → widget series and breakdowns (D-46) | SD-11 |
 | GET /stores/{store_id}/inventory?category&risk&refill_only | StoreInventoryService.get_view → StoreInventoryPage (rows + store-wide summary; no aisle filter, D-10/D-34) | SD-15 |
 | GET /stores/{store_id}/inventory/movements?product_id&type&from&to&cursor&page_size | ledger tab → CursorPage[InventoryMovementDTO], newest first (D-37) | – |
 | GET /stores/{store_id}/inventory/batches?product_id | batches tab → Page[BatchDTO] (FEFO rank, at-risk qty) | – |

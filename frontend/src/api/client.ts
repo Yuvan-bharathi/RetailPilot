@@ -6,6 +6,7 @@ import type {
   BatchQuery,
   CloseShortRequest,
   CursorPage,
+  DashboardInsights,
   DashboardQuery,
   DashboardSummary,
   ErrorResponse,
@@ -41,6 +42,7 @@ export interface ApiClient {
   listStores(): Promise<StoreDTO[]>;
   getLatestRun(): Promise<RunInfoDTO>;
   getDashboard(query: DashboardQuery): Promise<DashboardSummary>;
+  getDashboardInsights(query: DashboardQuery): Promise<DashboardInsights>;
   listRecommendations(query: RecommendationQuery): Promise<Page<RecommendationDTO>>;
   getRecommendation(recId: string): Promise<RecommendationDetailDTO>;
   actOnRecommendation(recId: string, body: RecActionRequest): Promise<RecommendationDTO>;
@@ -120,6 +122,7 @@ export function createHttpClient(getToken: () => string | null, baseUrl = "/api/
     listStores: () => request("GET", "/stores"),
     getLatestRun: () => request("GET", "/runs/latest"),
     getDashboard: (query) => request("GET", `/dashboard${toQueryString(query)}`),
+    getDashboardInsights: (query) => request("GET", `/dashboard/insights${toQueryString(query)}`),
     listRecommendations: (query) => request("GET", `/recommendations${toQueryString(query)}`),
     getRecommendation: (recId) => request("GET", `/recommendations/${encodeURIComponent(recId)}`),
     actOnRecommendation: (recId, body) => request("POST", `/recommendations/${encodeURIComponent(recId)}/action`, body),

@@ -29,20 +29,27 @@ from app.domain.schemas.common import Counterpart, ProductRef, StoreRef, Supplie
 from app.domain.schemas.dtos import (
     BatchDTO,
     BatchRiskRef,
+    CategoryValueDTO,
     CoReplenishEvidence,
+    DashboardInsights,
     DashboardSummary,
     Evidence,
+    ExpiryDayDTO,
     ExpiryEvidence,
     InventoryMovementDTO,
     InventoryRowDTO,
     MoverDTO,
     NeedsReviewEvidence,
     POLineDTO,
+    POStatusCountDTO,
     PurchaseOrderDTO,
     RecommendationDTO,
     ReorderEvidence,
     RunInfoDTO,
+    SalesDayDTO,
+    StockHealthDTO,
     StoreDTO,
+    StorePerformanceDTO,
     TransferEvidence,
     TransferOrderDTO,
 )
@@ -847,6 +854,146 @@ def _dashboard(
     return out
 
 
+def _insights(b: Builder, pos: Sequence[PurchaseOrderDTO]) -> dict[str, Any]:
+    """DashboardInsights per scope with the service's definitions (D-46), from the synthetic data (28 days)."""
+    pl, ds = b.pl, b.ds
+    start = pl.end_date - timedelta(days=27)
+    lines = ds.sales_lines.loc[
+        ~ds.sales_lines["is_voided"] & ~ds.sales_lines["is_return"] & (ds.sales_lines["txn_date"] >= start)
+    ]
+    last = ds.stock_snapshots.loc[ds.stock_snapshots["snapshot_date"] == pl.end_date]
+    snap = {(r.store_id, r.product_id): r for r in last.itertuples()}
+    window = pl.daily.loc[pl.daily["snapshot_date"] >= start]
+    expiring = ds.batches.loc[
+        (ds.batches["expiry_date"] > pl.end_date)
+        & (ds.batches["expiry_date"] <= pl.end_date + timedelta(days=14))
+    ]
+    risks = {
+        (s, p): RC.stockout_risk(
+            pl.available(s, p),
+            pl.demand(s, p),
+            pl.lead_time(s, p),
+            int(pl.store_product(s, p).review_period_days),
+        )
+        for s in pl.store_ids
+        for p in pl.listed_products()
+    }
+    out: dict[str, Any] = {}
+    for key in [None, *pl.store_ids]:
+        stores = pl.store_ids if key is None else [key]
+        scope = lines if key is None else lines.loc[lines["store_id"] == key]
+        trend = [
+            SalesDayDTO(
+                day=day,
+                revenue=money(
+                    sum(
+                        (
+                            q * pr - d
+                            for q, pr, d in zip(g["qty"], g["unit_price"], g["discount"], strict=True)
+                        ),
+                        Decimal(0),
+                    )
+                ),
+                units=int(g["qty"].sum()),
+            )
+            for day, g in scope.groupby("txn_date", sort=True)
+        ]
+        by_category: dict[str, Decimal] = defaultdict(Decimal)
+        shelf = backroom = Decimal(0)
+        for s in stores:
+            for p in pl.listed_products():
+                row = snap.get((s, p))
+                if row is None:
+                    continue
+                cost = pl.product(p).cost_price
+                shelf += int(row.shelf_qty) * cost
+                backroom += int(row.backroom_qty) * cost
+                by_category[str(pl.product(p).category)] += (
+                    int(row.shelf_qty) + int(row.backroom_qty)
+                ) * cost
+        scoped_risks = [r for (s, _), r in risks.items() if s in stores]
+        exp = expiring if key is None else expiring.loc[expiring["store_id"] == key]
+        expiry = [
+            ExpiryDayDTO(
+                day=day,
+                qty=int(g["qty"].sum()),
+                value=money(
+                    sum(
+                        (
+                            int(q) * pl.product(p).cost_price
+                            for q, p in zip(g["qty"], g["product_id"], strict=True)
+                        ),
+                        Decimal(0),
+                    )
+                ),
+            )
+            for day, g in exp.groupby("expiry_date", sort=True)
+        ]
+        po_counts: dict[str, list[Any]] = {}
+        for po in pos:
+            scoped_lines = [ln for ln in po.lines if key is None or ln.store.store_id == key]
+            if scoped_lines and po.status != "SUPERSEDED":
+                entry = po_counts.setdefault(po.status, [0, Decimal(0)])
+                entry[0] += 1
+                entry[1] += sum((Decimal(ln.line_value) for ln in scoped_lines), Decimal(0))
+        performance = []
+        if key is None:
+            for s in pl.store_ids:
+                s_lines = lines.loc[lines["store_id"] == s]
+                s_window = window.loc[window["store_id"] == s]
+                performance.append(
+                    StorePerformanceDTO(
+                        store=b.store_ref(s),
+                        revenue=money(
+                            sum(
+                                (
+                                    q * pr - d
+                                    for q, pr, d in zip(
+                                        s_lines["qty"],
+                                        s_lines["unit_price"],
+                                        s_lines["discount"],
+                                        strict=True,
+                                    )
+                                ),
+                                Decimal(0),
+                            )
+                        ),
+                        stockout_rate=round(float(s_window["is_stockout"].mean()), 4),
+                        high_risk_skus=sum(1 for (st, _), r in risks.items() if st == s and r == "HIGH"),
+                    )
+                )
+        dto = DashboardInsights(
+            store=None if key is None else b.store_ref(key),
+            period="LAST_28_DAYS",
+            data_as_of=pl.end_date,
+            forecast_units_per_day=round(
+                sum(pl.demand(s, p) for s in stores for p in pl.listed_products()), 2
+            ),
+            sales_trend=trend,
+            inventory_by_category=[
+                CategoryValueDTO(category=c, value=money(v))
+                for c, v in sorted(by_category.items(), key=lambda kv: (-kv[1], kv[0]))
+                if v
+            ],
+            shelf_value=money(shelf),
+            backroom_value=money(backroom),
+            stock_health=StockHealthDTO(
+                high_risk=scoped_risks.count("HIGH"),
+                medium_risk=scoped_risks.count("MEDIUM"),
+                low_risk=scoped_risks.count("LOW"),
+                out_of_stock=sum(1 for s in stores for p in pl.listed_products() if pl.on_hand(s, p) <= 0),
+            ),
+            expiry_next_14_days=expiry,
+            po_status=[
+                POStatusCountDTO(status=st, count=n, value=money(v))  # type: ignore[arg-type]
+                for st, (n, v) in sorted(po_counts.items())
+            ],
+            store_performance=performance,
+        )
+        out["all" if key is None else str(key)] = dto.model_dump(mode="json")
+    return out
+
+
 # --- scenarios -------------------------------------------------------------------------------------------------------------
 
 
@@ -993,6 +1140,7 @@ def build_fixtures(dataset_dir: Path) -> dict[str, Any]:
         "transfers": [t.model_dump(mode="json") for t in b.transfers],
         "purchase_orders": [po.model_dump(mode="json") for po in pos],
         "dashboard": _dashboard(b, lost, inventory, pos),
+        "dashboard_insights": _insights(b, pos),
         "scenarios": _scenarios(b),
     }
 

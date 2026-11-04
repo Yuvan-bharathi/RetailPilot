@@ -35,6 +35,24 @@ class RequirementCalculator:
         return shelf_qty + backroom_qty + incoming - reserved
 
     @staticmethod
+    def days_of_cover(available: int, daily_demand: float) -> float:
+        """available / max(daily_demand, 0.01) (spec §1)."""
+        return available / max(daily_demand, 0.01)
+
+    @staticmethod
+    def stockout_risk(
+        available: int, daily_demand: float, lead_time_days: int, review_period_days: int
+    ) -> str:
+        """HIGH: cover runs out before the next delivery could arrive (cover < lead time); MEDIUM: before the
+        delivery after the next review (cover < lead + review); else LOW (D-46)."""
+        cover = RequirementCalculator.days_of_cover(available, daily_demand)
+        if cover < lead_time_days:
+            return "HIGH"
+        if cover < lead_time_days + review_period_days:
+            return "MEDIUM"
+        return "LOW"
+
+    @staticmethod
     def surplus(available: int, requirement: int) -> int:
         """available − requirement; ≤ 0 means the store is not a donor."""
         return available - requirement
