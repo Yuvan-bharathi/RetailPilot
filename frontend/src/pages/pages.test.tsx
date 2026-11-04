@@ -1,16 +1,21 @@
 /** Phase 8a screens on the exported fixtures: Store Inventory, Recommendations inbox and detail. */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 
-import type { RecommendationDTO } from "../api/types";
+import { createHttpClient } from "../api/client";
+import type { InventoryMovementDTO, RecommendationDTO } from "../api/types";
 import { FIXTURES } from "../mocks/fixtures";
 import { renderApp } from "../test/render";
 
 const store = (code: string) => FIXTURES.stores.find((s) => s.code === code)!;
 const scenarioRec = (n: "1" | "2" | "3" | "4" | "5", type: RecommendationDTO["rec_type"]) =>
   FIXTURES.recommendations.find((r) => FIXTURES.scenarios[n].rec_ids.includes(r.rec_id) && r.rec_type === type)!;
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 beforeEach(() => {
   try {
@@ -94,6 +99,47 @@ describe("Store Inventory", () => {
     await user.click(screen.getByRole("button", { name: "Previous page" }));
     expect(await screen.findByText("Showing 1–25")).toBeTruthy();
     expect(within(ledger).getAllByRole("row")[1]!.textContent).toContain(firstRow.product.name);
+  });
+
+  it("with the real HTTP client, Previous from page 2 returns exactly page 1 (cursor stack in useCursorPaging)", async () => {
+    // A fake server behind a stubbed fetch: keyset pages over Store A's ledger; the cursor is opaque to the client.
+    const rows = FIXTURES.movements[store("A").store_id]!;
+    const requests: URLSearchParams[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const params = new URL(input, "http://test").searchParams;
+        requests.push(params);
+        const start = params.get("cursor") ? Number(atob(params.get("cursor")!)) : 0;
+        const size = Number(params.get("page_size"));
+        const items = rows.slice(start, start + size);
+        const next = start + size < rows.length ? btoa(String(start + size)) : null;
+        return new Response(JSON.stringify({ items, next_cursor: next, page_size: size }), { status: 200 });
+      }),
+    );
+    const http = createHttpClient(() => "token");
+    const user = userEvent.setup();
+    renderApp("/inventory", "sup.a", { listStoreMovements: http.listStoreMovements });
+    await screen.findByRole("region", { name: "Store inventory" });
+    await user.click(screen.getByRole("tab", { name: "Stock moves" }));
+    const ledger = await screen.findByRole("region", { name: "Stock moves (movement ledger)" });
+    const shown = () => within(ledger).getAllByRole("row").slice(1).map((r) => r.textContent);
+    const expected = (page: InventoryMovementDTO[]) => page.map((m) => m.product.name);
+
+    await screen.findByText("Showing 1–25");
+    const page1 = shown();
+    expect(page1.map((t, i) => t?.includes(expected(rows.slice(0, 25))[i]!))).not.toContain(false);
+    expect(requests.at(-1)!.has("cursor")).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    await screen.findByText("Showing 26–50");
+    expect(requests.at(-1)!.get("cursor")).toBe(btoa("25")); // the next_cursor of page 1, passed back verbatim
+
+    await user.click(screen.getByRole("button", { name: "Previous page" }));
+    await screen.findByText("Showing 1–25");
+    expect(shown()).toEqual(page1); // exactly page 1: same rows, same order
+    const pageOneRequests = requests.filter((p) => !p.has("cursor"));
+    expect(pageOneRequests.every((p) => p.get("page_size") === "25")).toBe(true);
   });
 
   it("opens a read-only product drawer with recommendations, transfers and batches", async () => {

@@ -94,7 +94,9 @@ infra/docker-compose.yml
 - Synthetic data (from the repo root): `uv run --project backend python -m data.synthetic.generate --scenarios all`
 - Frontend: `cd frontend && npm install && npm run dev` (mock API: `VITE_USE_MOCKS=true` in `.env.development`;
   demo users admin / sup.a / sup.b / sup.c, password `demo`) · all checks: `npm run check`
-  (lint, typecheck, check:no-hex, check:api, vitest incl. axe) · build: `npm run build`
+  (lint, typecheck, check:no-hex, check:api, vitest incl. axe) · build: `npm run build` ·
+  `npm run format:check` (Prettier 3.9.10 pinned, `.prettierrc.json` printWidth 120; not yet part of `check` —
+  existing files are reformatted in a separate commit when approved)
 - Mock data (frontend): `cd backend && uv run python -m scripts.export_mock_fixtures` regenerates
   `frontend/src/mocks/data/fixtures.json` from the synthetic data with the real tools (a test fails if it is stale)
 - API contract: after changing a DTO/route run `cd backend && uv run python -m scripts.export_openapi ../frontend/openapi.json`
@@ -106,4 +108,8 @@ infra/docker-compose.yml
 - Write tests first for tools/ (the worked example: Store C need 40, Store A surplus 24,
   Store B none → transfer 24 + PO 16).
 - Ask before: adding a dependency, changing the DB schema outside a migration, or changing any rule above.
+- Never run a tool through `npx` / `uvx` (or `npm exec`, `pipx run`) unless it is declared in
+  `frontend/package.json` / `backend/pyproject.toml`; use `npx --no-install …` or the npm/uv script so an
+  undeclared tool can never be downloaded and run. Formatting uses the pinned project tools only
+  (`ruff format`; Prettier via `npm run format:check`).
 - Commit at the end of each phase with a clear message.
