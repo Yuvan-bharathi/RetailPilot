@@ -1,5 +1,7 @@
 """Rebuild nightly-run planning inputs from the synthetic CSVs using the real Phase 3 tools.
 
+Used by the synthetic scenario tests and by scripts/export_mock_fixtures.py.
+
 This mirrors what the Stock Balancing / Freshness agents will do (SD-04, SD-06, SD-07, SD-08), but reads the CSV
 dataset instead of the database, so the planted scenarios can be checked before Phase 2/5 exist.
 """
@@ -57,6 +59,28 @@ class Planner:
         self._supplier = {r.supplier_id: r for r in ds.suppliers.itertuples()}
         self._product = {r.product_id: r for r in ds.products.itertuples()}
         self.store_ids: list[UUID] = sorted(ds.stores["store_id"])
+
+    # --- lookups --------------------------------------------------------------------------------------------------
+
+    def store_product(self, store: UUID, product: UUID) -> Any:
+        """The store_products.csv row (min_display_qty, safety_stock_days, review_period_days, …)."""
+        return self._sp[(store, product)]
+
+    def product(self, product: UUID) -> Any:
+        """The products.csv row (sku, name, category, cost_price, selling_price, shelf_life_days)."""
+        return self._product[product]
+
+    def supplier_name(self, supplier: UUID) -> str:
+        return str(self._supplier[supplier].name)
+
+    def on_hand(self, store: UUID, product: UUID) -> int:
+        return self._on_hand[(store, product)]
+
+    def incoming(self, store: UUID, product: UUID) -> int:
+        return self._incoming.get((store, product), 0)
+
+    def listed_products(self) -> list[UUID]:
+        return sorted({p for _, p in self._sp})
 
     # --- per store-product ------------------------------------------------------------------------------------
 

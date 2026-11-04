@@ -670,6 +670,43 @@
               ],
               "title": "Type"
             }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "HIGH",
+                    "NORMAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Product Id"
+            }
           }
         ],
         "responses": {
@@ -950,6 +987,16 @@
               ],
               "title": "Risk"
             }
+          },
+          {
+            "name": "refill_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Refill Only"
+            }
           }
         ],
         "responses": {
@@ -958,7 +1005,562 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_InventoryRowDTO_"
+                  "$ref": "#/components/schemas/StoreInventoryPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/stores/{store_id}/inventory/movements": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "List Store Movements",
+        "operationId": "list_store_movements",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Store Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^-?[a-z_]{1,40}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "SALE",
+                    "PO_RECEIPT",
+                    "TRANSFER_OUT",
+                    "TRANSFER_IN",
+                    "SHELF_REFILL",
+                    "ADJUSTMENT",
+                    "EXPIRY_WRITE_OFF"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventoryMovementDTO_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/stores/{store_id}/inventory/batches": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "List Store Batches",
+        "operationId": "list_store_batches",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Store Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^-?[a-z_]{1,40}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_BatchDTO_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/stores/{store_id}/inventory/expiring": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "List Store Expiring",
+        "operationId": "list_store_expiring",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Store Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^-?[a-z_]{1,40}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "within_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 60,
+              "minimum": 1,
+              "default": 14,
+              "title": "Within Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_BatchDTO_"
                 }
               }
             }
@@ -1132,6 +1734,23 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Product Id"
             }
           }
         ],
@@ -1583,6 +2202,193 @@
   },
   "components": {
     "schemas": {
+      "AssortmentGapEvidence": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "ASSORTMENT_GAP",
+            "title": "Kind"
+          },
+          "antecedent": {
+            "$ref": "#/components/schemas/ProductRef"
+          },
+          "lift": {
+            "type": "number",
+            "title": "Lift"
+          },
+          "source_stores": {
+            "items": {
+              "$ref": "#/components/schemas/StoreRef"
+            },
+            "type": "array",
+            "title": "Source Stores",
+            "description": "Stores where the rule holds (names only)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "antecedent",
+          "lift",
+          "source_stores"
+        ],
+        "title": "AssortmentGapEvidence",
+        "description": "ASSORTMENT_GAP — sells together with a listed product in other stores (SD-05)."
+      },
+      "BatchDTO": {
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Batch Id"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductRef"
+          },
+          "batch_no": {
+            "type": "string",
+            "title": "Batch No"
+          },
+          "qty": {
+            "type": "integer",
+            "title": "Qty"
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Expiry Date"
+          },
+          "days_left": {
+            "type": "integer",
+            "title": "Days Left"
+          },
+          "fefo_rank": {
+            "type": "integer",
+            "title": "Fefo Rank",
+            "description": "1 = sells first for this product"
+          },
+          "at_risk_qty": {
+            "type": "integer",
+            "title": "At Risk Qty"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "batch_id",
+          "product",
+          "batch_no",
+          "qty",
+          "expiry_date",
+          "days_left",
+          "fefo_rank",
+          "at_risk_qty"
+        ],
+        "title": "BatchDTO",
+        "description": "A batch held by the store, in FEFO order, with its expiry risk (D-31)."
+      },
+      "BatchRiskRef": {
+        "properties": {
+          "batch_no": {
+            "type": "string",
+            "title": "Batch No"
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Expiry Date"
+          },
+          "days_left": {
+            "type": "integer",
+            "title": "Days Left"
+          },
+          "batch_qty": {
+            "type": "integer",
+            "title": "Batch Qty"
+          },
+          "at_risk_qty": {
+            "type": "integer",
+            "title": "At Risk Qty"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "batch_no",
+          "expiry_date",
+          "days_left",
+          "batch_qty",
+          "at_risk_qty"
+        ],
+        "title": "BatchRiskRef",
+        "description": "A batch at risk of expiring before it sells (FEFO, D-31)."
+      },
+      "CoReplenishEvidence": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "CO_REPLENISH",
+            "title": "Kind"
+          },
+          "linked_product": {
+            "$ref": "#/components/schemas/ProductRef"
+          },
+          "support": {
+            "type": "number",
+            "title": "Support"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "lift": {
+            "type": "number",
+            "title": "Lift"
+          },
+          "daily_demand": {
+            "type": "number",
+            "title": "Daily Demand"
+          },
+          "review_period_days": {
+            "type": "integer",
+            "title": "Review Period Days"
+          },
+          "own_requirement": {
+            "type": "integer",
+            "title": "Own Requirement"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "projected_at_next_review": {
+            "type": "number",
+            "title": "Projected At Next Review",
+            "description": "available − daily demand × review period"
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/SupplierRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "linked_product",
+          "support",
+          "confidence",
+          "lift",
+          "daily_demand",
+          "review_period_days",
+          "own_requirement",
+          "available",
+          "projected_at_next_review",
+          "supplier"
+        ],
+        "title": "CoReplenishEvidence",
+        "description": "CO_REPLENISH — complement of a reordered product (D-02, D-13)."
+      },
       "Counterpart": {
         "properties": {
           "store": {
@@ -1790,6 +2596,49 @@
         ],
         "title": "ErrorResponse"
       },
+      "ExpiryEvidence": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "EXPIRY",
+            "title": "Kind"
+          },
+          "batch": {
+            "$ref": "#/components/schemas/BatchRiskRef"
+          },
+          "daily_demand": {
+            "type": "number",
+            "title": "Daily Demand"
+          },
+          "receivers_checked": {
+            "type": "integer",
+            "title": "Receivers Checked",
+            "description": "Other stores checked for an expiry-aware transfer"
+          },
+          "markdown_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markdown Pct",
+            "description": "MARKDOWN only (extension)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "batch",
+          "daily_demand",
+          "receivers_checked"
+        ],
+        "title": "ExpiryEvidence",
+        "description": "EXPIRY_ALERT / MARKDOWN — batch that will not sell in time and no store can take it (SD-08)."
+      },
       "HealthChecks": {
         "properties": {
           "database": {
@@ -1841,6 +2690,85 @@
           "checks"
         ],
         "title": "HealthResponse"
+      },
+      "InventoryMovementDTO": {
+        "properties": {
+          "movement_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Movement Id"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductRef"
+          },
+          "movement_type": {
+            "type": "string",
+            "enum": [
+              "SALE",
+              "PO_RECEIPT",
+              "TRANSFER_OUT",
+              "TRANSFER_IN",
+              "SHELF_REFILL",
+              "ADJUSTMENT",
+              "EXPIRY_WRITE_OFF"
+            ],
+            "title": "Movement Type"
+          },
+          "qty": {
+            "type": "integer",
+            "title": "Qty",
+            "description": "Signed quantity (+ in, − out)"
+          },
+          "location": {
+            "type": "string",
+            "enum": [
+              "SHELF",
+              "BACKROOM"
+            ],
+            "title": "Location"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "movement_id",
+          "product",
+          "movement_type",
+          "qty",
+          "location",
+          "reference",
+          "reason",
+          "created_at"
+        ],
+        "title": "InventoryMovementDTO",
+        "description": "One row of the inventory movement ledger (spec §3)."
       },
       "InventoryRowDTO": {
         "properties": {
@@ -1931,6 +2859,45 @@
         ],
         "title": "InventoryRowDTO"
       },
+      "InventorySummary": {
+        "properties": {
+          "products": {
+            "type": "integer",
+            "title": "Products"
+          },
+          "high_risk": {
+            "type": "integer",
+            "title": "High Risk"
+          },
+          "medium_risk": {
+            "type": "integer",
+            "title": "Medium Risk"
+          },
+          "refill_needed": {
+            "type": "integer",
+            "title": "Refill Needed"
+          },
+          "near_expiry_qty": {
+            "type": "integer",
+            "title": "Near Expiry Qty"
+          },
+          "shortage_products": {
+            "type": "integer",
+            "title": "Shortage Products"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "products",
+          "high_risk",
+          "medium_risk",
+          "refill_needed",
+          "near_expiry_qty",
+          "shortage_products"
+        ],
+        "title": "InventorySummary"
+      },
       "LoginRequest": {
         "properties": {
           "username": {
@@ -2020,6 +2987,52 @@
         ],
         "title": "MoverDTO"
       },
+      "NeedsReviewEvidence": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "NEEDS_REVIEW",
+            "title": "Kind"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "LOW_CONFIDENCE",
+              "BUDGET",
+              "NO_ELIGIBLE_SUPPLIER"
+            ],
+            "title": "Reason"
+          },
+          "own_requirement": {
+            "type": "integer",
+            "title": "Own Requirement"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "suggested_qty": {
+            "type": "integer",
+            "title": "Suggested Qty"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "reason",
+          "own_requirement",
+          "available",
+          "suggested_qty",
+          "detail"
+        ],
+        "title": "NeedsReviewEvidence",
+        "description": "NEEDS_REVIEW — no automatic action; a person decides (D-04, D-29, SD-09)."
+      },
       "POLineDTO": {
         "properties": {
           "po_line_id": {
@@ -2081,11 +3094,11 @@
         ],
         "title": "POLineDTO"
       },
-      "Page_InventoryRowDTO_": {
+      "Page_BatchDTO_": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/InventoryRowDTO"
+              "$ref": "#/components/schemas/BatchDTO"
             },
             "type": "array",
             "title": "Items"
@@ -2116,7 +3129,44 @@
           "page",
           "page_size"
         ],
-        "title": "Page[InventoryRowDTO]"
+        "title": "Page[BatchDTO]"
+      },
+      "Page_InventoryMovementDTO_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryMovementDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Total matching rows across all pages"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[InventoryMovementDTO]"
       },
       "Page_PurchaseOrderDTO_": {
         "properties": {
@@ -2486,24 +3536,43 @@
           "evidence": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/TransferEvidenceDTO"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/TransferEvidence"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReorderEvidence"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CoReplenishEvidence"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExpiryEvidence"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AssortmentGapEvidence"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NeedsReviewEvidence"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "kind",
+                  "mapping": {
+                    "ASSORTMENT_GAP": "#/components/schemas/AssortmentGapEvidence",
+                    "CO_REPLENISH": "#/components/schemas/CoReplenishEvidence",
+                    "EXPIRY": "#/components/schemas/ExpiryEvidence",
+                    "NEEDS_REVIEW": "#/components/schemas/NeedsReviewEvidence",
+                    "REORDER": "#/components/schemas/ReorderEvidence",
+                    "TRANSFER": "#/components/schemas/TransferEvidence"
+                  }
+                }
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Reason",
-            "description": "NO_SURPLUS_IN_ANY_STORE, PARTIAL_SURPLUS, BUDGET, …"
+            "title": "Evidence"
           }
         },
         "additionalProperties": false,
@@ -2513,6 +3582,115 @@
           "evidence"
         ],
         "title": "RecommendationDetailDTO"
+      },
+      "ReorderEvidence": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "REORDER",
+            "title": "Kind"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "NO_SURPLUS_IN_ANY_STORE",
+              "PARTIAL_SURPLUS",
+              "TRANSFER_NOT_VIABLE"
+            ],
+            "title": "Reason"
+          },
+          "daily_demand": {
+            "type": "number",
+            "title": "Daily Demand"
+          },
+          "lead_time_days": {
+            "type": "integer",
+            "title": "Lead Time Days"
+          },
+          "review_period_days": {
+            "type": "integer",
+            "title": "Review Period Days"
+          },
+          "safety_stock_days": {
+            "type": "integer",
+            "title": "Safety Stock Days"
+          },
+          "min_display_qty": {
+            "type": "integer",
+            "title": "Min Display Qty"
+          },
+          "own_requirement": {
+            "type": "integer",
+            "title": "Own Requirement"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "need_qty": {
+            "type": "integer",
+            "title": "Need Qty"
+          },
+          "transferred_qty": {
+            "type": "integer",
+            "title": "Transferred Qty",
+            "description": "Units covered by transfers (PARTIAL_SURPLUS); the PO is the rest"
+          },
+          "days_of_cover": {
+            "type": "number",
+            "title": "Days Of Cover"
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/SupplierRef"
+          },
+          "lost_revenue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?\\d+\\.\\d{2}$",
+                "description": "Amount in ₹ (INR), 2 decimals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lost Revenue"
+          },
+          "lost_profit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?\\d+\\.\\d{2}$",
+                "description": "Amount in ₹ (INR), 2 decimals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lost Profit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "reason",
+          "daily_demand",
+          "lead_time_days",
+          "review_period_days",
+          "safety_stock_days",
+          "min_display_qty",
+          "own_requirement",
+          "available",
+          "need_qty",
+          "transferred_qty",
+          "days_of_cover",
+          "supplier",
+          "lost_revenue",
+          "lost_profit"
+        ],
+        "title": "ReorderEvidence",
+        "description": "REORDER — own requirement vs available, and why a PO instead of a transfer (SD-06/07)."
       },
       "RunInfoDTO": {
         "properties": {
@@ -2586,6 +3764,52 @@
         ],
         "title": "StoreDTO"
       },
+      "StoreInventoryPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryRowDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Total matching rows across all pages"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size"
+          },
+          "store": {
+            "$ref": "#/components/schemas/StoreRef"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/InventorySummary"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "store",
+          "summary"
+        ],
+        "title": "StoreInventoryPage",
+        "description": "Page of inventory rows plus store-wide counts for the summary chips (SD-15 totals)."
+      },
       "StoreRef": {
         "properties": {
           "store_id": {
@@ -2651,8 +3875,13 @@
         ],
         "title": "TokenResponse"
       },
-      "TransferEvidenceDTO": {
+      "TransferEvidence": {
         "properties": {
+          "kind": {
+            "type": "string",
+            "const": "TRANSFER",
+            "title": "Kind"
+          },
           "destination_shortage": {
             "type": "integer",
             "title": "Destination Shortage"
@@ -2750,11 +3979,23 @@
           "days_of_cover_after": {
             "type": "number",
             "title": "Days Of Cover After"
+          },
+          "expiring_batch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BatchRiskRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for an expiry-aware transfer (SD-08)"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "kind",
           "destination_shortage",
           "donor",
           "transfer_qty",
@@ -2765,8 +4006,8 @@
           "days_of_cover_before",
           "days_of_cover_after"
         ],
-        "title": "TransferEvidenceDTO",
-        "description": "Evidence panel of a transfer / PO-remainder recommendation (design doc §6).\n\nScoped per viewer (D-32): donor_surplus and donor_protected_requirement describe the DONOR store's stock, so\nthey are filled for the Super Admin and for the donor store's own supervisor, and null for the destination\nsupervisor (CLAUDE.md rule 10), who sees the donor as name + offered qty plus the numberless assurance\n`donor_keeps_requirement`."
+        "title": "TransferEvidence",
+        "description": "TRANSFER (surplus or expiry-aware) — design doc §6.\n\nScoped per viewer (D-32): donor_surplus and donor_protected_requirement describe the DONOR store's stock, so\nthey are filled for the Super Admin and for the donor store's own supervisor, and null for the destination\nsupervisor (CLAUDE.md rule 10), who sees the donor as name + offered qty plus the numberless assurance\n`donor_keeps_requirement`."
       },
       "TransferOrderDTO": {
         "properties": {

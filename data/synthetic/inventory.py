@@ -150,21 +150,42 @@ def simulate(
     return result
 
 
+def last_review_day(n_days: int, review_period: int) -> int:
+    return list(range(0, n_days, review_period))[-1]
+
+
 def scenario_plan(
-    demand: int, n_days: int, review_period: int, final_on_hand: int, near_dated_expiry: date | None = None
+    demand: int,
+    n_days: int,
+    review_period: int,
+    final_on_hand: int,
+    start: date | None = None,
+    near_dated_age: int | None = None,
 ) -> tuple[int, list[Delivery]]:
     """Opening stock and deliveries so a constant-demand product never runs out and ends at `final_on_hand`.
 
     Deliveries on review days replace exactly the demand until the next review, keeping a buffer b; the last
     delivery is sized so the final closing stock equals `final_on_hand`. Closing stock never drops below
     min(b, final_on_hand), so the only possible stockout day is the last day when final_on_hand = 0.
+
+    `near_dated_age` (with `start`): every delivery arrives with only that many days of shelf life left
+    (near-dated supply), so batches still expire in delivery order and FEFO sells them in that order.
     """
     review_days = list(range(0, n_days, review_period))
     last = review_days[-1]
     remaining_after_last = demand * (n_days - last)
     buffer = min(2 * demand, remaining_after_last)
-    deliveries = [Delivery(r, demand * (min(r + review_period, n_days) - r)) for r in review_days[:-1]]
+
+    def expiry(day_index: int) -> date | None:
+        if near_dated_age is None or start is None:
+            return None
+        return start + timedelta(days=day_index + near_dated_age)
+
+    deliveries = [
+        Delivery(r, demand * (min(r + review_period, n_days) - r), expiry_override=expiry(r))
+        for r in review_days[:-1]
+    ]
     deliveries.append(
-        Delivery(last, remaining_after_last + final_on_hand - buffer, expiry_override=near_dated_expiry)
+        Delivery(last, remaining_after_last + final_on_hand - buffer, expiry_override=expiry(last))
     )
     return buffer, deliveries

@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { Button } from "./Button";
 
@@ -13,10 +13,12 @@ export interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   description?: string;
+  /** "drawer" slides in from the right, full height (same focus and keyboard behaviour). */
+  variant?: "dialog" | "drawer";
 }
 
 /** Accessible dialog: focus moves in and is trapped; Escape closes; focus returns to the opener. */
-export function Modal({ open, title, onClose, children, footer, description }: ModalProps) {
+export function Modal({ open, title, onClose, children, footer, description, variant = "dialog" }: ModalProps) {
   const titleId = useId();
   const descId = useId();
   const panel = useRef<HTMLDivElement>(null);
@@ -36,7 +38,7 @@ export function Modal({ open, title, onClose, children, footer, description }: M
 
   if (!open) return null;
 
-  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.stopPropagation();
       onCloseRef.current();
@@ -57,7 +59,7 @@ export function Modal({ open, title, onClose, children, footer, description }: M
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={`fixed inset-0 z-50 flex ${variant === "drawer" ? "justify-end" : "items-center justify-center p-4"}`}>
       <div aria-hidden="true" className="absolute inset-0 bg-ink/40" onClick={() => onCloseRef.current()} />
       <div
         ref={panel}
@@ -67,7 +69,11 @@ export function Modal({ open, title, onClose, children, footer, description }: M
         aria-describedby={description ? descId : undefined}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="relative w-full max-w-lg rounded-modal border border-border bg-surface shadow-dropdown"
+        className={
+          variant === "drawer"
+            ? "relative flex h-full w-full max-w-xl flex-col border-l border-border bg-surface shadow-dropdown"
+            : "relative w-full max-w-lg rounded-modal border border-border bg-surface shadow-dropdown"
+        }
       >
         <div className="flex items-start justify-between gap-4 border-b border-divider px-5 py-4">
           <div>
@@ -89,7 +95,7 @@ export function Modal({ open, title, onClose, children, footer, description }: M
             <X aria-hidden="true" size={18} />
           </button>
         </div>
-        <div className="px-5 py-4 text-sm text-ink">{children}</div>
+        <div className={`px-5 py-4 text-sm text-ink ${variant === "drawer" ? "flex-1 overflow-y-auto" : ""}`}>{children}</div>
         {footer ? <div className="flex justify-end gap-2 border-t border-divider px-5 py-3">{footer}</div> : null}
       </div>
     </div>

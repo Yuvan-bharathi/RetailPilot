@@ -2,20 +2,20 @@
 import { Check, Download, Trash2 } from "lucide-react";
 import { useDeferredValue, useState, type ReactNode } from "react";
 
-import { useDashboard, useRecommendation, useRecommendations } from "../api/hooks";
+import { useDashboard, useRecommendations } from "../api/hooks";
 import type { RecommendationDTO, RecStatus } from "../api/types";
-import { useAuth } from "../app/AuthContext";
 import { useShell } from "../app/ShellContext";
 import { Button } from "../components/Button";
 import { DataTable, type Column, type TableQuery } from "../components/DataTable";
 import { DeadlineCountdown } from "../components/DeadlineCountdown";
-import { EvidencePanel } from "../components/EvidencePanel";
+import { EvidenceView } from "../components/EvidencePanel";
 import { KpiCard } from "../components/KpiCard";
 import { ConfirmDialog, Modal } from "../components/Modal";
 import { StatusBadge, StatusPill } from "../components/StatusBadge";
 import { Stepper, TRANSFER_STEPS } from "../components/Stepper";
 import { formatINR, formatINRCompact, formatNumber, formatPercent } from "../lib/format";
-import { CROSS_STORE_TRANSFER_REC } from "../mocks/fixtures";
+import { REC_TYPE_LABEL } from "../lib/labels";
+import { EXAMPLE_EVIDENCE } from "../mocks/examples";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -42,7 +42,7 @@ const REC_COLUMNS: Column<RecommendationDTO>[] = [
     ),
   },
   { id: "store", header: "Store", cell: (r) => r.store.name },
-  { id: "rec_type", header: "Type", sortable: true, cell: (r) => r.rec_type.replaceAll("_", " ").toLowerCase() },
+  { id: "rec_type", header: "Type", sortable: true, cell: (r) => REC_TYPE_LABEL[r.rec_type] },
   { id: "qty", header: "Qty", sortable: true, align: "right", cell: (r) => formatNumber(r.qty) },
   {
     id: "counterpart",
@@ -140,44 +140,27 @@ function RecommendationsTable() {
   );
 }
 
-function CrossStoreExample() {
-  const { user } = useAuth();
-  const own = user?.store?.store_id;
-  const canSee =
-    user?.role === "SUPER_ADMIN" ||
-    own === CROSS_STORE_TRANSFER_REC.store.store_id || // destination
-    own === CROSS_STORE_TRANSFER_REC.counterpart?.store.store_id; // donor
-  const detail = useRecommendation(CROSS_STORE_TRANSFER_REC.rec_id);
-  if (!canSee) {
-    return (
-      <p className="text-sm text-ink-secondary">
-        This example belongs to {CROSS_STORE_TRANSFER_REC.store.name}. Sign in as <strong>admin</strong>, <strong>sup.a</strong> (donor) or{" "}
-        <strong>sup.c</strong> to see it — a supervisor cannot open another store&apos;s recommendation.
-      </p>
-    );
-  }
-  if (detail.isPending) return <p className="text-sm text-ink-secondary">Loading…</p>;
-  if (detail.error || !detail.data?.evidence) return <p className="text-sm text-danger">Could not load the example.</p>;
-  const rec = detail.data.recommendation;
+const EVIDENCE_EXAMPLES: Array<[string, keyof typeof EXAMPLE_EVIDENCE]> = [
+  ["Transfer — Super Admin / donor store view", "TRANSFER"],
+  ["Transfer — destination store view (D-32)", "TRANSFER_DESTINATION"],
+  ["Reorder", "REORDER"],
+  ["Co-replenish", "CO_REPLENISH"],
+  ["Expiry alert", "EXPIRY"],
+  ["Assortment gap", "ASSORTMENT_GAP"],
+  ["Needs review", "NEEDS_REVIEW"],
+];
+
+function EvidenceExamples() {
   return (
     <div className="grid items-start gap-4 lg:grid-cols-2">
-      <div className="rounded-card border border-border bg-surface p-4">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-ink">
-            Transfer {rec.qty} × {rec.product.name}
-          </h3>
-          <StatusPill status={rec.status} />
+      {EVIDENCE_EXAMPLES.map(([title, key]) => (
+        <div key={key} className="space-y-2">
+          <p className="text-sm font-medium text-ink-secondary">{title}</p>
+          <EvidenceView evidence={EXAMPLE_EVIDENCE[key]} label={`Evidence example: ${title}`} />
         </div>
-        <p className="mt-2 text-sm text-ink-secondary">{rec.explanation}</p>
-        {rec.counterpart ? (
-          <p className="mt-2 text-sm">
-            From <strong>{rec.counterpart.store.name}</strong> · {formatNumber(rec.counterpart.qty)} units offered
-          </p>
-        ) : null}
-      </div>
-      <EvidencePanel evidence={detail.data.evidence} />
+      ))}
     </div>
-  );
+  )
 }
 
 export function ComponentsPage() {
@@ -279,8 +262,8 @@ export function ComponentsPage() {
         </div>
       </Section>
 
-      <Section title="Cross-store recommendation and evidence">
-        <CrossStoreExample />
+      <Section title="Evidence views (one per kind)">
+        <EvidenceExamples />
       </Section>
 
       <Section title="Transfer stepper">

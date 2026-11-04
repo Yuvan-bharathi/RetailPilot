@@ -1,7 +1,7 @@
 """Response DTOs of the /api/v1 contract (spec §5). Implemented in Phase 6; stubs return 501 until then (D-32)."""
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import Field
@@ -10,6 +10,7 @@ from app.domain.schemas.common import (
     DTO,
     Counterpart,
     Money,
+    Page,
     Priority,
     ProductRef,
     Role,
@@ -107,8 +108,18 @@ class RecommendationDTO(DTO):
     created_at: datetime
 
 
-class TransferEvidenceDTO(DTO):
-    """Evidence panel of a transfer / PO-remainder recommendation (design doc §6).
+class BatchRiskRef(DTO):
+    """A batch at risk of expiring before it sells (FEFO, D-31)."""
+
+    batch_no: str
+    expiry_date: date
+    days_left: int
+    batch_qty: int
+    at_risk_qty: int
+
+
+class TransferEvidence(DTO):
+    """TRANSFER (surplus or expiry-aware) — design doc §6.
 
     Scoped per viewer (D-32): donor_surplus and donor_protected_requirement describe the DONOR store's stock, so
     they are filled for the Super Admin and for the donor store's own supervisor, and null for the destination
@@ -116,6 +127,7 @@ class TransferEvidenceDTO(DTO):
     `donor_keeps_requirement`.
     """
 
+    kind: Literal["TRANSFER"]
     destination_shortage: int
     donor: Counterpart | None
     donor_surplus: int | None = Field(None, description="Super Admin and the donor store's supervisor only")
@@ -132,12 +144,97 @@ class TransferEvidenceDTO(DTO):
     expected_delivery: date | None
     days_of_cover_before: float
     days_of_cover_after: float
+    expiring_batch: BatchRiskRef | None = Field(None, description="Set for an expiry-aware transfer (SD-08)")
+
+
+NeedReason = Literal["NO_SURPLUS_IN_ANY_STORE", "PARTIAL_SURPLUS", "TRANSFER_NOT_VIABLE"]
+
+
+class ReorderEvidence(DTO):
+    """REORDER — own requirement vs available, and why a PO instead of a transfer (SD-06/07)."""
+
+    kind: Literal["REORDER"]
+    reason: NeedReason
+    daily_demand: float
+    lead_time_days: int
+    review_period_days: int
+    safety_stock_days: int
+    min_display_qty: int
+    own_requirement: int
+    available: int
+    need_qty: int
+    transferred_qty: int = Field(
+        description="Units covered by transfers (PARTIAL_SURPLUS); the PO is the rest"
+    )
+    days_of_cover: float
+    supplier: SupplierRef
+    lost_revenue: Money | None
+    lost_profit: Money | None
+
+
+class CoReplenishEvidence(DTO):
+    """CO_REPLENISH — complement of a reordered product (D-02, D-13)."""
+
+    kind: Literal["CO_REPLENISH"]
+    linked_product: ProductRef
+    support: float
+    confidence: float
+    lift: float
+    daily_demand: float
+    review_period_days: int
+    own_requirement: int
+    available: int
+    projected_at_next_review: float = Field(description="available − daily demand × review period")
+    supplier: SupplierRef
+
+
+class ExpiryEvidence(DTO):
+    """EXPIRY_ALERT / MARKDOWN — batch that will not sell in time and no store can take it (SD-08)."""
+
+    kind: Literal["EXPIRY"]
+    batch: BatchRiskRef
+    daily_demand: float
+    receivers_checked: int = Field(description="Other stores checked for an expiry-aware transfer")
+    markdown_pct: int | None = Field(None, description="MARKDOWN only (extension)")
+
+
+class AssortmentGapEvidence(DTO):
+    """ASSORTMENT_GAP — sells together with a listed product in other stores (SD-05)."""
+
+    kind: Literal["ASSORTMENT_GAP"]
+    antecedent: ProductRef
+    lift: float
+    source_stores: list[StoreRef] = Field(description="Stores where the rule holds (names only)")
+
+
+ReviewReason = Literal["LOW_CONFIDENCE", "BUDGET", "NO_ELIGIBLE_SUPPLIER"]
+
+
+class NeedsReviewEvidence(DTO):
+    """NEEDS_REVIEW — no automatic action; a person decides (D-04, D-29, SD-09)."""
+
+    kind: Literal["NEEDS_REVIEW"]
+    reason: ReviewReason
+    own_requirement: int
+    available: int
+    suggested_qty: int
+    detail: str
+
+
+Evidence = Annotated[
+    TransferEvidence
+    | ReorderEvidence
+    | CoReplenishEvidence
+    | ExpiryEvidence
+    | AssortmentGapEvidence
+    | NeedsReviewEvidence,
+    Field(discriminator="kind"),
+]
 
 
 class RecommendationDetailDTO(DTO):
     recommendation: RecommendationDTO
-    evidence: TransferEvidenceDTO | None
-    reason: str | None = Field(None, description="NO_SURPLUS_IN_ANY_STORE, PARTIAL_SURPLUS, BUDGET, …")
+    evidence: Evidence | None
 
 
 # --- store inventory (SD-15) ----------------------------------------------------------------------------------------
@@ -161,6 +258,53 @@ class InventoryRowDTO(DTO):
     pending_transfer_in: int
     pending_transfer_out: int
     refill_from_backroom: bool
+
+
+class InventorySummary(DTO):
+    products: int
+    high_risk: int
+    medium_risk: int
+    refill_needed: int
+    near_expiry_qty: int
+    shortage_products: int
+
+
+class StoreInventoryPage(Page[InventoryRowDTO]):
+    """Page of inventory rows plus store-wide counts for the summary chips (SD-15 totals)."""
+
+    store: StoreRef
+    summary: InventorySummary
+
+
+MovementType = Literal[
+    "SALE", "PO_RECEIPT", "TRANSFER_OUT", "TRANSFER_IN", "SHELF_REFILL", "ADJUSTMENT", "EXPIRY_WRITE_OFF"
+]
+
+
+class InventoryMovementDTO(DTO):
+    """One row of the inventory movement ledger (spec §3)."""
+
+    movement_id: UUID
+    product: ProductRef
+    movement_type: MovementType
+    qty: int = Field(description="Signed quantity (+ in, − out)")
+    location: Literal["SHELF", "BACKROOM"]
+    reference: str | None
+    reason: str | None
+    created_at: datetime
+
+
+class BatchDTO(DTO):
+    """A batch held by the store, in FEFO order, with its expiry risk (D-31)."""
+
+    batch_id: UUID
+    product: ProductRef
+    batch_no: str
+    qty: int
+    expiry_date: date
+    days_left: int
+    fefo_rank: int = Field(description="1 = sells first for this product")
+    at_risk_qty: int
 
 
 # --- transfers ------------------------------------------------------------------------------------------------------

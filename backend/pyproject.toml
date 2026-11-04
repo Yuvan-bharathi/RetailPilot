@@ -59,6 +59,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["N802", "N814", "N817"]  # short aliases such as TE / RC in tests
+"scripts/**" = ["N814", "N817"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app", "data"]

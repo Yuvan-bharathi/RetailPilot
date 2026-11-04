@@ -1,11 +1,15 @@
 import type {
+  BatchDTO,
+  BatchQuery,
   DashboardQuery,
   DashboardSummary,
   ErrorResponse,
+  ExpiringQuery,
+  InventoryMovementDTO,
   InventoryQuery,
-  InventoryRowDTO,
   LoginRequest,
   MeDTO,
+  MovementQuery,
   Page,
   PurchaseOrderDTO,
   PurchaseOrderQuery,
@@ -14,6 +18,7 @@ import type {
   RecommendationQuery,
   RunInfoDTO,
   StoreDTO,
+  StoreInventoryPage,
   TokenResponse,
   TransferOrderDTO,
   TransferQuery,
@@ -28,7 +33,10 @@ export interface ApiClient {
   getDashboard(query: DashboardQuery): Promise<DashboardSummary>;
   listRecommendations(query: RecommendationQuery): Promise<Page<RecommendationDTO>>;
   getRecommendation(recId: string): Promise<RecommendationDetailDTO>;
-  getStoreInventory(storeId: string, query: InventoryQuery): Promise<Page<InventoryRowDTO>>;
+  getStoreInventory(storeId: string, query: InventoryQuery): Promise<StoreInventoryPage>;
+  listStoreMovements(storeId: string, query: MovementQuery): Promise<Page<InventoryMovementDTO>>;
+  listStoreBatches(storeId: string, query: BatchQuery): Promise<Page<BatchDTO>>;
+  listStoreExpiring(storeId: string, query: ExpiringQuery): Promise<Page<BatchDTO>>;
   listTransfers(query: TransferQuery): Promise<Page<TransferOrderDTO>>;
   listPurchaseOrders(query: PurchaseOrderQuery): Promise<Page<PurchaseOrderDTO>>;
 }
@@ -89,6 +97,12 @@ export function createHttpClient(getToken: () => string | null, baseUrl = "/api/
     getRecommendation: (recId) => request("GET", `/recommendations/${encodeURIComponent(recId)}`),
     getStoreInventory: (storeId, query) =>
       request("GET", `/stores/${encodeURIComponent(storeId)}/inventory${toQueryString(query)}`),
+    listStoreMovements: (storeId, query) =>
+      request("GET", `/stores/${encodeURIComponent(storeId)}/inventory/movements${toQueryString(query)}`),
+    listStoreBatches: (storeId, query) =>
+      request("GET", `/stores/${encodeURIComponent(storeId)}/inventory/batches${toQueryString(query)}`),
+    listStoreExpiring: (storeId, query) =>
+      request("GET", `/stores/${encodeURIComponent(storeId)}/inventory/expiring${toQueryString(query)}`),
     listTransfers: (query) => request("GET", `/transfers${toQueryString(query)}`),
     listPurchaseOrders: (query) => request("GET", `/purchase-orders${toQueryString(query)}`),
   };

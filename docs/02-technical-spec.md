@@ -169,18 +169,18 @@ business meaning, never alphabetically.
 | GET /stores | stores visible to the user (supervisor: own store only) | – |
 | GET /runs/latest | latest successful run for "Data as of last run" (both roles, D-32) | SD-01 |
 | GET /dashboard?store_id&period | DashboardService.get_summary | SD-11 |
-| GET /stores/{store_id}/inventory?category&status | StoreInventoryService.get_view (no aisle filter in PoC, D-10) | SD-15 |
-| GET /stores/{store_id}/inventory/movements?product_id&type&from&to | ledger tab | – |
-| GET /stores/{store_id}/inventory/batches?product_id | batches tab | – |
-| GET /stores/{store_id}/inventory/expiring?within_days | expiring-soon tab | – |
-| GET /recommendations?store_id&status&type | RecommendationService.list_inbox | – |
-| GET /recommendations/{rec_id} | RecommendationService.get_detail (evidence) | – |
+| GET /stores/{store_id}/inventory?category&risk&refill_only | StoreInventoryService.get_view → StoreInventoryPage (rows + store-wide summary; no aisle filter, D-10/D-34) | SD-15 |
+| GET /stores/{store_id}/inventory/movements?product_id&type&from&to | ledger tab → Page[InventoryMovementDTO] | – |
+| GET /stores/{store_id}/inventory/batches?product_id | batches tab → Page[BatchDTO] (FEFO rank, at-risk qty) | – |
+| GET /stores/{store_id}/inventory/expiring?within_days | expiring-soon tab → Page[BatchDTO] | – |
+| GET /recommendations?store_id&status&type&priority&product_id | RecommendationService.list_inbox | – |
+| GET /recommendations/{rec_id} | RecommendationService.get_detail → evidence is a discriminated union on `kind` (D-34) | – |
 | GET /purchase-orders?status&store_id · GET /purchase-orders/{po_id} | PO queries | – |
 | POST /purchase-orders/{po_id}/resolve | PurchaseOrderService.resolve_needs_review (Super Admin) | – |
 | POST /purchase-orders/{po_id}/receipts | GoodsReceiptService.receive | SD-16 |
 | POST /purchase-orders/{po_id}/close-short | PurchaseOrderService.close_short (Super Admin, Phase 6) | – |
 | POST /approvals | ApprovalService.decide | SD-10 |
-| GET /transfers?store_id&status · GET /transfers/{id} | TransferService queries | – |
+| GET /transfers?store_id&status&product_id · GET /transfers/{id} | TransferService queries | – |
 | POST /transfers/{id}/accept · /approve-release · /reject · /dispatch · /receive | TransferService | SD-12 |
 | GET /notifications?unread · POST /notifications/{id}/read | NotificationService | SD-14 |
 | GET /agent-runs · GET /agent-runs/{run_id} | ObservabilityService | – |

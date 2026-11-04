@@ -121,7 +121,9 @@ def build_scenarios(selected: frozenset[int]) -> list[Scenario]:
             Supplier("scenario-4", "Scenario supplier 4 (synthetic)"),
             {
                 "bread": ScenarioProduct(
-                    _product("DEMO-BREAD", "Bread 400 g (demo)", "bakery", "32", "40", 6, 5),
+                    _product(
+                        "DEMO-BREAD", "Bread 400 g (demo)", "bakery", "32", "40", 6, 14
+                    ),  # long-life packaged: covers the B/C 9-day window plus delivery age
                     {
                         "A": Plant(10, 1, 8, 30),  # requirement 68 → need 38
                         "B": Plant(6, 1, 6, 66),  # requirement 66 → at requirement
@@ -146,9 +148,11 @@ def build_scenarios(selected: frozenset[int]) -> list[Scenario]:
             Supplier("scenario-5", "Scenario supplier 5 (synthetic)"),
             {
                 "main": ScenarioProduct(
-                    _product("DEMO-PANEER-200G", "Paneer 200 g (demo)", "dairy", "80", "100", 6, 7),
+                    _product("DEMO-PANEER-200G", "Paneer 200 g (demo)", "dairy", "80", "100", 6, 14),
                     {
-                        "A": Plant(2, 1, 2, 40),  # requirement 14; one batch of 40 expiring in 5 days
+                        "A": Plant(
+                            2, 1, 2, 40
+                        ),  # requirement 14; near-dated supply, last batch of 40 expires in 5 days
                         "B": Plant(2, 1, 2, 22),  # requirement 22 → at requirement
                         "C": Plant(8, 1, 2, 74),  # requirement 74 → at requirement; sells 8 / day
                     },

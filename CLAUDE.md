@@ -95,6 +95,8 @@ infra/docker-compose.yml
 - Frontend: `cd frontend && npm install && npm run dev` (mock API: `VITE_USE_MOCKS=true` in `.env.development`;
   demo users admin / sup.a / sup.b / sup.c, password `demo`) · all checks: `npm run check`
   (lint, typecheck, check:no-hex, check:api, vitest incl. axe) · build: `npm run build`
+- Mock data (frontend): `cd backend && uv run python -m scripts.export_mock_fixtures` regenerates
+  `frontend/src/mocks/data/fixtures.json` from the synthetic data with the real tools (a test fails if it is stale)
 - API contract: after changing a DTO/route run `cd backend && uv run python -m scripts.export_openapi ../frontend/openapi.json`
   then `cd ../frontend && npm run gen:api` — both sides are checked (test_contract.py, check:api)
 

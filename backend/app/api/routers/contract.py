@@ -5,18 +5,21 @@ The request and response shapes are final so the frontend can generate its types
 follow the store-scoping rule encoded in the DTOs (app/domain/schemas/common.py).
 """
 
+from datetime import date
 from typing import Annotated, NoReturn
 from uuid import UUID
 
 from fastapi import APIRouter, Query
 
 from app.core.errors import NotImplementedYet
-from app.domain.schemas.common import Page, PageParams
+from app.domain.schemas.common import Page, PageParams, Priority
 from app.domain.schemas.dtos import (
+    BatchDTO,
     DashboardSummary,
-    InventoryRowDTO,
+    InventoryMovementDTO,
     LoginRequest,
     MeDTO,
+    MovementType,
     Period,
     POStatus,
     PurchaseOrderDTO,
@@ -27,6 +30,7 @@ from app.domain.schemas.dtos import (
     RunInfoDTO,
     StockoutRisk,
     StoreDTO,
+    StoreInventoryPage,
     TokenResponse,
     TransferOrderDTO,
     TransferStatus,
@@ -71,6 +75,8 @@ def list_recommendations(
     store_id: UUID | None = None,
     status: RecStatus | None = None,
     rec_type: Annotated[RecType | None, Query(alias="type")] = None,
+    priority: Priority | None = None,
+    product_id: UUID | None = None,
 ) -> Page[RecommendationDTO]:
     _todo()
 
@@ -86,13 +92,41 @@ def get_store_inventory(
     paging: Paging,
     category: str | None = None,
     risk: StockoutRisk | None = None,
-) -> Page[InventoryRowDTO]:
+    refill_only: bool = False,
+) -> StoreInventoryPage:
+    _todo()
+
+
+@router.get("/stores/{store_id}/inventory/movements", tags=["inventory"])
+def list_store_movements(
+    store_id: UUID,
+    paging: Paging,
+    product_id: UUID | None = None,
+    movement_type: Annotated[MovementType | None, Query(alias="type")] = None,
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
+) -> Page[InventoryMovementDTO]:
+    _todo()
+
+
+@router.get("/stores/{store_id}/inventory/batches", tags=["inventory"])
+def list_store_batches(store_id: UUID, paging: Paging, product_id: UUID | None = None) -> Page[BatchDTO]:
+    _todo()
+
+
+@router.get("/stores/{store_id}/inventory/expiring", tags=["inventory"])
+def list_store_expiring(
+    store_id: UUID, paging: Paging, within_days: Annotated[int, Query(ge=1, le=60)] = 14
+) -> Page[BatchDTO]:
     _todo()
 
 
 @router.get("/transfers", tags=["transfers"])
 def list_transfers(
-    paging: Paging, store_id: UUID | None = None, status: TransferStatus | None = None
+    paging: Paging,
+    store_id: UUID | None = None,
+    status: TransferStatus | None = None,
+    product_id: UUID | None = None,
 ) -> Page[TransferOrderDTO]:
     _todo()
 

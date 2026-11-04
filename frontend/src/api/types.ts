@@ -8,6 +8,7 @@ type Schemas = components["schemas"];
 
 export type StoreRef = Schemas["StoreRef"];
 export type ProductRef = Schemas["ProductRef"];
+export type SupplierRef = Schemas["SupplierRef"];
 export type Counterpart = Schemas["Counterpart"];
 export type ErrorResponse = Schemas["ErrorResponse"];
 
@@ -24,11 +25,28 @@ export type MoverDTO = Schemas["MoverDTO"];
 
 export type RecommendationDTO = Schemas["RecommendationDTO"];
 export type RecommendationDetailDTO = Schemas["RecommendationDetailDTO"];
-export type TransferEvidenceDTO = Schemas["TransferEvidenceDTO"];
 export type RecType = RecommendationDTO["rec_type"];
 export type RecStatus = RecommendationDTO["status"];
+export type Priority = RecommendationDTO["priority"];
+
+/** Evidence is a discriminated union on `kind` (D-32): one shape per recommendation kind. */
+export type Evidence = NonNullable<RecommendationDetailDTO["evidence"]>;
+export type TransferEvidence = Schemas["TransferEvidence"];
+export type ReorderEvidence = Schemas["ReorderEvidence"];
+export type CoReplenishEvidence = Schemas["CoReplenishEvidence"];
+export type ExpiryEvidence = Schemas["ExpiryEvidence"];
+export type AssortmentGapEvidence = Schemas["AssortmentGapEvidence"];
+export type NeedsReviewEvidence = Schemas["NeedsReviewEvidence"];
+export type BatchRiskRef = Schemas["BatchRiskRef"];
 
 export type InventoryRowDTO = Schemas["InventoryRowDTO"];
+export type InventorySummary = Schemas["InventorySummary"];
+export type StoreInventoryPage = Schemas["StoreInventoryPage"];
+export type StockoutRisk = InventoryRowDTO["stockout_risk"];
+export type InventoryMovementDTO = Schemas["InventoryMovementDTO"];
+export type MovementType = InventoryMovementDTO["movement_type"];
+export type BatchDTO = Schemas["BatchDTO"];
+
 export type TransferOrderDTO = Schemas["TransferOrderDTO"];
 export type TransferStatus = TransferOrderDTO["status"];
 export type PurchaseOrderDTO = Schemas["PurchaseOrderDTO"];
@@ -42,6 +60,9 @@ export type Page<T> = Omit<Schemas["Page_RecommendationDTO_"], "items"> & { item
 type Query<Op extends keyof operations> = NonNullable<operations[Op]["parameters"]["query"]>;
 export type RecommendationQuery = Query<"list_recommendations">;
 export type InventoryQuery = Query<"get_store_inventory">;
+export type MovementQuery = Query<"list_store_movements">;
+export type BatchQuery = Query<"list_store_batches">;
+export type ExpiringQuery = Query<"list_store_expiring">;
 export type TransferQuery = Query<"list_transfers">;
 export type PurchaseOrderQuery = Query<"list_purchase_orders">;
 export type DashboardQuery = Query<"get_dashboard">;

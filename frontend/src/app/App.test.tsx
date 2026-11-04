@@ -59,37 +59,20 @@ describe("app shell", () => {
 });
 
 describe("/components page", () => {
-  it("renders every component with mock data and has no axe violations (super admin)", async () => {
+  it("renders every component and evidence kind with no axe violations", async () => {
     const { container } = renderApp("/components", "admin");
     await screen.findByRole("heading", { name: "Design system" });
-    await screen.findByText("Transfer 24 × Biscuits 200 g");
     await waitFor(() => expect(screen.getByText(/^Showing 1–10 of/)).toBeTruthy());
-    expect(screen.getByText("Donor surplus")).toBeTruthy();
+    for (const title of [
+      "Why order from the supplier",
+      "Why add this to the order",
+      "Why this is an expiry alert",
+      "Why list this product",
+      "Why this needs your review",
+    ]) {
+      expect(screen.getByText(title)).toBeTruthy();
+    }
+    expect(screen.getByText("Donor keeps its full requirement")).toBeTruthy(); // destination-view example
     expect(await axe(container)).toHaveNoViolations();
   }, 20_000);
-
-  it("shows a supervisor the other store only as name + quantity", async () => {
-    const { container } = renderApp("/components", "sup.c");
-    await screen.findByText("Transfer 24 × Biscuits 200 g");
-    const evidence = screen.getByRole("region", { name: "Decision evidence" });
-    expect(within(evidence).getByText("Store A - Residential · 24 units")).toBeTruthy();
-    expect(within(evidence).queryByText("Donor surplus")).toBeNull();
-    expect(within(evidence).queryByText("Donor's protected requirement")).toBeNull();
-    expect(within(evidence).getByText("Donor keeps its full requirement")).toBeTruthy();
-    expect(within(evidence).getByText("Other stores are shown by name and offered quantity only.")).toBeTruthy();
-    expect(await axe(container)).toHaveNoViolations();
-  }, 20_000);
-
-  it("shows the donor store's own supervisor their surplus and protected requirement", async () => {
-    renderApp("/components", "sup.a");
-    await screen.findByText("Transfer 24 × Biscuits 200 g");
-    const evidence = screen.getByRole("region", { name: "Decision evidence" });
-    expect(within(evidence).getByText("Donor surplus")).toBeTruthy();
-    expect(within(evidence).getByText("Donor's protected requirement")).toBeTruthy();
-  }, 20_000);
-
-  it("explains why a supervisor of another store cannot open the example", async () => {
-    renderApp("/components", "sup.b");
-    expect(await screen.findByText(/a supervisor cannot open another store/)).toBeTruthy();
-  });
 });

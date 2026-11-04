@@ -7,7 +7,7 @@ import pytest
 from data.synthetic.config import GeneratorConfig
 from data.synthetic.generate import generate
 from data.synthetic.reader import Dataset, load_dataset
-from tests.unit.synthetic.planning import Planner
+from scripts.planning import Planner
 
 
 @pytest.fixture(scope="session")

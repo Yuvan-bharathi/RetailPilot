@@ -36,7 +36,7 @@ from data.synthetic.catalog import (
 )
 from data.synthetic.config import ALL_SCENARIOS, PROFILES, GeneratorConfig
 from data.synthetic.demand import background_demand, day_factor, expected_rate
-from data.synthetic.inventory import Policy, SimResult, scenario_plan, simulate
+from data.synthetic.inventory import Policy, SimResult, last_review_day, scenario_plan, simulate
 from data.synthetic.scenarios import Scenario, ScenarioProduct, build_scenarios
 from data.synthetic.writer import write_csv, write_json
 
@@ -199,13 +199,14 @@ def generate(config: GeneratorConfig, out_dir: Path) -> dict[str, Any]:
     for s, _key, sp in scenario_items:
         for store in STORES:
             plant = sp.plants[store.code]
-            near_dated = (
-                config.run_date + timedelta(days=sp.final_batch_expiry_days)
-                if sp.final_batch_expiry_days is not None and s.extra.get("from") == store.code
-                else None
-            )
+            # scenario 5: the donor store gets near-dated supply so its final batch expires
+            # `final_batch_expiry_days` after the run date (every delivery has the same age → FEFO order holds)
+            age: int | None = None
+            if sp.final_batch_expiry_days is not None and s.extra.get("from") == store.code:
+                final_expiry = config.run_date + timedelta(days=sp.final_batch_expiry_days)
+                age = (final_expiry - days[last_review_day(n_days, store.review_period_days)]).days
             opening, plan = scenario_plan(
-                plant.daily_demand, n_days, store.review_period_days, plant.on_hand, near_dated
+                plant.daily_demand, n_days, store.review_period_days, plant.on_hand, days[0], age
             )
             shelf_life = sp.product.shelf_life_days
             item = _Item(
@@ -225,7 +226,11 @@ def generate(config: GeneratorConfig, out_dir: Path) -> dict[str, Any]:
                 shelf_capacity=_shelf_capacity(plant.daily_demand, plant.min_display_qty),
                 batch_prefix=f"{store.code}-{sp.product.sku}",
                 opening_qty=opening,
-                opening_expiry=None if shelf_life is None else days[0] + timedelta(days=shelf_life),
+                opening_expiry=(
+                    None
+                    if shelf_life is None
+                    else days[0] + timedelta(days=age if age is not None else shelf_life)
+                ),
                 plan=plan,
             )
             items.append(item)

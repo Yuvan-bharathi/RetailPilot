@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.domain.schemas.common import Counterpart, PageParams, StoreRef
-from app.domain.schemas.dtos import RecommendationDTO, TransferEvidenceDTO
+from app.domain.schemas.dtos import RecommendationDTO, TransferEvidence
 from app.main import create_app
 
 FRONTEND_OPENAPI = Path(__file__).resolve().parents[3] / "frontend" / "openapi.json"
@@ -70,7 +70,8 @@ def test_counterpart_exposes_only_store_name_and_quantity() -> None:
 
 
 def test_donor_stock_fields_are_optional_so_supervisor_views_can_omit_them() -> None:
-    evidence = TransferEvidenceDTO(
+    evidence = TransferEvidence(
+        kind="TRANSFER",
         destination_shortage=40,
         donor=Counterpart(store=StoreRef(store_id=UUID(ANY_ID), name="Store A"), qty=24),
         transfer_qty=24,

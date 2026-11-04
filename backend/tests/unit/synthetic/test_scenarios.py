@@ -12,7 +12,7 @@ from app.tools.requirement import RequirementCalculator as RC
 from app.tools.transfer_engine import TransferDecisionEngine as TE
 from app.tools.types import BasketQualityRules, BatchInfo
 from data.synthetic.reader import Dataset
-from tests.unit.synthetic.planning import Planner
+from scripts.planning import Planner
 
 
 def _store(ds: Dataset, code: str) -> UUID:

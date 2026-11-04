@@ -284,8 +284,10 @@ export function DataTable<T extends RowData>({
         </div>
       </div>
 
+      {/* `relative` keeps absolutely positioned children (e.g. sr-only labels) inside the scroll area; without it
+          they are positioned against the page and widen the whole document. */}
       <div
-        className="max-h-[560px] overflow-auto"
+        className="relative max-h-[560px] overflow-auto"
         role="region"
         aria-label={caption}
         aria-busy={isLoading || isFetching}

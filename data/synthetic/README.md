@@ -58,8 +58,8 @@ Also planted: a **stale SKU** in Store C (stock held, no sales for 5 days; `mani
 | 1 | Rice 5 kg | d 10, req 65, holds 30 | d 8, req 85, holds 40 | d 9, req 86, holds 35 | PO needs 35 / 45 / 51, NO_SURPLUS_IN_ANY_STORE |
 | 2 | Tea 250 g | req 16, holds 46 (surplus 30) | at requirement | req 30, holds 10 | transfer A→C 20, no PO |
 | 3 | Biscuits 200 g | req 30, holds 54 (surplus 24) | at requirement (55) | req 40, holds 0 | transfer A→C 24 + PO C 16 (PARTIAL_SURPLUS) |
-| 4 | Bread + butter | bread req 68, holds 30; butter req 22, holds 25 | at requirement | at requirement | bread PO 38; butter co-replenish 3 (lift ≥ 1.5) |
-| 5 | Paneer 200 g | one batch of 40 expiring in 5 days, sells 2/day | at requirement | sells 8/day | 30 at risk → single transfer A→C 30 |
+| 4 | Bread (14-day long-life) + butter | bread req 68, holds 30; butter req 22, holds 25 | at requirement | at requirement | bread PO 38; butter co-replenish 3 (lift ≥ 1.5) |
+| 5 | Paneer 200 g (14-day shelf life; Store A gets near-dated supply) | one batch of 40 expiring in 5 days, sells 2/day | at requirement | sells 8/day | 30 at risk → single transfer A→C 30 |
 
 Scenario 3 Store C holds 0, so its last day closes at 0 (a stockout day, excluded from the baseline by D-30);
 its other days have the same constant demand, so the baseline still equals the planted 4/day.

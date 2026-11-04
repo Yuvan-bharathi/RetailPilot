@@ -157,6 +157,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{store_id}/inventory/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Store Movements */
+        get: operations["list_store_movements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{store_id}/inventory/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Store Batches */
+        get: operations["list_store_batches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{store_id}/inventory/expiring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Store Expiring */
+        get: operations["list_store_expiring"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transfers": {
         parameters: {
             query?: never;
@@ -229,6 +280,106 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AssortmentGapEvidence
+         * @description ASSORTMENT_GAP — sells together with a listed product in other stores (SD-05).
+         */
+        AssortmentGapEvidence: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "ASSORTMENT_GAP";
+            antecedent: components["schemas"]["ProductRef"];
+            /** Lift */
+            lift: number;
+            /**
+             * Source Stores
+             * @description Stores where the rule holds (names only)
+             */
+            source_stores: components["schemas"]["StoreRef"][];
+        };
+        /**
+         * BatchDTO
+         * @description A batch held by the store, in FEFO order, with its expiry risk (D-31).
+         */
+        BatchDTO: {
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            product: components["schemas"]["ProductRef"];
+            /** Batch No */
+            batch_no: string;
+            /** Qty */
+            qty: number;
+            /**
+             * Expiry Date
+             * Format: date
+             */
+            expiry_date: string;
+            /** Days Left */
+            days_left: number;
+            /**
+             * Fefo Rank
+             * @description 1 = sells first for this product
+             */
+            fefo_rank: number;
+            /** At Risk Qty */
+            at_risk_qty: number;
+        };
+        /**
+         * BatchRiskRef
+         * @description A batch at risk of expiring before it sells (FEFO, D-31).
+         */
+        BatchRiskRef: {
+            /** Batch No */
+            batch_no: string;
+            /**
+             * Expiry Date
+             * Format: date
+             */
+            expiry_date: string;
+            /** Days Left */
+            days_left: number;
+            /** Batch Qty */
+            batch_qty: number;
+            /** At Risk Qty */
+            at_risk_qty: number;
+        };
+        /**
+         * CoReplenishEvidence
+         * @description CO_REPLENISH — complement of a reordered product (D-02, D-13).
+         */
+        CoReplenishEvidence: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "CO_REPLENISH";
+            linked_product: components["schemas"]["ProductRef"];
+            /** Support */
+            support: number;
+            /** Confidence */
+            confidence: number;
+            /** Lift */
+            lift: number;
+            /** Daily Demand */
+            daily_demand: number;
+            /** Review Period Days */
+            review_period_days: number;
+            /** Own Requirement */
+            own_requirement: number;
+            /** Available */
+            available: number;
+            /**
+             * Projected At Next Review
+             * @description available − daily demand × review period
+             */
+            projected_at_next_review: number;
+            supplier: components["schemas"]["SupplierRef"];
+        };
         /**
          * Counterpart
          * @description Another store as a Store Supervisor may see it: name + offered/requested quantity only.
@@ -316,6 +467,30 @@ export interface components {
         ErrorResponse: {
             error: components["schemas"]["ErrorBody"];
         };
+        /**
+         * ExpiryEvidence
+         * @description EXPIRY_ALERT / MARKDOWN — batch that will not sell in time and no store can take it (SD-08).
+         */
+        ExpiryEvidence: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "EXPIRY";
+            batch: components["schemas"]["BatchRiskRef"];
+            /** Daily Demand */
+            daily_demand: number;
+            /**
+             * Receivers Checked
+             * @description Other stores checked for an expiry-aware transfer
+             */
+            receivers_checked: number;
+            /**
+             * Markdown Pct
+             * @description MARKDOWN only (extension)
+             */
+            markdown_pct?: number | null;
+        };
         /** HealthChecks */
         HealthChecks: {
             /**
@@ -339,6 +514,42 @@ export interface components {
             /** Version */
             version: string;
             checks: components["schemas"]["HealthChecks"];
+        };
+        /**
+         * InventoryMovementDTO
+         * @description One row of the inventory movement ledger (spec §3).
+         */
+        InventoryMovementDTO: {
+            /**
+             * Movement Id
+             * Format: uuid
+             */
+            movement_id: string;
+            product: components["schemas"]["ProductRef"];
+            /**
+             * Movement Type
+             * @enum {string}
+             */
+            movement_type: "SALE" | "PO_RECEIPT" | "TRANSFER_OUT" | "TRANSFER_IN" | "SHELF_REFILL" | "ADJUSTMENT" | "EXPIRY_WRITE_OFF";
+            /**
+             * Qty
+             * @description Signed quantity (+ in, − out)
+             */
+            qty: number;
+            /**
+             * Location
+             * @enum {string}
+             */
+            location: "SHELF" | "BACKROOM";
+            /** Reference */
+            reference: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** InventoryRowDTO */
         InventoryRowDTO: {
@@ -378,6 +589,21 @@ export interface components {
             /** Refill From Backroom */
             refill_from_backroom: boolean;
         };
+        /** InventorySummary */
+        InventorySummary: {
+            /** Products */
+            products: number;
+            /** High Risk */
+            high_risk: number;
+            /** Medium Risk */
+            medium_risk: number;
+            /** Refill Needed */
+            refill_needed: number;
+            /** Near Expiry Qty */
+            near_expiry_qty: number;
+            /** Shortage Products */
+            shortage_products: number;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Username */
@@ -413,6 +639,30 @@ export interface components {
              */
             revenue: string;
         };
+        /**
+         * NeedsReviewEvidence
+         * @description NEEDS_REVIEW — no automatic action; a person decides (D-04, D-29, SD-09).
+         */
+        NeedsReviewEvidence: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "NEEDS_REVIEW";
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "LOW_CONFIDENCE" | "BUDGET" | "NO_ELIGIBLE_SUPPLIER";
+            /** Own Requirement */
+            own_requirement: number;
+            /** Available */
+            available: number;
+            /** Suggested Qty */
+            suggested_qty: number;
+            /** Detail */
+            detail: string;
+        };
         /** POLineDTO */
         POLineDTO: {
             /**
@@ -445,10 +695,24 @@ export interface components {
              */
             received_qty: number;
         };
-        /** Page[InventoryRowDTO] */
-        Page_InventoryRowDTO_: {
+        /** Page[BatchDTO] */
+        Page_BatchDTO_: {
             /** Items */
-            items: components["schemas"]["InventoryRowDTO"][];
+            items: components["schemas"]["BatchDTO"][];
+            /**
+             * Total
+             * @description Total matching rows across all pages
+             */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** Page[InventoryMovementDTO] */
+        Page_InventoryMovementDTO_: {
+            /** Items */
+            items: components["schemas"]["InventoryMovementDTO"][];
             /**
              * Total
              * @description Total matching rows across all pages
@@ -606,12 +870,52 @@ export interface components {
         /** RecommendationDetailDTO */
         RecommendationDetailDTO: {
             recommendation: components["schemas"]["RecommendationDTO"];
-            evidence: components["schemas"]["TransferEvidenceDTO"] | null;
+            /** Evidence */
+            evidence: (components["schemas"]["TransferEvidence"] | components["schemas"]["ReorderEvidence"] | components["schemas"]["CoReplenishEvidence"] | components["schemas"]["ExpiryEvidence"] | components["schemas"]["AssortmentGapEvidence"] | components["schemas"]["NeedsReviewEvidence"]) | null;
+        };
+        /**
+         * ReorderEvidence
+         * @description REORDER — own requirement vs available, and why a PO instead of a transfer (SD-06/07).
+         */
+        ReorderEvidence: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "REORDER";
             /**
              * Reason
-             * @description NO_SURPLUS_IN_ANY_STORE, PARTIAL_SURPLUS, BUDGET, …
+             * @enum {string}
              */
-            reason?: string | null;
+            reason: "NO_SURPLUS_IN_ANY_STORE" | "PARTIAL_SURPLUS" | "TRANSFER_NOT_VIABLE";
+            /** Daily Demand */
+            daily_demand: number;
+            /** Lead Time Days */
+            lead_time_days: number;
+            /** Review Period Days */
+            review_period_days: number;
+            /** Safety Stock Days */
+            safety_stock_days: number;
+            /** Min Display Qty */
+            min_display_qty: number;
+            /** Own Requirement */
+            own_requirement: number;
+            /** Available */
+            available: number;
+            /** Need Qty */
+            need_qty: number;
+            /**
+             * Transferred Qty
+             * @description Units covered by transfers (PARTIAL_SURPLUS); the PO is the rest
+             */
+            transferred_qty: number;
+            /** Days Of Cover */
+            days_of_cover: number;
+            supplier: components["schemas"]["SupplierRef"];
+            /** Lost Revenue */
+            lost_revenue: string | null;
+            /** Lost Profit */
+            lost_profit: string | null;
         };
         /**
          * RunInfoDTO
@@ -655,6 +959,25 @@ export interface components {
             /** Store Type */
             store_type: string;
         };
+        /**
+         * StoreInventoryPage
+         * @description Page of inventory rows plus store-wide counts for the summary chips (SD-15 totals).
+         */
+        StoreInventoryPage: {
+            /** Items */
+            items: components["schemas"]["InventoryRowDTO"][];
+            /**
+             * Total
+             * @description Total matching rows across all pages
+             */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            store: components["schemas"]["StoreRef"];
+            summary: components["schemas"]["InventorySummary"];
+        };
         /** StoreRef */
         StoreRef: {
             /**
@@ -689,15 +1012,20 @@ export interface components {
             expires_in: number;
         };
         /**
-         * TransferEvidenceDTO
-         * @description Evidence panel of a transfer / PO-remainder recommendation (design doc §6).
+         * TransferEvidence
+         * @description TRANSFER (surplus or expiry-aware) — design doc §6.
          *
          *     Scoped per viewer (D-32): donor_surplus and donor_protected_requirement describe the DONOR store's stock, so
          *     they are filled for the Super Admin and for the donor store's own supervisor, and null for the destination
          *     supervisor (CLAUDE.md rule 10), who sees the donor as name + offered qty plus the numberless assurance
          *     `donor_keeps_requirement`.
          */
-        TransferEvidenceDTO: {
+        TransferEvidence: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "TRANSFER";
             /** Destination Shortage */
             destination_shortage: number;
             donor: components["schemas"]["Counterpart"] | null;
@@ -731,6 +1059,8 @@ export interface components {
             days_of_cover_before: number;
             /** Days Of Cover After */
             days_of_cover_after: number;
+            /** @description Set for an expiry-aware transfer (SD-08) */
+            expiring_batch?: components["schemas"]["BatchRiskRef"] | null;
         };
         /** TransferOrderDTO */
         TransferOrderDTO: {
@@ -1236,6 +1566,8 @@ export interface operations {
                 store_id?: string | null;
                 status?: ("PENDING" | "ACCEPTED" | "EDITED" | "REJECTED" | "NEEDS_REVIEW" | "SUPERSEDED") | null;
                 type?: ("REORDER" | "TRANSFER" | "CO_REPLENISH" | "MARKDOWN" | "EXPIRY_ALERT" | "ASSORTMENT_GAP") | null;
+                priority?: ("HIGH" | "NORMAL") | null;
+                product_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -1393,6 +1725,7 @@ export interface operations {
                 q?: string | null;
                 category?: string | null;
                 risk?: ("HIGH" | "MEDIUM" | "LOW") | null;
+                refill_only?: boolean;
             };
             header?: never;
             path: {
@@ -1408,7 +1741,256 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_InventoryRowDTO_"];
+                    "application/json": components["schemas"]["StoreInventoryPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_store_movements: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                sort?: string | null;
+                q?: string | null;
+                product_id?: string | null;
+                type?: ("SALE" | "PO_RECEIPT" | "TRANSFER_OUT" | "TRANSFER_IN" | "SHELF_REFILL" | "ADJUSTMENT" | "EXPIRY_WRITE_OFF") | null;
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                store_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_InventoryMovementDTO_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_store_batches: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                sort?: string | null;
+                q?: string | null;
+                product_id?: string | null;
+            };
+            header?: never;
+            path: {
+                store_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_BatchDTO_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_store_expiring: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                sort?: string | null;
+                q?: string | null;
+                within_days?: number;
+            };
+            header?: never;
+            path: {
+                store_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_BatchDTO_"];
                 };
             };
             /** @description Unauthorized */
@@ -1476,6 +2058,7 @@ export interface operations {
                 q?: string | null;
                 store_id?: string | null;
                 status?: ("PROPOSED" | "DEST_ACCEPTED" | "DONOR_APPROVED" | "DISPATCHED" | "RECEIVED" | "REJECTED" | "CANCELLED" | "SUPERSEDED") | null;
+                product_id?: string | null;
             };
             header?: never;
             path?: never;

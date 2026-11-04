@@ -15,6 +15,7 @@ choose silently.
 | D-31 | 2026-11-04 | Product owner (approved after Phase 4a finding) |
 | D-32 | 2026-11-04 | Product owner (Phase 7 approval; choices confirmed with per-viewer scoping) |
 | D-33 | 2026-11-04 | Product owner (contrast, Design System v1.1) |
+| D-34 | 2026-11-04 | Product owner (Phase 8a contract, mock data) + implementation choices to confirm |
 
 ---
 
@@ -363,3 +364,36 @@ versioned as Design System **v1.1** (the frozen v1.0 is not edited silently):
 `npm run check:no-hex` fails on hex colours outside tokens.css and on any text use of `--text-muted`.
 **Changed.** frontend/src/styles/tokens.css, index.css; docs/03-design-system.md (v1.1 note, §1, §8);
 frontend/scripts/check-no-hex.mjs.
+
+---
+
+## D-34 Phase 8a contract additions and mock data (approved 2026-11-04)
+**Decision.**
+- **Evidence is a discriminated union** on `kind` — one Pydantic model per kind, so each has exactly its own fields
+  and TypeScript narrows on it: `TRANSFER` (surplus or expiry-aware, with `expiring_batch`), `REORDER`,
+  `CO_REPLENISH`, `EXPIRY` (EXPIRY_ALERT / MARKDOWN), `ASSORTMENT_GAP`, `NEEDS_REVIEW`
+  (reason `LOW_CONFIDENCE | BUDGET | NO_ELIGIBLE_SUPPLIER`). `kind` is required. NEEDS_REVIEW is a recommendation
+  *status*, so the union is keyed on `kind`, not `rec_type`. `RecommendationDetailDTO.reason` is replaced by the
+  reason inside each evidence kind.
+- **Inventory endpoints:** `GET /stores/{id}/inventory` returns `StoreInventoryPage` (Page + store + store-wide
+  `summary` counts, SD-15 totals) and takes `refill_only`; new `…/inventory/movements` (type, from, to, product_id),
+  `…/inventory/batches` (product_id; FEFO rank and at-risk qty per batch) and `…/inventory/expiring` (within_days).
+  `GET /recommendations` and `GET /transfers` take `product_id`; recommendations also `priority`.
+- **Super Admin inventory store:** picker when "All stores" is selected, defaulting to the last store chosen
+  (per-browser preference).
+- **Mock data** is exported from the synthetic `small` dataset by `backend/scripts/export_mock_fixtures.py`, which
+  runs the real Phase 3 tools in nightly-run order, validates every object against the DTOs and asserts the five
+  scenarios. A backend test fails if the committed fixture is stale. The fixture is a lazily loaded chunk that is
+  never part of a production build.
+
+**Implementation choices (to confirm).**
+- Synthetic data fixes found by running the planner on the fixtures: paneer shelf life 14 days with **near-dated
+  supply** for the scenario-5 donor store (every delivery arrives with the same remaining life, so FEFO order holds),
+  and bread shelf life 14 days ("long-life packaged"). With the shorter shelf lives, Stores B/C held more than they
+  could sell before expiry (their requirement window is 9 days), which produced expiry alerts and extra transfers
+  around scenarios 4–5.
+- Lost revenue of 0 is sent as null (shown as "—"), not ₹0.00.
+- 4xx API answers are not retried by the client (they will not change); 5xx/network errors are retried once.
+- The synthetic data has no NEEDS_REVIEW (the planted stale SKU is not short) and no ASSORTMENT_GAP (all products
+  are listed in every store); those evidence views are covered by component tests with typed examples.
+**Changed.** Spec §5; backend DTOs and contract routes; frontend api/mocks/pages; data/synthetic scenarios.
