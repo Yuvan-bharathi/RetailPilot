@@ -2,9 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation, type RouteObject } from "react-router";
 
-import { api, ApiError, tokenStore, USE_MOCKS } from "../api";
+import { ApiError, api, tokenStore, USE_MOCKS } from "../api";
 import type { ApiClient } from "../api/client";
 import { AppShell } from "../components/AppShell";
+import { AnalyticsPage } from "../pages/AnalyticsPage";
 import { ApprovalsPage } from "../pages/ApprovalsPage";
 import { ComponentsPage } from "../pages/ComponentsPage";
 import { DashboardPage } from "../pages/DashboardPage";
@@ -15,6 +16,7 @@ import { MonitoringPage } from "../pages/MonitoringPage";
 import { PurchaseOrdersPage } from "../pages/PurchaseOrdersPage";
 import { RecommendationDetailPage } from "../pages/RecommendationDetailPage";
 import { RecommendationsPage } from "../pages/RecommendationsPage";
+import { SettingsPage } from "../pages/SettingsPage";
 import { ForbiddenPage, NotFoundPage, PlaceholderPage } from "../pages/SimplePages";
 import { StoresPage } from "../pages/StoresPage";
 import { TransfersPage } from "../pages/TransfersPage";
@@ -63,7 +65,9 @@ const BUILT_PAGES: Record<string, ReactNode> = {
   "/purchase-orders": <PurchaseOrdersPage />,
   "/approvals": <ApprovalsPage />,
   "/goods-receipt": <GoodsReceiptPage />,
+  "/analytics": <AnalyticsPage />,
   "/monitoring": <MonitoringPage />,
+  "/settings": <SettingsPage />,
 };
 
 // eslint-disable-next-line react-refresh/only-export-components
