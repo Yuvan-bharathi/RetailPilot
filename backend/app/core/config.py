@@ -4,6 +4,7 @@ Business parameters (thresholds, budgets, deadlines) do NOT live here: they are 
 BusinessRule table (docs/02-technical-spec.md §9). This module holds only infrastructure settings.
 """
 
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -13,6 +14,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/core/config.py -> parents[3] is the repository root
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 class Settings(BaseSettings):
@@ -47,7 +51,9 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 480
 
     anthropic_api_key: SecretStr | None = None
-    llm_model: str = "claude-sonnet-5-5"
+    groq_api_key: SecretStr | None = None
+    llm_provider: str = "groq"
+    llm_model: str = "openai/gpt-oss-20b"
 
     app_timezone: str = "Asia/Kolkata"
     cors_origins: list[str] = ["http://localhost:5173"]
