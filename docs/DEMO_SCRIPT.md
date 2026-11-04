@@ -112,3 +112,4 @@ uv run python -m scripts.seed_demo
    - Inspect tool calls (e.g. `query_velocity_metrics` with duration in ms).
    - Inspect LLM token consumption by model (`claude-3-7-sonnet`).
 5. Click **Trigger Nightly Pipeline** to execute an on-demand replenishment cycle.
+

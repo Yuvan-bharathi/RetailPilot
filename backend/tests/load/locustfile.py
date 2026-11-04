@@ -96,3 +96,4 @@ class RetailPilotUser(HttpUser):
                     resp.failure(f"Telemetry SLA exceeded: {resp.elapsed.total_seconds():.3f}s > 0.500s")
                 else:
                     resp.success()
+
