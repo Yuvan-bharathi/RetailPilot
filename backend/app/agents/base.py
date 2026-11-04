@@ -25,7 +25,9 @@ class RunParams:
     stale_days: int = 30
     markdown_enabled: bool = False
     schemes_enabled: bool = False
-    use_statsforecast: bool = False
+    use_model_selection: bool = (
+        False  # D-45: off — the replay showed no gain over the baseline on current data
+    )
     use_calendar_uplift: bool = False
 
     @classmethod

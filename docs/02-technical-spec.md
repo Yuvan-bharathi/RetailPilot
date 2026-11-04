@@ -224,8 +224,9 @@ Critical agents (failure stops the run, no cache swap): DemandForecasting, Stock
 | LostSalesCalculator | estimate(daily_sales, stockout_days, margins: DataFrame) → lost_revenue, lost_profit | DataFrame | SD-03 |
 | ForecastTools | classify_abc_xyz(series, value_col='revenue', a_cut=0.8, b_cut=0.95, x_cv=0.5, y_cv=1.0) | DataFrame | SD-04 |
 | ForecastTools | baseline_avg_daily(df: DataFrame, window_days: int = 28) — df may carry is_stockout; stockout days excluded (D-30) | DataFrame[unique_id, daily_demand, method, in_stock_days] | SD-04 |
-| ForecastTools | fit_statsforecast(df, models: list, horizon: int, n_windows: int = 3)  [ext] | DataFrame | SD-04 |
-| ForecastTools | select_best(cv_results: DataFrame, baseline: DataFrame)  [ext] | DataFrame | SD-04 |
+| ForecastTools | model_forecast(y: Sequence[float], method: BASELINE\|ETS\|CROSTON\|TSB, window_days=28) — flat daily demand (D-45) | float | SD-04 |
+| ForecastTools | backtest_models(df, horizon: int, n_windows=3, min_history_days=56, adi_threshold=1.32, window_days=28) — rolling origin, WMAPE of horizon totals (D-45; replaces fit_statsforecast) | DataFrame[unique_id, method, wmape, windows, forecast] | SD-04 |
+| ForecastTools | select_best(cv_results, baseline, min_improvement=0.05) — model only if > 5% better (D-45) | DataFrame[unique_id, daily_demand, method, in_stock_days] | SD-04 |
 | ForecastTools | apply_calendar_uplift(forecast, events, uplift_by_type: dict)  [ext] | DataFrame | SD-04 |
 | BasketTools | to_basket_matrix(lines: DataFrame) | DataFrame[bool] | SD-05 |
 | BasketTools | mine_rules(basket, min_support=0.005, min_confidence=0.2, min_lift=1.0, max_len=2) | DataFrame | SD-05 |
