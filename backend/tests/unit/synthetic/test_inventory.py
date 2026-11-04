@@ -46,21 +46,9 @@ def test_batches_are_depleted_earliest_expiry_first_not_in_arrival_order() -> No
     assert remaining == {"T-001": 10, "T-003": 2}
 
 
-@pytest.mark.parametrize(
-    "daily",
-    [
-        pytest.param(1, marks=pytest.mark.xfail(strict=True, reason="spec §1 FEFO formula; proposed D-31")),
-        pytest.param(3, marks=pytest.mark.xfail(strict=True, reason="spec §1 FEFO formula; proposed D-31")),
-        pytest.param(4, marks=pytest.mark.xfail(strict=True, reason="spec §1 FEFO formula; proposed D-31")),
-        7,  # every batch sells in time → both agree
-    ],
-)
+@pytest.mark.parametrize("daily", [1, 3, 4, 7])
 def test_simulated_write_offs_equal_fefo_at_risk_prediction(daily: int) -> None:
-    """Cross-check: what the simulator actually writes off vs what FreshnessTools predicts.
-
-    The spec §1 formula adds an earlier batch's FULL qty to qty_ahead, even the part that expires unsold, so it
-    overstates the risk of later batches. Proposed D-31: qty_ahead += batch.qty − at_risk (units actually sold).
-    """
+    """Cross-check: what the simulator actually writes off equals what FreshnessTools predicts (D-31)."""
     expiries = [8, 4, 12]  # days from the start, delivered out of order
     qtys = [20, 15, 25]
     deliveries = [

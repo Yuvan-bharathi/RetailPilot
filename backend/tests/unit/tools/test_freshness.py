@@ -45,6 +45,16 @@ def test_float_artefacts_do_not_lose_a_unit() -> None:
     assert risks[0].at_risk == 0
 
 
+def test_units_that_expire_unsold_do_not_use_up_later_demand() -> None:
+    # D-31: 1 unit/day; batches 15 @ day 4, 20 @ day 8, 25 @ day 12. The first batch sells 4 and 11 expire;
+    # those 11 never consume selling days, so the second batch sells 4 (days 4–7), not 0 → 16 at risk, not 20.
+    risks = FreshnessTools.at_risk_by_batch(
+        [_batch(B2, 20, 8), _batch(B1, 15, 4), _batch(B3, 25, 12)], daily_demand=1, run_date=RUN
+    )
+
+    assert [(r.batch_id, r.sellable, r.at_risk) for r in risks] == [(B1, 4, 11), (B2, 4, 16), (B3, 4, 21)]
+
+
 def test_same_expiry_ordered_by_batch_id() -> None:
     risks = FreshnessTools.at_risk_by_batch(
         [_batch(B2, 5, 2), _batch(B1, 5, 2)], daily_demand=3, run_date=RUN

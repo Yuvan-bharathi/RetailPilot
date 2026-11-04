@@ -21,7 +21,7 @@ loop for (store_id, product_id), batches in group_by_store_product(batches)
     FA -> FA : days_left = (batch.expiry_date − ctx.run_date).days
     FA -> FA : sellable = forecast.daily_demand × days_left − qty_ahead
     FA -> FA : at_risk = max(0, batch.qty − max(0, floor(sellable)))
-    FA -> FA : qty_ahead += batch.qty
+    FA -> FA : qty_ahead += batch.qty − at_risk   (units actually sold, D-31)
     opt at_risk > 0
       FA -> IR : get_store_states(product_id, ctx.store_ids) → list[StoreState]
       FA -> TE : find_expiry_receivers(product_id: UUID, qty: int = at_risk, days_left: int,\n from_store: UUID = store_id, states: list[StoreState], routes, unit_cost: Decimal) → list[TransferProposal]

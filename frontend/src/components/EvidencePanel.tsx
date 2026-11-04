@@ -14,8 +14,9 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
 }
 
 /**
- * Evidence behind a transfer / PO-remainder recommendation (design doc §6). Donor stock details are shown only
- * when the API sends them (Super Admin); a Store Supervisor sees the other store as name + offered quantity.
+ * Evidence behind a transfer / PO-remainder recommendation (design doc §6). Donor stock details are shown only when
+ * the API sends them (Super Admin, donor's own supervisor); the destination supervisor sees the donor as name +
+ * offered quantity and a numberless "Donor keeps its full requirement" assurance (D-32).
  */
 export function EvidencePanel({ evidence }: { evidence: TransferEvidenceDTO }) {
   const scoped = evidence.donor !== null && evidence.donor_surplus === null;
@@ -37,6 +38,17 @@ export function EvidencePanel({ evidence }: { evidence: TransferEvidenceDTO }) {
               <span className="inline-flex items-center gap-1">
                 <ShieldCheck aria-hidden="true" size={14} className="text-success" />
                 {formatNumber(evidence.donor_protected_requirement)} units kept
+              </span>
+            }
+          />
+        ) : null}
+        {evidence.donor && evidence.donor_protected_requirement == null && evidence.donor_keeps_requirement ? (
+          <Row
+            label="Donor protection"
+            value={
+              <span className="inline-flex items-center gap-1">
+                <ShieldCheck aria-hidden="true" size={14} className="text-success" />
+                Donor keeps its full requirement
               </span>
             }
           />

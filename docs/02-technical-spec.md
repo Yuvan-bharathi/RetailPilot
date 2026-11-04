@@ -74,7 +74,8 @@ Worked example (must be a unit test): Store C need 40, holds 0; Store A availabl
 (surplus 24); Store B surplus 0 → `TransferProposal(A→C, 24)` + `PONeed(C, 16, "PARTIAL_SURPLUS")`.
 
 FEFO at-risk qty per batch (earliest expiry first): `sellable = daily_demand × days_left − qty_ahead`;
-`at_risk = max(0, batch.qty − max(0, floor(sellable)))`; `qty_ahead += batch.qty`.
+`at_risk = max(0, batch.qty − max(0, floor(sellable)))`; `qty_ahead += batch.qty − at_risk` (only units actually
+sold — units that expire unsold use no demand, D-31).
 
 ## 2. State machines
 
@@ -144,7 +145,9 @@ Ingestion also writes `inventory_daily_snapshot` (closing stock per store-produc
 | Transfer: accept incoming / approve release / dispatch / receive | ✓ for own store's side | view |
 | Business rules, suppliers, stores, users | – | ✓ |
 | Agent runs / system monitoring | – | ✓ |
-Cross-store rule: a supervisor sees another store only as name + offered/requested quantity.
+Cross-store rule: a supervisor sees another store only as name + offered/requested quantity. Per viewer (D-32):
+the donor's own supervisor sees its own surplus and protected requirement on a transfer; the destination
+supervisor sees only name + quantity and "Donor keeps its full requirement".
 
 ## 5. API (FastAPI, prefix /api/v1, JWT bearer; all list endpoints paginated)
 
@@ -152,7 +155,12 @@ Contract-first (D-32): every route below that is not built yet answers 501 `NOT_
 error body until its phase. List endpoints take `page` (≥ 1, default 1), `page_size` (1–200, default 25),
 `sort` (`field` / `-field`; `priority` and `stockout_risk` sort by rank) and `q`, and return
 `Page[T] = {items, total, page, page_size}`. Supervisor-facing DTOs show another store only as
-`Counterpart {store: {store_id, name}, qty}`; donor stock fields are Super Admin only.
+`Counterpart {store: {store_id, name}, qty}`. Scoping is **per viewer**: donor stock fields (donor surplus, protected
+requirement) are visible to the Super Admin and the donor store's own supervisor; the destination supervisor sees
+name + quantity plus the numberless assurance `donor_keeps_requirement`. Transfer and PO incremental costs are
+visible to both roles.
+**Phase 6 requirement:** `sort` on `priority` (HIGH > NORMAL) and `stockout_risk` (HIGH > MEDIUM > LOW) ranks by
+business meaning, never alphabetically.
 
 | Method & path | Handler → service | Diagram |
 |---|---|---|

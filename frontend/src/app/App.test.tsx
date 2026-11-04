@@ -75,8 +75,17 @@ describe("/components page", () => {
     expect(within(evidence).getByText("Store A - Residential · 24 units")).toBeTruthy();
     expect(within(evidence).queryByText("Donor surplus")).toBeNull();
     expect(within(evidence).queryByText("Donor's protected requirement")).toBeNull();
+    expect(within(evidence).getByText("Donor keeps its full requirement")).toBeTruthy();
     expect(within(evidence).getByText("Other stores are shown by name and offered quantity only.")).toBeTruthy();
     expect(await axe(container)).toHaveNoViolations();
+  }, 20_000);
+
+  it("shows the donor store's own supervisor their surplus and protected requirement", async () => {
+    renderApp("/components", "sup.a");
+    await screen.findByText("Transfer 24 × Biscuits 200 g");
+    const evidence = screen.getByRole("region", { name: "Decision evidence" });
+    expect(within(evidence).getByText("Donor surplus")).toBeTruthy();
+    expect(within(evidence).getByText("Donor's protected requirement")).toBeTruthy();
   }, 20_000);
 
   it("explains why a supervisor of another store cannot open the example", async () => {

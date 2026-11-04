@@ -142,13 +142,16 @@ function RecommendationsTable() {
 
 function CrossStoreExample() {
   const { user } = useAuth();
+  const own = user?.store?.store_id;
   const canSee =
-    user?.role === "SUPER_ADMIN" || user?.store?.store_id === CROSS_STORE_TRANSFER_REC.store.store_id;
+    user?.role === "SUPER_ADMIN" ||
+    own === CROSS_STORE_TRANSFER_REC.store.store_id || // destination
+    own === CROSS_STORE_TRANSFER_REC.counterpart?.store.store_id; // donor
   const detail = useRecommendation(CROSS_STORE_TRANSFER_REC.rec_id);
   if (!canSee) {
     return (
       <p className="text-sm text-ink-secondary">
-        This example belongs to {CROSS_STORE_TRANSFER_REC.store.name}. Sign in as <strong>admin</strong> or{" "}
+        This example belongs to {CROSS_STORE_TRANSFER_REC.store.name}. Sign in as <strong>admin</strong>, <strong>sup.a</strong> (donor) or{" "}
         <strong>sup.c</strong> to see it — a supervisor cannot open another store&apos;s recommendation.
       </p>
     );

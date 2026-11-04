@@ -1,5 +1,6 @@
 /*
- * RetailPilot AI design tokens — Design System v1.0 (frozen), docs/03-design-system.md §1.
+ * RetailPilot AI design tokens — Design System v1.1, docs/03-design-system.md §1
+ * (v1.1 = contrast fixes D-33: darker warning / attention / info text; --text-muted is decorative only, never text).
  * The ONLY file allowed to contain hex colour values (enforced by `npm run check:no-hex`).
  * Do not change values without approval (contrast proposal: docs/notes/contrast-proposal.md).
  */
@@ -10,16 +11,16 @@
   --app-bg: #F7F6F5; --surface: #FFFFFF; --sidebar-bg: #F1EFEE; --surface-elevated: #FCFBFA;
   --border: #E8E3E2; --divider: #EEEAE9;
   /* Text */
-  --text-primary: #332D30; --text-secondary: #746A6D; --text-muted: #958B8D; --text-disabled: #C8C1C2;
+  --text-primary: #332D30; --text-secondary: #746A6D; --text-muted: #958B8D; /* decorative only (dividers, icon accents) — never text, D-33 */ --text-disabled: #C8C1C2;
   /* Supporting accents */
   --accent-blue: #7892A6; --accent-lavender: #A096B5; --accent-sand: #C5A779;
   --accent-sage: #8DAE9A; --accent-stone: #A5A0A0;
   /* Semantic status */
   --success-bg: #E8F2EC; --success-text: #397653;
-  --warning-bg: #FBF1DF; --warning-text: #986F28;
-  --attention-bg: #F8EDE5; --attention-text: #A7653D;
+  --warning-bg: #FBF1DF; --warning-text: #8C6625;
+  --attention-bg: #F8EDE5; --attention-text: #995C38;
   --danger-bg: #F7E8E8; --danger-text: #A64F52;
-  --info-bg: #EAF0F5; --info-text: #56758F;
+  --info-bg: #EAF0F5; --info-text: #516F87;
   --neutral-bg: #EFEEED; --neutral-text: #706A6A;
   /* Typography */
   --font-family: "Inter", sans-serif;

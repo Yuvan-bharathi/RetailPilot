@@ -144,10 +144,14 @@ export function createMockClient(getToken: () => string | null, delayMs = 120): 
       await wait();
       const rec = RECOMMENDATIONS.find((r) => r.rec_id === recId);
       if (!rec) throw new ApiError(404, "NOT_FOUND", "Recommendation not found");
-      scopeStore(rec.store.store_id);
+      const own = currentUser().store?.store_id;
+      const isDonorViewer = rec.rec_type === "TRANSFER" && rec.counterpart?.store.store_id === own;
+      if (!isDonorViewer) scopeStore(rec.store.store_id); // the destination's own recommendation, or 403
+      // per-viewer scoping (D-32): donor stock details for the Super Admin and the donor's own supervisor only
+      const seesDonorStock = isAdmin() || isDonorViewer;
       const evidence =
         rec.rec_id === CROSS_STORE_TRANSFER_REC.rec_id
-          ? isAdmin()
+          ? seesDonorStock
             ? CROSS_STORE_EVIDENCE_ADMIN
             : { ...CROSS_STORE_EVIDENCE_ADMIN, donor_surplus: null, donor_protected_requirement: null }
           : null;

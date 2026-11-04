@@ -25,15 +25,26 @@ describe("mock API — store scoping (CLAUDE.md rule 10)", () => {
     await expect(supA.listStores()).resolves.toHaveLength(1);
   });
 
-  it("shows another store only as name + quantity in evidence", async () => {
-    const supervisor = await as("sup.c").getRecommendation(CROSS_STORE_TRANSFER_REC.rec_id);
+  it("scopes transfer evidence per viewer (D-32)", async () => {
+    const destination = await as("sup.c").getRecommendation(CROSS_STORE_TRANSFER_REC.rec_id);
+    const donor = await as("sup.a").getRecommendation(CROSS_STORE_TRANSFER_REC.rec_id);
     const admin = await as("admin").getRecommendation(CROSS_STORE_TRANSFER_REC.rec_id);
 
-    expect(supervisor.recommendation.counterpart).toEqual({ store: { store_id: STORE_A!.store_id, name: STORE_A!.name }, qty: 24 });
-    expect(supervisor.evidence?.donor_surplus).toBeNull();
-    expect(supervisor.evidence?.donor_protected_requirement).toBeNull();
+    // destination supervisor: donor as name + quantity, plus a numberless assurance
+    expect(destination.recommendation.counterpart).toEqual({ store: { store_id: STORE_A!.store_id, name: STORE_A!.name }, qty: 24 });
+    expect(destination.evidence?.donor_surplus).toBeNull();
+    expect(destination.evidence?.donor_protected_requirement).toBeNull();
+    expect(destination.evidence?.donor_keeps_requirement).toBe(true);
+    // donor supervisor: it is their own stock — surplus and protected requirement are shown
+    expect(donor.evidence?.donor_surplus).toBe(24);
+    expect(donor.evidence?.donor_protected_requirement).toBe(30);
+    // super admin: everything
     expect(admin.evidence?.donor_surplus).toBe(24);
     expect(admin.evidence?.donor_protected_requirement).toBe(30);
+  });
+
+  it("forbids a supervisor of an uninvolved store from opening the transfer", async () => {
+    await expect(as("sup.b").getRecommendation(CROSS_STORE_TRANSFER_REC.rec_id)).rejects.toMatchObject({ status: 403 });
   });
 
   it("reduces other stores' PO lines to name + quantity for a supervisor", async () => {

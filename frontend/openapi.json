@@ -2677,7 +2677,7 @@
               }
             ],
             "title": "Donor Surplus",
-            "description": "Super Admin only"
+            "description": "Super Admin and the donor store's supervisor only"
           },
           "donor_protected_requirement": {
             "anyOf": [
@@ -2689,7 +2689,13 @@
               }
             ],
             "title": "Donor Protected Requirement",
-            "description": "Super Admin only"
+            "description": "Super Admin and the donor store's supervisor only"
+          },
+          "donor_keeps_requirement": {
+            "type": "boolean",
+            "title": "Donor Keeps Requirement",
+            "description": "Donor stays at or above its own requirement after the transfer (donor protection)",
+            "default": true
           },
           "transfer_qty": {
             "type": "integer",
@@ -2760,7 +2766,7 @@
           "days_of_cover_after"
         ],
         "title": "TransferEvidenceDTO",
-        "description": "Evidence panel of a transfer / PO-remainder recommendation (design doc §6).\n\ndonor_surplus and donor_protected_requirement describe ANOTHER store's stock: Super Admin only — null for\nStore Supervisors (CLAUDE.md rule 10; they see the donor as `counterpart` name + offered qty)."
+        "description": "Evidence panel of a transfer / PO-remainder recommendation (design doc §6).\n\nScoped per viewer (D-32): donor_surplus and donor_protected_requirement describe the DONOR store's stock, so\nthey are filled for the Super Admin and for the donor store's own supervisor, and null for the destination\nsupervisor (CLAUDE.md rule 10), who sees the donor as name + offered qty plus the numberless assurance\n`donor_keeps_requirement`."
       },
       "TransferOrderDTO": {
         "properties": {

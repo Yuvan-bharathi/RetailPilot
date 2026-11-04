@@ -1,4 +1,4 @@
-# Contrast proposal — for approval (tokens NOT changed)
+# Contrast proposal — APPROVED as Design System v1.1 (D-33, 2026-11-04)
 
 Design system v1.0 §8 flagged possible contrast problems. Measured with the WCAG 2.x relative-luminance formula
 (AA requires **4.5:1** for normal text, 3:1 for text ≥ 18.66 px bold / 24 px). Status badges and metadata are

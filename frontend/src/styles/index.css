@@ -23,8 +23,10 @@
 
   --color-ink: var(--text-primary);
   --color-ink-secondary: var(--text-secondary);
-  --color-ink-muted: var(--text-muted);
   --color-ink-disabled: var(--text-disabled);
+
+  /* --text-muted fails AA for text (3.06–3.30:1): decorative use only, e.g. border-decor / fill-decor (D-33) */
+  --color-decor: var(--text-muted);
 
   --color-accent-blue: var(--accent-blue);
   --color-accent-lavender: var(--accent-lavender);

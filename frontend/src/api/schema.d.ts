@@ -692,8 +692,10 @@ export interface components {
          * TransferEvidenceDTO
          * @description Evidence panel of a transfer / PO-remainder recommendation (design doc §6).
          *
-         *     donor_surplus and donor_protected_requirement describe ANOTHER store's stock: Super Admin only — null for
-         *     Store Supervisors (CLAUDE.md rule 10; they see the donor as `counterpart` name + offered qty).
+         *     Scoped per viewer (D-32): donor_surplus and donor_protected_requirement describe the DONOR store's stock, so
+         *     they are filled for the Super Admin and for the donor store's own supervisor, and null for the destination
+         *     supervisor (CLAUDE.md rule 10), who sees the donor as name + offered qty plus the numberless assurance
+         *     `donor_keeps_requirement`.
          */
         TransferEvidenceDTO: {
             /** Destination Shortage */
@@ -701,14 +703,20 @@ export interface components {
             donor: components["schemas"]["Counterpart"] | null;
             /**
              * Donor Surplus
-             * @description Super Admin only
+             * @description Super Admin and the donor store's supervisor only
              */
             donor_surplus?: number | null;
             /**
              * Donor Protected Requirement
-             * @description Super Admin only
+             * @description Super Admin and the donor store's supervisor only
              */
             donor_protected_requirement?: number | null;
+            /**
+             * Donor Keeps Requirement
+             * @description Donor stays at or above its own requirement after the transfer (donor protection)
+             * @default true
+             */
+            donor_keeps_requirement: boolean;
             /** Transfer Qty */
             transfer_qty: number;
             /** Po Remainder Qty */

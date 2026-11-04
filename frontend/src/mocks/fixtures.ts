@@ -99,12 +99,13 @@ export const CROSS_STORE_TRANSFER_REC: RecommendationDTO = {
   created_at: "2026-11-02T18:40:00Z",
 };
 
-/** Evidence as the Super Admin sees it; supervisors get donor_surplus / donor_protected_requirement = null. */
+/** Full evidence (Super Admin, donor supervisor); the destination supervisor gets the donor stock fields = null. */
 export const CROSS_STORE_EVIDENCE_ADMIN: TransferEvidenceDTO = {
   destination_shortage: 40,
   donor: { store: storeRef(STORE_A), qty: 24 },
   donor_surplus: 24,
   donor_protected_requirement: 30,
+  donor_keeps_requirement: true,
   transfer_qty: 24,
   po_remainder_qty: 16,
   transfer_cost: "222.00",

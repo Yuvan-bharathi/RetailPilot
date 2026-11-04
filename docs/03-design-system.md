@@ -1,4 +1,9 @@
-# RetailPilot AI — Design System v1.0 (frozen) + UI rules
+# RetailPilot AI — Design System v1.1 (frozen) + UI rules
+
+> **v1.1 (2026-11-04, decision D-33)** — contrast fixes measured against WCAG AA 4.5:1 (docs/notes/contrast-proposal.md):
+> `--warning-text` #986F28 → #8C6625, `--attention-text` #A7653D → #995C38, `--info-text` #56758F → #516F87;
+> `--text-muted` (#958B8D, 3.06–3.30:1) is retired for text and kept for decorative, non-text use only
+> (Tailwind `decor`). Essential small text uses `--text-secondary`. Enforced by `npm run check:no-hex`.
 
 Light mode only · Burgundy & Neutral · Premium SaaS · Information-dense · Font: Inter.
 Burgundy is the identity colour for primary actions, active navigation and key emphasis — not applied everywhere.
@@ -13,16 +18,16 @@ Reference inspiration: Heirloom dashboard (Dribbble) for overview screens; Odoo 
   --app-bg: #F7F6F5; --surface: #FFFFFF; --sidebar-bg: #F1EFEE; --surface-elevated: #FCFBFA;
   --border: #E8E3E2; --divider: #EEEAE9;
   /* Text */
-  --text-primary: #332D30; --text-secondary: #746A6D; --text-muted: #958B8D; --text-disabled: #C8C1C2;
+  --text-primary: #332D30; --text-secondary: #746A6D; --text-muted: #958B8D /* decorative only, v1.1 */; --text-disabled: #C8C1C2;
   /* Supporting accents */
   --accent-blue: #7892A6; --accent-lavender: #A096B5; --accent-sand: #C5A779;
   --accent-sage: #8DAE9A; --accent-stone: #A5A0A0;
   /* Semantic status */
   --success-bg: #E8F2EC; --success-text: #397653;
-  --warning-bg: #FBF1DF; --warning-text: #986F28;
-  --attention-bg: #F8EDE5; --attention-text: #A7653D;
+  --warning-bg: #FBF1DF; --warning-text: #8C6625;
+  --attention-bg: #F8EDE5; --attention-text: #995C38;
   --danger-bg: #F7E8E8; --danger-text: #A64F52;
-  --info-bg: #EAF0F5; --info-text: #56758F;
+  --info-bg: #EAF0F5; --info-text: #516F87;
   --neutral-bg: #EFEEED; --neutral-text: #706A6A;
   /* Typography */
   --font-family: "Inter", sans-serif;
@@ -100,7 +105,7 @@ status colours keep their meaning · tables optimised for readability · one com
 actions follow permissions and approval guardrails · responsive for desktop, laptop, tablet ·
 visible focus, keyboard navigation, readable contrast.
 
-## 8. Review notes to confirm (do not change tokens without approval — flag only)
+## 8. Review notes (resolved in v1.1 — see the version note at the top and D-33)
 - Estimated contrast below WCAG AA 4.5:1 for 12px text: `--text-muted` on white (~3.3:1), warning text on
   warning bg (~4:1), attention text on attention bg (~4:1). Use `--text-secondary` for essential small text and
   verify with a contrast checker; propose darker values for approval.

@@ -83,6 +83,7 @@ def test_donor_stock_fields_are_optional_so_supervisor_views_can_omit_them() -> 
     )
 
     assert evidence.donor_surplus is None and evidence.donor_protected_requirement is None
+    assert evidence.donor_keeps_requirement is True  # numberless assurance for the destination supervisor
     assert "counterpart" in RecommendationDTO.model_fields
 
 

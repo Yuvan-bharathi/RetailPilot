@@ -12,8 +12,9 @@ choose silently.
 | D-18 … D-26 | 2026-11-03 | Product owner (Phase 1 acceptance, Phase 3 approval) |
 | D-27 … D-29 | 2026-11-03 | Product owner (Phase 3 acceptance) |
 | D-30 | 2026-11-03 | Product owner (Phase 4a approval) |
-| D-31 | — | PROPOSED, awaiting approval (FEFO formula) |
-| D-32 | 2026-11-04 | Product owner (Phase 7 approval) + implementation choices to confirm |
+| D-31 | 2026-11-04 | Product owner (approved after Phase 4a finding) |
+| D-32 | 2026-11-04 | Product owner (Phase 7 approval; choices confirmed with per-viewer scoping) |
+| D-33 | 2026-11-04 | Product owner (contrast, Design System v1.1) |
 
 ---
 
@@ -300,7 +301,7 @@ so its last day closes at 0 — a stockout day — and is excluded; the remainin
 
 ---
 
-## D-31 (PROPOSED — awaiting approval) FEFO at-risk formula counts only units actually sold
+## D-31 FEFO at-risk formula counts only units actually sold (approved 2026-11-04)
 **Finding (Phase 4a FEFO check).** The synthetic stock simulator depletes batches strictly FEFO and writes off
 whatever is left at expiry. Cross-checking its write-offs against `FreshnessTools.at_risk_by_batch` showed that
 the spec §1 formula overstates the risk of later batches whenever an earlier batch expires unsold: it adds the
@@ -310,6 +311,8 @@ actual FEFO write-offs are 11 / 16 / 21.
 **Proposal.** `qty_ahead += batch.qty − at_risk` (only the units that sell). Matches the simulator for every
 tested demand rate. Scenario 5 is unaffected (single batch). Until approved, the spec formula stays and the
 cross-check test is a strict xfail referencing this entry.
+**Approved 2026-11-04.** Implemented in `FreshnessTools.at_risk_by_batch`; spec §1 and SD-08 updated; the
+simulator cross-check now passes at every tested rate, plus a unit test of the 11 / 16 / 21 example.
 
 ---
 
@@ -329,7 +332,13 @@ client (`VITE_USE_MOCKS=true`). Two guards keep the contract in sync: backend te
   `.donor_protected_requirement`. A consolidated PO shows a supervisor only their own lines plus
   `other_store_lines: [Counterpart]`. A supervisor asking for another store's data gets 403.
 
-**Implementation choices (to confirm).**
+**Confirmed 2026-11-04 with one change — scoping is per viewer:** the donor store's own supervisor sees its own
+surplus and protected requirement (it is their stock and they approve its release); the destination supervisor
+sees name + quantity plus a numberless assurance `donor_keeps_requirement` ("Donor keeps its full requirement");
+the Super Admin sees everything. Transfer costs visible to both roles; rank sorting is a Phase 6 requirement
+(spec §5); `GET /runs/latest` is in spec §5.
+
+**Implementation choices (as proposed).**
 - Design doc §6 lists "donor surplus" and "donor protected requirement" on the recommendation detail, while CLAUDE.md
   rule 10 limits supervisors to name + quantity. Resolution: the rule wins for supervisors (fields null), the Super
   Admin sees them.
@@ -341,3 +350,16 @@ client (`VITE_USE_MOCKS=true`). Two guards keep the contract in sync: backend te
 - New error code `NOT_IMPLEMENTED` (501) for the contract stubs; operation ids are handler names
   (e.g. `list_recommendations`).
 **Changed.** Spec §5; backend `app/api/routers/contract.py`; frontend `src/api`, `src/mocks`.
+
+---
+
+## D-33 Design System v1.1 — contrast fixes (approved 2026-11-04)
+**Decision.** Token values changed after measurement against WCAG AA 4.5:1 (docs/notes/contrast-proposal.md),
+versioned as Design System **v1.1** (the frozen v1.0 is not edited silently):
+`--warning-text` #986F28 → #8C6625 (4.64:1), `--attention-text` #A7653D → #995C38 (4.63:1),
+`--info-text` #56758F → #516F87 (4.60:1, used by "Pending" / "Due in" badges).
+`--text-muted` (#958B8D, 3.06–3.30:1) is **retired for text** and kept for decorative, non-text use only
+(Tailwind `decor`, e.g. `border-decor`); essential small text uses `--text-secondary`.
+`npm run check:no-hex` fails on hex colours outside tokens.css and on any text use of `--text-muted`.
+**Changed.** frontend/src/styles/tokens.css, index.css; docs/03-design-system.md (v1.1 note, §1, §8);
+frontend/scripts/check-no-hex.mjs.
