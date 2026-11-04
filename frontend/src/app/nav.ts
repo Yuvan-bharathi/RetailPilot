@@ -34,8 +34,16 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Sparkles,
     label: { SUPER_ADMIN: "AI recommendations", STORE_SUPERVISOR: "AI recommendations" },
   },
-  { path: "/transfers", icon: ArrowLeftRight, label: { SUPER_ADMIN: "Stock transfers", STORE_SUPERVISOR: "Stock transfers" } },
-  { path: "/purchase-orders", icon: ClipboardList, label: { SUPER_ADMIN: "Purchase orders", STORE_SUPERVISOR: "Purchase orders" } },
+  {
+    path: "/transfers",
+    icon: ArrowLeftRight,
+    label: { SUPER_ADMIN: "Stock transfers", STORE_SUPERVISOR: "Stock transfers" },
+  },
+  {
+    path: "/purchase-orders",
+    icon: ClipboardList,
+    label: { SUPER_ADMIN: "Purchase orders", STORE_SUPERVISOR: "Purchase orders" },
+  },
   { path: "/approvals", icon: CheckCircle2, label: { SUPER_ADMIN: "Approvals", STORE_SUPERVISOR: "Approvals" } },
   { path: "/goods-receipt", icon: PackageCheck, label: { SUPER_ADMIN: null, STORE_SUPERVISOR: "Goods receipt" } },
   { path: "/analytics", icon: BarChart3, label: { SUPER_ADMIN: "Analytics", STORE_SUPERVISOR: "Store reports" } },

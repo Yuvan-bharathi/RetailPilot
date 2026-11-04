@@ -6,30 +6,55 @@
  */
 :root {
   /* Brand */
-  --brand-primary: #873F52; --brand-hover: #6F3042; --brand-soft: #F3E9EC; --brand-muted: #D8BFC5;
+  --brand-primary: #873f52;
+  --brand-hover: #6f3042;
+  --brand-soft: #f3e9ec;
+  --brand-muted: #d8bfc5;
   /* Neutral */
-  --app-bg: #F7F6F5; --surface: #FFFFFF; --sidebar-bg: #F1EFEE; --surface-elevated: #FCFBFA;
-  --border: #E8E3E2; --divider: #EEEAE9;
+  --app-bg: #f7f6f5;
+  --surface: #ffffff;
+  --sidebar-bg: #f1efee;
+  --surface-elevated: #fcfbfa;
+  --border: #e8e3e2;
+  --divider: #eeeae9;
   /* Text */
-  --text-primary: #332D30; --text-secondary: #746A6D; --text-muted: #958B8D; /* decorative only (dividers, icon accents) — never text, D-33 */ --text-disabled: #C8C1C2;
+  --text-primary: #332d30;
+  --text-secondary: #746a6d;
+  --text-muted: #958b8d; /* decorative only (dividers, icon accents) — never text, D-33 */
+  --text-disabled: #c8c1c2;
   /* Supporting accents */
-  --accent-blue: #7892A6; --accent-lavender: #A096B5; --accent-sand: #C5A779;
-  --accent-sage: #8DAE9A; --accent-stone: #A5A0A0;
+  --accent-blue: #7892a6;
+  --accent-lavender: #a096b5;
+  --accent-sand: #c5a779;
+  --accent-sage: #8dae9a;
+  --accent-stone: #a5a0a0;
   /* Semantic status */
-  --success-bg: #E8F2EC; --success-text: #397653;
-  --warning-bg: #FBF1DF; --warning-text: #8C6625;
-  --attention-bg: #F8EDE5; --attention-text: #995C38;
-  --danger-bg: #F7E8E8; --danger-text: #A64F52;
-  --info-bg: #EAF0F5; --info-text: #516F87;
-  --neutral-bg: #EFEEED; --neutral-text: #706A6A;
+  --success-bg: #e8f2ec;
+  --success-text: #397653;
+  --warning-bg: #fbf1df;
+  --warning-text: #8c6625;
+  --attention-bg: #f8ede5;
+  --attention-text: #995c38;
+  --danger-bg: #f7e8e8;
+  --danger-text: #a64f52;
+  --info-bg: #eaf0f5;
+  --info-text: #516f87;
+  --neutral-bg: #efeeed;
+  --neutral-text: #706a6a;
   /* Typography */
   --font-family: "Inter", sans-serif;
   /* Layout */
-  --sidebar-width: 248px; --sidebar-collapsed-width: 72px; --header-height: 64px;
-  --page-padding: 24px; --content-gap: 20px;
+  --sidebar-width: 248px;
+  --sidebar-collapsed-width: 72px;
+  --header-height: 64px;
+  --page-padding: 24px;
+  --content-gap: 20px;
   /* Components */
-  --radius-card: 10px; --radius-input: 7px; --radius-button: 7px; --radius-modal: 12px;
+  --radius-card: 10px;
+  --radius-input: 7px;
+  --radius-button: 7px;
+  --radius-modal: 12px;
   /* Shadows */
   --shadow-card: 0 1px 3px rgba(51, 45, 48, 0.04);
-  --shadow-dropdown: 0 8px 24px rgba(51, 45, 48, 0.10);
+  --shadow-dropdown: 0 8px 24px rgba(51, 45, 48, 0.1);
 }

@@ -56,11 +56,19 @@ describe("StatusBadge", () => {
 describe("DataTable", () => {
   it("shows loading, empty and error states", async () => {
     const onRetry = vi.fn();
-    const common = { caption: "T", columns: COLUMNS, query: { page: 1, pageSize: 10 }, onQueryChange: () => {}, getRowId: (r: Row) => r.id };
+    const common = {
+      caption: "T",
+      columns: COLUMNS,
+      query: { page: 1, pageSize: 10 },
+      onQueryChange: () => {},
+      getRowId: (r: Row) => r.id,
+    };
     const { rerender } = render(<DataTable {...common} page={undefined} isLoading />);
     expect(screen.getByRole("region", { name: "T" }).getAttribute("aria-busy")).toBe("true");
 
-    rerender(<DataTable {...common} page={{ items: [], total: 0, page: 1, page_size: 10 }} emptyTitle="Nothing here" />);
+    rerender(
+      <DataTable {...common} page={{ items: [], total: 0, page: 1, page_size: 10 }} emptyTitle="Nothing here" />,
+    );
     expect(screen.getByText("Nothing here")).toBeTruthy();
 
     rerender(<DataTable {...common} page={undefined} error="Server down" onRetry={onRetry} />);

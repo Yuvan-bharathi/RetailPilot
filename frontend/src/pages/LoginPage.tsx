@@ -23,7 +23,9 @@ export function LoginPage({ showDemoUsers }: { showDemoUsers: boolean }) {
     try {
       await signIn(username.trim(), password);
     } catch (e) {
-      setError(e instanceof ApiError && e.status === 401 ? "Wrong username or password." : "Sign-in failed. Try again.");
+      setError(
+        e instanceof ApiError && e.status === 401 ? "Wrong username or password." : "Sign-in failed. Try again.",
+      );
     } finally {
       setBusy(false);
     }

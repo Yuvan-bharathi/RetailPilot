@@ -3,7 +3,15 @@ import type { ReactNode } from "react";
 
 import { Button } from "./Button";
 
-export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+export function EmptyState({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+}) {
   return (
     <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
       <Inbox aria-hidden="true" className="text-ink-secondary" size={28} />

@@ -31,7 +31,8 @@ function lazyMockClient(getToken: () => string | null): ApiClient {
   let client: Promise<ApiClient> | null = null;
   const load = () => (client ??= import("../mocks/mockClient").then((m) => m.createMockClient(getToken)));
   return new Proxy({} as ApiClient, {
-    get: (_target, method: string) =>
+    get:
+      (_target, method: string) =>
       async (...args: unknown[]) => {
         const target = (await load()) as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
         const fn = target[method];
@@ -41,7 +42,9 @@ function lazyMockClient(getToken: () => string | null): ApiClient {
   });
 }
 
-export const api: ApiClient = USE_MOCKS ? lazyMockClient(() => tokenStore.get()) : createHttpClient(() => tokenStore.get());
+export const api: ApiClient = USE_MOCKS
+  ? lazyMockClient(() => tokenStore.get())
+  : createHttpClient(() => tokenStore.get());
 
 export { ApiError } from "./client";
 export type { ApiClient } from "./client";

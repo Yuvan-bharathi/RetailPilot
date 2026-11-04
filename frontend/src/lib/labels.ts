@@ -1,11 +1,5 @@
 /** Human-readable labels for contract enums (sentence case, design doc §2). */
-import type {
-  MovementType,
-  NeedsReviewEvidence,
-  ReorderEvidence,
-  RecType,
-  StockoutRisk,
-} from "../api/types";
+import type { MovementType, NeedsReviewEvidence, ReorderEvidence, RecType, StockoutRisk } from "../api/types";
 
 export const REC_TYPE_LABEL: Record<RecType, string> = {
   REORDER: "Reorder",

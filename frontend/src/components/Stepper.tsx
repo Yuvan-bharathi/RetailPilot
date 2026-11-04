@@ -32,7 +32,10 @@ export function Stepper({
   note?: string;
   label?: string;
 }) {
-  const index = Math.max(0, steps.findIndex((s) => s.key === current));
+  const index = Math.max(
+    0,
+    steps.findIndex((s) => s.key === current),
+  );
   return (
     <nav aria-label={label}>
       <ol className="flex flex-wrap items-start gap-y-3">
@@ -48,10 +51,22 @@ export function Stepper({
                 ? "border-brand bg-brand-soft text-brand"
                 : "border-border bg-surface text-ink-secondary";
           return (
-            <li key={step.key} className="flex min-w-[120px] flex-1 items-start" aria-current={isCurrent ? "step" : undefined}>
+            <li
+              key={step.key}
+              className="flex min-w-[120px] flex-1 items-start"
+              aria-current={isCurrent ? "step" : undefined}
+            >
               <div className="flex flex-col items-center gap-1 text-center">
-                <span className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-semibold ${circle}`}>
-                  {isFailed ? <X aria-hidden="true" size={14} /> : done ? <Check aria-hidden="true" size={14} /> : i + 1}
+                <span
+                  className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-semibold ${circle}`}
+                >
+                  {isFailed ? (
+                    <X aria-hidden="true" size={14} />
+                  ) : done ? (
+                    <Check aria-hidden="true" size={14} />
+                  ) : (
+                    i + 1
+                  )}
                 </span>
                 <span className={`text-xs ${isCurrent ? "font-semibold text-ink" : "text-ink-secondary"}`}>
                   {step.label}
@@ -60,7 +75,10 @@ export function Stepper({
                 </span>
               </div>
               {i < steps.length - 1 ? (
-                <span aria-hidden="true" className={`mx-2 mt-3.5 h-0.5 flex-1 ${i < index ? "bg-brand" : "bg-border"}`} />
+                <span
+                  aria-hidden="true"
+                  className={`mx-2 mt-3.5 h-0.5 flex-1 ${i < index ? "bg-brand" : "bg-border"}`}
+                />
               ) : null}
             </li>
           );

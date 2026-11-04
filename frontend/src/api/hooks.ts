@@ -17,7 +17,12 @@ const FIVE_MINUTES = 300_000; // spec §9 React Query staleTime
 
 export function useLatestRun(enabled = true) {
   const api = useApi();
-  return useQuery({ queryKey: ["runs", "latest"], queryFn: () => api.getLatestRun(), staleTime: FIVE_MINUTES, enabled });
+  return useQuery({
+    queryKey: ["runs", "latest"],
+    queryFn: () => api.getLatestRun(),
+    staleTime: FIVE_MINUTES,
+    enabled,
+  });
 }
 
 export function useStores(enabled = true) {
@@ -87,7 +92,11 @@ export function useStoreExpiring(storeId: string | null, query: ExpiringQuery) {
 
 export function useTransfers(query: TransferQuery) {
   const api = useApi();
-  return useQuery({ queryKey: ["transfers", query], queryFn: () => api.listTransfers(query), placeholderData: keepPreviousData });
+  return useQuery({
+    queryKey: ["transfers", query],
+    queryFn: () => api.listTransfers(query),
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function usePurchaseOrders(query: PurchaseOrderQuery) {

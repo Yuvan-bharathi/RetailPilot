@@ -27,7 +27,15 @@ export function deadlineState(deadline: string, now: number, escalated: boolean)
 }
 
 /** L1 approval deadline: countdown, due soon, overdue and escalated states (design doc §6, SD-14). */
-export function DeadlineCountdown({ deadline, escalated = false, now }: { deadline: string; escalated?: boolean; now?: number }) {
+export function DeadlineCountdown({
+  deadline,
+  escalated = false,
+  now,
+}: {
+  deadline: string;
+  escalated?: boolean;
+  now?: number;
+}) {
   const [tick, setTick] = useState(() => now ?? Date.now());
 
   useEffect(() => {

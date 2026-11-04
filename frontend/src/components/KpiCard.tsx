@@ -22,7 +22,9 @@ export function KpiCard({ title, value, trend, meta }: { title: string; value: s
       <p className="tabular mt-2 text-[26px] leading-8 font-semibold text-ink">{value}</p>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
         {trend ? (
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${TREND_CLASSES[trend.tone]}`}>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${TREND_CLASSES[trend.tone]}`}
+          >
             <Arrow aria-hidden="true" size={12} />
             {trend.label}
           </span>

@@ -24,7 +24,10 @@ export function Tabs({
 }) {
   const id = useId();
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const index = Math.max(0, items.findIndex((t) => t.key === value));
+  const index = Math.max(
+    0,
+    items.findIndex((t) => t.key === value),
+  );
 
   const select = (i: number) => {
     const item = items[(i + items.length) % items.length];
@@ -34,7 +37,12 @@ export function Tabs({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const moves: Record<string, number> = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: items.length - 1 };
+    const moves: Record<string, number> = {
+      ArrowRight: index + 1,
+      ArrowLeft: index - 1,
+      Home: 0,
+      End: items.length - 1,
+    };
     const next = moves[event.key];
     if (next === undefined) return;
     event.preventDefault();
@@ -60,7 +68,9 @@ export function Tabs({
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(item.key)}
               className={`-mb-px border-b-2 px-3 py-2 text-sm whitespace-nowrap ${
-                selected ? "border-brand font-semibold text-brand" : "border-transparent text-ink-secondary hover:text-ink"
+                selected
+                  ? "border-brand font-semibold text-brand"
+                  : "border-transparent text-ink-secondary hover:text-ink"
               }`}
             >
               {item.label}

@@ -62,9 +62,15 @@ function TransferView({ e }: { e: TransferEvidence }) {
       title={e.expiring_batch ? "Why this batch should move" : "Why this is recommended"}
       note={scoped ? "Other stores are shown by name and offered quantity only." : undefined}
     >
-      {e.expiring_batch ? <BatchRows batch={e.expiring_batch} /> : <Row label="Shortage at this store" value={units(e.destination_shortage)} />}
+      {e.expiring_batch ? (
+        <BatchRows batch={e.expiring_batch} />
+      ) : (
+        <Row label="Shortage at this store" value={units(e.destination_shortage)} />
+      )}
       {e.donor ? <Row label="Offered by" value={`${e.donor.store.name} · ${units(e.donor.qty)}`} /> : null}
-      {e.donor_surplus != null && !e.expiring_batch ? <Row label="Donor surplus" value={units(e.donor_surplus)} /> : null}
+      {e.donor_surplus != null && !e.expiring_batch ? (
+        <Row label="Donor surplus" value={units(e.donor_surplus)} />
+      ) : null}
       {e.donor_protected_requirement != null ? (
         <Row
           label="Donor's protected requirement"
@@ -90,12 +96,18 @@ function TransferView({ e }: { e: TransferEvidence }) {
       <Row label="Transfer quantity" value={units(e.transfer_qty)} />
       {!e.expiring_batch ? <Row label="Purchase order for the remainder" value={units(e.po_remainder_qty)} /> : null}
       {e.transfer_cost && e.po_incremental_cost ? (
-        <Row label="Transfer cost vs extra cost of ordering" value={`${formatINR(e.transfer_cost)} vs ${formatINR(e.po_incremental_cost)}`} />
+        <Row
+          label="Transfer cost vs extra cost of ordering"
+          value={`${formatINR(e.transfer_cost)} vs ${formatINR(e.po_incremental_cost)}`}
+        />
       ) : e.transfer_cost ? (
         <Row label="Transfer cost" value={formatINR(e.transfer_cost)} />
       ) : null}
       {e.expected_delivery ? <Row label="Expected delivery" value={formatDateIST(e.expected_delivery)} /> : null}
-      <Row label="Days of cover" value={`${formatDays(e.days_of_cover_before)} → ${formatDays(e.days_of_cover_after)}`} />
+      <Row
+        label="Days of cover"
+        value={`${formatDays(e.days_of_cover_before)} → ${formatDays(e.days_of_cover_after)}`}
+      />
     </Panel>
   );
 }
@@ -131,7 +143,10 @@ function CoReplenishView({ e }: { e: CoReplenishEvidence }) {
       <Row label="Support" value={`${(e.support * 100).toFixed(2)}% of bills`} />
       <Row label="Forecast demand" value={perDay(e.daily_demand)} />
       <Row label="Available now" value={units(e.available)} />
-      <Row label={`Expected at next review (${e.review_period_days} days)`} value={units(Math.round(e.projected_at_next_review))} />
+      <Row
+        label={`Expected at next review (${e.review_period_days} days)`}
+        value={units(Math.round(e.projected_at_next_review))}
+      />
       <Row label="Own requirement" value={units(e.own_requirement)} />
       <Row label="Same delivery as" value={e.supplier.name} />
     </Panel>

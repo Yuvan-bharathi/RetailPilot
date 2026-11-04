@@ -61,7 +61,11 @@ const REC_COLUMNS: Column<RecommendationDTO>[] = [
     header: "Priority",
     sortable: true,
     cell: (r) =>
-      r.priority === "HIGH" ? <StatusBadge tone="attention" label="High" /> : <StatusBadge tone="neutral" label="Normal" />,
+      r.priority === "HIGH" ? (
+        <StatusBadge tone="attention" label="High" />
+      ) : (
+        <StatusBadge tone="neutral" label="Normal" />
+      ),
   },
   { id: "status", header: "Status", sortable: true, cell: (r) => <StatusPill status={r.status} /> },
 ];
@@ -160,7 +164,7 @@ function EvidenceExamples() {
         </div>
       ))}
     </div>
-  )
+  );
 }
 
 export function ComponentsPage() {
@@ -269,7 +273,12 @@ export function ComponentsPage() {
       <Section title="Transfer stepper">
         <div className="space-y-6 rounded-card border border-border bg-surface p-4">
           <Stepper label="Transfer in progress" steps={TRANSFER_STEPS} current="DONOR_APPROVED" />
-          <Stepper label="Transfer rejected" steps={TRANSFER_STEPS} current="DEST_ACCEPTED" failed={{ label: "Rejected by donor" }} />
+          <Stepper
+            label="Transfer rejected"
+            steps={TRANSFER_STEPS}
+            current="DEST_ACCEPTED"
+            failed={{ label: "Rejected by donor" }}
+          />
           <Stepper
             label="Transfer received"
             steps={TRANSFER_STEPS}
@@ -296,7 +305,11 @@ export function ComponentsPage() {
           <Button variant="destructive" onClick={() => setConfirmOpen(true)}>
             Reject PO line…
           </Button>
-          {lastAction ? <span className="self-center text-sm text-ink-secondary" role="status">{lastAction}</span> : null}
+          {lastAction ? (
+            <span className="self-center text-sm text-ink-secondary" role="status">
+              {lastAction}
+            </span>
+          ) : null}
         </div>
         <Modal
           open={modalOpen}
@@ -315,7 +328,12 @@ export function ComponentsPage() {
           <label htmlFor="demo-qty" className="text-sm font-medium">
             Quantity
           </label>
-          <input id="demo-qty" type="number" defaultValue={36} className="mt-1 h-10 w-full rounded-input border border-border px-3" />
+          <input
+            id="demo-qty"
+            type="number"
+            defaultValue={36}
+            className="mt-1 h-10 w-full rounded-input border border-border px-3"
+          />
         </Modal>
         <ConfirmDialog
           open={confirmOpen}

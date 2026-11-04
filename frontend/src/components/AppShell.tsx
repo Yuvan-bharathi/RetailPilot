@@ -28,7 +28,11 @@ function Sidebar({ user, collapsed, onToggle }: { user: MeDTO; collapsed: boolea
     >
       <div className="flex h-16 items-center gap-2 px-4">
         <ShoppingBasket aria-hidden="true" className="shrink-0 text-brand" size={24} />
-        {collapsed ? <span className="sr-only">RetailPilot AI</span> : <span className="font-semibold text-ink">RetailPilot AI</span>}
+        {collapsed ? (
+          <span className="sr-only">RetailPilot AI</span>
+        ) : (
+          <span className="font-semibold text-ink">RetailPilot AI</span>
+        )}
       </div>
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-2">
         <ul className="space-y-1">
@@ -40,12 +44,18 @@ function Sidebar({ user, collapsed, onToggle }: { user: MeDTO; collapsed: boolea
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
                   `flex h-10 items-center gap-3 rounded-button px-3 text-sm ${
-                    isActive ? "bg-brand-soft font-semibold text-brand" : "text-ink-secondary hover:bg-surface hover:text-ink"
+                    isActive
+                      ? "bg-brand-soft font-semibold text-brand"
+                      : "text-ink-secondary hover:bg-surface hover:text-ink"
                   }`
                 }
               >
                 <item.icon aria-hidden="true" size={18} className="shrink-0" />
-                {collapsed ? <span className="sr-only">{item.label}</span> : <span className="truncate">{item.label}</span>}
+                {collapsed ? (
+                  <span className="sr-only">{item.label}</span>
+                ) : (
+                  <span className="truncate">{item.label}</span>
+                )}
               </NavLink>
             </li>
           ))}
@@ -134,7 +144,9 @@ export function AppShell({ user, onSignOut, children }: { user: MeDTO; onSignOut
   const [override, setOverride] = useState<boolean | null>(null);
   const collapsed = override ?? narrow;
   const location = useLocation();
-  const current = navFor(user.role).find((i) => (i.path === "/" ? location.pathname === "/" : location.pathname.startsWith(i.path)));
+  const current = navFor(user.role).find((i) =>
+    i.path === "/" ? location.pathname === "/" : location.pathname.startsWith(i.path),
+  );
   const title = location.pathname === "/components" ? "Design system" : (current?.label ?? "RetailPilot AI");
 
   return (

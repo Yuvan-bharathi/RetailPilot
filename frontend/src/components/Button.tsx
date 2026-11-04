@@ -35,7 +35,11 @@ export function Button({
       className={`inline-flex items-center justify-center gap-2 rounded-button font-medium transition-colors disabled:cursor-not-allowed disabled:border-border disabled:bg-neutral-bg disabled:text-ink-disabled ${height} ${VARIANT[variant]} ${className}`}
       {...rest}
     >
-      {icon ? <span aria-hidden="true" className="inline-flex">{icon}</span> : null}
+      {icon ? (
+        <span aria-hidden="true" className="inline-flex">
+          {icon}
+        </span>
+      ) : null}
       {children}
     </button>
   );

@@ -44,7 +44,15 @@ describe("Store Inventory", () => {
     renderApp("/inventory", "sup.a");
     const table = await screen.findByRole("region", { name: "Store inventory" });
     await within(table).findAllByRole("row");
-    for (const header of ["Shelf", "Shelf min", "Backroom", "Available", "Own requirement", "Surplus / shortage", "Stockout risk"]) {
+    for (const header of [
+      "Shelf",
+      "Shelf min",
+      "Backroom",
+      "Available",
+      "Own requirement",
+      "Surplus / shortage",
+      "Stockout risk",
+    ]) {
       expect(within(table).getByRole("columnheader", { name: header })).toBeTruthy();
     }
     expect(screen.queryByLabelText("Inventory for")).toBeNull();
@@ -58,9 +66,7 @@ describe("Store Inventory", () => {
     const count = Number(chip.textContent?.split("·")[1]);
     await user.click(chip);
     expect(chip.getAttribute("aria-pressed")).toBe("true");
-    await waitFor(() =>
-      expect(screen.getByText(count === 0 ? "No rows" : new RegExp(`of ${count}$`))).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(count === 0 ? "No rows" : new RegExp(`of ${count}$`))).toBeTruthy());
   });
 
   it("switches tabs with the arrow keys and shows the ledger, batches and expiring stock", async () => {
@@ -123,7 +129,11 @@ describe("Store Inventory", () => {
     await screen.findByRole("region", { name: "Store inventory" });
     await user.click(screen.getByRole("tab", { name: "Stock moves" }));
     const ledger = await screen.findByRole("region", { name: "Stock moves (movement ledger)" });
-    const shown = () => within(ledger).getAllByRole("row").slice(1).map((r) => r.textContent);
+    const shown = () =>
+      within(ledger)
+        .getAllByRole("row")
+        .slice(1)
+        .map((r) => r.textContent);
     const expected = (page: InventoryMovementDTO[]) => page.map((m) => m.product.name);
 
     await screen.findByText("Showing 1–25");
@@ -176,7 +186,9 @@ describe("Recommendations inbox", () => {
     const table = screen.getByRole("region", { name: "AI recommendations" });
     const row = await within(table).findByText("Biscuits 200 g (demo)");
     await user.click(row);
-    await waitFor(() => expect(router.state.location.pathname).toBe(`/recommendations/${scenarioRec("3", "TRANSFER").rec_id}`));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/recommendations/${scenarioRec("3", "TRANSFER").rec_id}`),
+    );
   });
 
   it("restores filters from the URL and lists high priority first", async () => {

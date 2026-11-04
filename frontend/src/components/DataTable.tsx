@@ -27,7 +27,12 @@ import { formatNumber } from "../lib/format";
 import { Button } from "./Button";
 import { EmptyState, ErrorState, SkeletonLine } from "./StateViews";
 
-const features = tableFeatures({ rowSortingFeature, rowPaginationFeature, columnVisibilityFeature, rowSelectionFeature });
+const features = tableFeatures({
+  rowSortingFeature,
+  rowPaginationFeature,
+  columnVisibilityFeature,
+  rowSelectionFeature,
+});
 type Features = typeof features;
 
 export interface Column<T> {
@@ -173,7 +178,9 @@ export function DataTable<T extends RowData>({
   const first = rows === 0 ? 0 : (query.page - 1) * query.pageSize + 1;
   const last = total === null ? first + rows - 1 : Math.min(query.page * query.pageSize, total);
   const pageCount = total === null ? null : Math.max(1, Math.ceil(total / query.pageSize));
-  const hasNext = cursorMode ? Boolean(page && "next_cursor" in page && page.next_cursor) : query.page < (pageCount ?? 1);
+  const hasNext = cursorMode
+    ? Boolean(page && "next_cursor" in page && page.next_cursor)
+    : query.page < (pageCount ?? 1);
   let rangeText = "No rows";
   if (rows > 0) {
     rangeText =

@@ -28,7 +28,8 @@ for (const file of walk(root)) {
     .forEach((line, i) => {
       const where = `${relative(root, file).split(sep).join("/")}:${i + 1}`;
       for (const match of line.matchAll(hex)) problems.push(`${where}  ${match[0]} (hex colour — use a token)`);
-      for (const match of line.matchAll(mutedText)) problems.push(`${where}  ${match[0]} (--text-muted is not a text colour, D-33)`);
+      for (const match of line.matchAll(mutedText))
+        problems.push(`${where}  ${match[0]} (--text-muted is not a text colour, D-33)`);
     });
 }
 

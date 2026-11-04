@@ -16,7 +16,9 @@ execFileSync(process.execPath, [cli, join(frontend, "openapi.json"), "-o", fresh
 
 const normalise = (text) => text.replace(/\r\n/g, "\n");
 if (normalise(readFileSync(committed, "utf8")) !== normalise(readFileSync(fresh, "utf8"))) {
-  console.error("src/api/schema.d.ts is stale — run `npm run gen:api` (after exporting openapi.json from the backend).");
+  console.error(
+    "src/api/schema.d.ts is stale — run `npm run gen:api` (after exporting openapi.json from the backend).",
+  );
   process.exit(1);
 }
 console.log("check:api ok — generated types match openapi.json");

@@ -68,7 +68,15 @@ export function appRoutes(showDemoUsers: boolean): RouteObject[] {
   ];
 }
 
-export function AppProviders({ client, tokens, children }: { client: ApiClient; tokens: TokenStore; children: ReactNode }) {
+export function AppProviders({
+  client,
+  tokens,
+  children,
+}: {
+  client: ApiClient;
+  tokens: TokenStore;
+  children: ReactNode;
+}) {
   const [queryClient] = useState(
     () =>
       new QueryClient({

@@ -39,7 +39,10 @@ describe("mock API — per-viewer scoping (D-32)", () => {
     const page = await supA.listRecommendations({ page: 1, page_size: 200 });
     expect(page.total).toBeGreaterThan(0);
     expect(page.items.every((r) => r.store.store_id === store("A").store_id)).toBe(true);
-    await expect(supA.getStoreInventory(store("C").store_id, {})).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+    await expect(supA.getStoreInventory(store("C").store_id, {})).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN",
+    });
     await expect(supA.listStoreMovements(store("B").store_id, {})).rejects.toMatchObject({ status: 403 });
     await expect(supA.listStores()).resolves.toHaveLength(1);
   });

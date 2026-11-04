@@ -13,7 +13,9 @@ import { categoryLabel, REC_TYPE_LABEL } from "../lib/labels";
 
 function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: "brand" }) {
   return (
-    <div className={`rounded-card border p-3 ${tone === "brand" ? "border-brand-muted bg-brand-soft" : "border-border bg-elevated"}`}>
+    <div
+      className={`rounded-card border p-3 ${tone === "brand" ? "border-brand-muted bg-brand-soft" : "border-border bg-elevated"}`}
+    >
       <p className="text-xs text-ink-secondary">{label}</p>
       <p className="tabular mt-1 text-xl font-semibold text-ink">{value}</p>
     </div>
@@ -51,7 +53,10 @@ export function RecommendationDetailPage() {
       <div className="space-y-4">
         {back}
         <div className="rounded-card border border-border bg-surface">
-          <ErrorState message={message} onRetry={status >= 500 || status === 0 ? () => void detail.refetch() : undefined} />
+          <ErrorState
+            message={message}
+            onRetry={status >= 500 || status === 0 ? () => void detail.refetch() : undefined}
+          />
         </div>
       </div>
     );
@@ -65,7 +70,10 @@ export function RecommendationDetailPage() {
     <div className="space-y-4">
       {back}
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
-        <section aria-labelledby="rec-title" className="space-y-4 rounded-card border border-border bg-surface p-5 shadow-card">
+        <section
+          aria-labelledby="rec-title"
+          className="space-y-4 rounded-card border border-border bg-surface p-5 shadow-card"
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 id="rec-title" className="text-lg font-semibold text-ink">
@@ -109,7 +117,8 @@ export function RecommendationDetailPage() {
           ) : null}
 
           <p className="text-xs text-ink-secondary">
-            Created {formatDateTimeIST(rec.created_at)}. Approve, edit or reject in the Approvals screen (coming in Phase 6).
+            Created {formatDateTimeIST(rec.created_at)}. Approve, edit or reject in the Approvals screen (coming in
+            Phase 6).
           </p>
         </section>
         {evidence ? <EvidenceView evidence={evidence} /> : null}

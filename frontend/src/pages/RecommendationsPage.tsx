@@ -54,7 +54,11 @@ function columns(showStore: boolean): Column<RecommendationDTO>[] {
       header: "Priority",
       sortable: true,
       cell: (r) =>
-        r.priority === "HIGH" ? <StatusBadge tone="attention" label="High" /> : <StatusBadge tone="neutral" label="Normal" />,
+        r.priority === "HIGH" ? (
+          <StatusBadge tone="attention" label="High" />
+        ) : (
+          <StatusBadge tone="neutral" label="Normal" />
+        ),
     },
     { id: "status", header: "Status", sortable: true, cell: (r) => <StatusPill status={r.status} /> },
   ];
@@ -141,7 +145,14 @@ export function RecommendationsPage() {
       page={result.data}
       query={query}
       onQueryChange={(next) =>
-        update({ page: next.page === 1 ? undefined : next.page, size: next.pageSize === 25 ? undefined : next.pageSize, sort: next.sort }, false)
+        update(
+          {
+            page: next.page === 1 ? undefined : next.page,
+            size: next.pageSize === 25 ? undefined : next.pageSize,
+            sort: next.sort,
+          },
+          false,
+        )
       }
       getRowId={(r) => r.rec_id}
       isLoading={result.isPending}

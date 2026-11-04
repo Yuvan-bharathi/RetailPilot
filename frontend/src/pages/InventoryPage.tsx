@@ -12,7 +12,14 @@ import {
   useStores,
   useTransfers,
 } from "../api/hooks";
-import type { BatchDTO, InventoryMovementDTO, InventoryRowDTO, MovementType, StockoutRisk, StoreDTO } from "../api/types";
+import type {
+  BatchDTO,
+  InventoryMovementDTO,
+  InventoryRowDTO,
+  MovementType,
+  StockoutRisk,
+  StoreDTO,
+} from "../api/types";
 import { useAuth } from "../app/AuthContext";
 import { useShell } from "../app/ShellContext";
 import { Button } from "../components/Button";
@@ -82,13 +89,28 @@ const PRODUCT_COLUMNS: Column<InventoryRowDTO>[] = [
     sortable: true,
     align: "right",
     cell: (r) => (
-      <span className={r.surplus_or_shortage < 0 ? "font-semibold text-danger" : r.surplus_or_shortage > 0 ? "text-success" : ""}>
+      <span
+        className={
+          r.surplus_or_shortage < 0 ? "font-semibold text-danger" : r.surplus_or_shortage > 0 ? "text-success" : ""
+        }
+      >
         {signed(r.surplus_or_shortage)}
       </span>
     ),
   },
-  { id: "days_of_cover", header: "Days of cover", sortable: true, align: "right", cell: (r) => formatDays(r.days_of_cover) },
-  { id: "stockout_risk", header: "Stockout risk", sortable: true, cell: (r) => <StatusPill status={r.stockout_risk} /> },
+  {
+    id: "days_of_cover",
+    header: "Days of cover",
+    sortable: true,
+    align: "right",
+    cell: (r) => formatDays(r.days_of_cover),
+  },
+  {
+    id: "stockout_risk",
+    header: "Stockout risk",
+    sortable: true,
+    cell: (r) => <StatusPill status={r.stockout_risk} />,
+  },
   {
     id: "near_expiry_qty",
     header: "Near expiry",
@@ -124,7 +146,8 @@ const PRODUCT_COLUMNS: Column<InventoryRowDTO>[] = [
   {
     id: "refill",
     header: "Refill",
-    cell: (r) => (r.refill_from_backroom ? <StatusBadge tone="warning" icon={PackageOpen} label="Refill from backroom" /> : "—"),
+    cell: (r) =>
+      r.refill_from_backroom ? <StatusBadge tone="warning" icon={PackageOpen} label="Refill from backroom" /> : "—",
   },
 ];
 
@@ -135,7 +158,9 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       aria-pressed={active}
       onClick={onClick}
       className={`h-8 rounded-full border px-3 text-sm ${
-        active ? "border-brand bg-brand-soft font-semibold text-brand" : "border-border bg-surface text-ink hover:bg-elevated"
+        active
+          ? "border-brand bg-brand-soft font-semibold text-brand"
+          : "border-border bg-surface text-ink hover:bg-elevated"
       }`}
     >
       {children}
@@ -317,7 +342,12 @@ const BATCH_COLUMNS: Column<BatchDTO>[] = [
   { id: "qty", header: "Quantity", sortable: true, align: "right", cell: (b) => formatNumber(b.qty) },
   { id: "expiry_date", header: "Expiry date", sortable: true, cell: (b) => formatDateIST(b.expiry_date) },
   { id: "days_left", header: "Days left", sortable: true, align: "right", cell: (b) => formatNumber(b.days_left) },
-  { id: "fefo_rank", header: "Sells", align: "right", cell: (b) => (b.fefo_rank === 1 ? "First (FEFO)" : `#${b.fefo_rank}`) },
+  {
+    id: "fefo_rank",
+    header: "Sells",
+    align: "right",
+    cell: (b) => (b.fefo_rank === 1 ? "First (FEFO)" : `#${b.fefo_rank}`),
+  },
   {
     id: "at_risk_qty",
     header: "Expiry risk",
@@ -332,7 +362,11 @@ const BATCH_COLUMNS: Column<BatchDTO>[] = [
 ];
 
 function BatchesTab({ storeId, expiring }: { storeId: string; expiring: boolean }) {
-  const [query, setQuery] = useState<TableQuery>({ page: 1, pageSize: 25, sort: expiring ? "days_left" : "expiry_date" });
+  const [query, setQuery] = useState<TableQuery>({
+    page: 1,
+    pageSize: 25,
+    sort: expiring ? "days_left" : "expiry_date",
+  });
   const params = { page: query.page, page_size: query.pageSize, sort: query.sort };
   const batches = useStoreBatches(expiring ? null : storeId, params);
   const soon = useStoreExpiring(expiring ? storeId : null, { ...params, within_days: 14 });
@@ -456,7 +490,9 @@ function ProductDrawer({ storeId, row, onClose }: { storeId: string; row: Invent
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-ink-secondary">{batches.isPending ? "Loading…" : "No batches tracked for this product."}</p>
+            <p className="text-sm text-ink-secondary">
+              {batches.isPending ? "Loading…" : "No batches tracked for this product."}
+            </p>
           )}
         </DrawerSection>
       </div>
@@ -516,7 +552,11 @@ export function InventoryPage() {
   };
 
   if (!storeId) {
-    return stores.data ? <StorePicker stores={stores.data} onPick={choose} /> : <p className="text-sm text-ink-secondary">Loading stores…</p>;
+    return stores.data ? (
+      <StorePicker stores={stores.data} onPick={choose} />
+    ) : (
+      <p className="text-sm text-ink-secondary">Loading stores…</p>
+    );
   }
 
   return (

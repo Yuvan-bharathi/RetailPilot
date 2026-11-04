@@ -59,7 +59,9 @@ export function Modal({ open, title, onClose, children, footer, description, var
   };
 
   return (
-    <div className={`fixed inset-0 z-50 flex ${variant === "drawer" ? "justify-end" : "items-center justify-center p-4"}`}>
+    <div
+      className={`fixed inset-0 z-50 flex ${variant === "drawer" ? "justify-end" : "items-center justify-center p-4"}`}
+    >
       <div aria-hidden="true" className="absolute inset-0 bg-ink/40" onClick={() => onCloseRef.current()} />
       <div
         ref={panel}
@@ -95,7 +97,9 @@ export function Modal({ open, title, onClose, children, footer, description, var
             <X aria-hidden="true" size={18} />
           </button>
         </div>
-        <div className={`px-5 py-4 text-sm text-ink ${variant === "drawer" ? "flex-1 overflow-y-auto" : ""}`}>{children}</div>
+        <div className={`px-5 py-4 text-sm text-ink ${variant === "drawer" ? "flex-1 overflow-y-auto" : ""}`}>
+          {children}
+        </div>
         {footer ? <div className="flex justify-end gap-2 border-t border-divider px-5 py-3">{footer}</div> : null}
       </div>
     </div>
@@ -192,7 +196,10 @@ export function ConfirmDialog({
       {requireReason ? (
         <div className="mt-4">
           <label htmlFor={fieldId} className="text-sm font-medium">
-            Your reason <span aria-hidden="true" className="text-danger">*</span>
+            Your reason{" "}
+            <span aria-hidden="true" className="text-danger">
+              *
+            </span>
             <span className="sr-only">(required)</span>
           </label>
           <textarea
