@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -13,6 +15,25 @@ from app.domain.models.inventory import Batch
 class BatchRepo:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def get_expiring(
+        self, store_ids: list[UUID], as_of_date: date, within_days: int = 14
+    ) -> list[Batch]:
+        """Fetch held batches expiring within window (D-38, SD-08)."""
+        if not store_ids:
+            return []
+        cutoff = as_of_date + timedelta(days=within_days)
+        stmt = (
+            select(Batch)
+            .where(
+                Batch.store_id.in_(store_ids),
+                Batch.qty > 0,
+                Batch.expiry_date >= as_of_date,
+                Batch.expiry_date <= cutoff,
+            )
+            .order_by(Batch.store_id, Batch.product_id, Batch.expiry_date.asc())
+        )
+        return list(self.session.scalars(stmt).all())
 
     def bulk_upsert(self, store_id: UUID, batches: list[Batch]) -> int:
         if not batches:
@@ -40,3 +61,4 @@ class BatchRepo:
         )
         self.session.execute(stmt)
         return len(batches)
+

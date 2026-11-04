@@ -165,3 +165,4 @@ class InventoryLedgerService:
             self.post(adjustments)
 
         return adjustments
+

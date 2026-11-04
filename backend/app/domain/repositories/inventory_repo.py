@@ -69,3 +69,4 @@ class InventoryRepo:
         )
         self.session.execute(stmt)
         return len(rows)
+
