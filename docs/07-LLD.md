@@ -170,3 +170,4 @@ Standard status codes:
 - **404 Not Found:** Resource not found.
 - **409 Conflict:** State transition conflict (e.g. transfer already dispatched, PO already finalised).
 - **422 Unprocessable Entity:** Schema validation failure or negative quantities.
+

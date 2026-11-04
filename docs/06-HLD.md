@@ -132,3 +132,4 @@ Orchestrated by `WorkflowOrchestrator.run_nightly()` through Celery Beat:
 - Monthly partitioning for high-volume append tables (`sales_line`, `inventory_movement`) with indexes inherited automatically by partitions.
 - Scheduled Celery Beat maintenance job creates next-month partitions proactively and raises an alert if rows land in the `DEFAULT` partition.
 - Optimistic/Pessimistic row locking (`SELECT ... FOR UPDATE`) guards against race conditions in PO line approvals, transfer dispatches, and inventory movements.
+
