@@ -94,3 +94,24 @@ class CacheService:
         except redis.RedisError as e:
             logger.warning("Redis error on invalidate_run: %s", e)
         return deleted
+
+    def invalidate_store_keys(self, store_ids: list[UUID], prefixes: list[str]) -> int:
+        """Invalidates cache keys matching {prefix}:*:{store_id}:* (SD-10, SD-12)."""
+        if self.client is None or not store_ids:
+            return 0
+        deleted = 0
+        try:
+            for store_id in store_ids:
+                for prefix in prefixes:
+                    pattern = f"{prefix}:*:{store_id}:*"
+                    cursor = 0
+                    while True:
+                        cursor, keys = self.client.scan(cursor=cursor, match=pattern, count=100)
+                        if keys:
+                            self.client.delete(*keys)
+                            deleted += len(keys)
+                        if cursor == 0:
+                            break
+        except redis.RedisError as e:
+            logger.warning("Redis error on invalidate_store_keys: %s", e)
+        return deleted

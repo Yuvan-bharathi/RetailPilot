@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -b",
-    "test": "vitest run",
+    "test": "vitest run --pool=threads",
     "test:watch": "vitest",
     "gen:api": "openapi-typescript openapi.json -o src/api/schema.d.ts",
     "check:api": "node scripts/check-api.mjs",

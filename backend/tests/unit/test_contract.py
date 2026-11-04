@@ -10,7 +10,9 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from app.api.deps import get_current_user
 from app.core.errors import ValidationError as AppValidationError
+from app.domain.models.users import AppUser
 from app.domain.schemas.common import Counterpart, CursorParams, PageParams, StoreRef
 from app.domain.schemas.cursor import MovementCursor, decode_movement_cursor, encode_movement_cursor
 from app.domain.schemas.dtos import RecommendationDTO, TransferEvidence
@@ -18,6 +20,24 @@ from app.main import create_app
 
 FRONTEND_OPENAPI = Path(__file__).resolve().parents[3] / "frontend" / "openapi.json"
 ANY_ID = "00000000-0000-0000-0000-000000000001"
+
+
+@pytest.fixture
+def authed_client(client: TestClient):
+    app = client.app
+    user = AppUser(
+        user_id=UUID(ANY_ID),
+        username="admin",
+        name="Admin",
+        role="SUPER_ADMIN",
+        password_hash="x",
+        is_active=True,
+    )
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        yield client
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
 
 STUBS = [
     ("post", "/api/v1/auth/login", {"username": "admin", "password": "x"}),
@@ -37,16 +57,16 @@ STUBS = [
 
 
 @pytest.mark.parametrize(("method", "path", "body"), STUBS)
-def test_contract_stubs_answer_501(client: TestClient, method: str, path: str, body: object) -> None:
+def test_contract_endpoints_require_auth(client: TestClient, method: str, path: str, body: object) -> None:
     response = client.request(method, path, json=body)
 
-    assert response.status_code == 501
-    assert response.json()["error"]["code"] == "NOT_IMPLEMENTED"
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "UNAUTHORIZED"
 
 
 @pytest.mark.parametrize("query", ["page=0", "page_size=500", "sort=drop table", "type=UNKNOWN", "page=x"])
-def test_paging_parameters_are_validated(client: TestClient, query: str) -> None:
-    response = client.get(f"/api/v1/recommendations?{query}")
+def test_paging_parameters_are_validated(authed_client: TestClient, query: str) -> None:
+    response = authed_client.get(f"/api/v1/recommendations?{query}")
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION"
@@ -133,8 +153,8 @@ def test_movements_are_cursor_paged_without_a_total() -> None:
 
 
 @pytest.mark.parametrize("query", ["cursor=not%20base64!", "page_size=0", "page_size=201"])
-def test_cursor_parameters_are_validated(client: TestClient, query: str) -> None:
-    response = client.get(f"/api/v1/stores/{ANY_ID}/inventory/movements?{query}")
+def test_cursor_parameters_are_validated(authed_client: TestClient, query: str) -> None:
+    response = authed_client.get(f"/api/v1/stores/{ANY_ID}/inventory/movements?{query}")
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION"
