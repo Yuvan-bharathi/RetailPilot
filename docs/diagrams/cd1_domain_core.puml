@@ -1,7 +1,7 @@
 @startuml
 !include style.iuml
 skinparam linetype ortho
-title CD-1  Domain Model (1/2) v3.2: Master Data, Sales & Inventory, Planning Outputs\n<size:11>SQLAlchemy models mapped to PostgreSQL tables · v3.2 = decision log D-02 … D-09, D-35, D-37</size>
+title CD-1  Domain Model (1/2) v3.2: Master Data, Sales & Inventory, Planning Outputs\n<size:11>SQLAlchemy models mapped to PostgreSQL tables · v3.2 = decision log D-02 … D-09, D-35, D-37, D-43</size>
 hide empty methods
 
 package "Master data" {
@@ -79,6 +79,7 @@ package "Sales & inventory" {
     +bill_id: UUID <<PK>>
     +store_id: UUID <<FK>>
     +txn_datetime: datetime
+    +txn_date: date (IST business day, D-43)
     +total_amount: Decimal
   }
   class SalesLine {
@@ -90,6 +91,7 @@ package "Sales & inventory" {
     +qty: int
     +unit_price: Decimal
     +discount: Decimal
+    +is_return / is_voided / is_promo_day: bool (D-43)
   }
   class InventoryPosition {
     +store_id: UUID <<PK,FK>>
@@ -151,6 +153,7 @@ package "Planning outputs (written by nightly run)" {
   }
   class AssociationRule {
     +rule_id: UUID <<PK>>
+    +run_id: UUID <<FK>> (D-43)
     +store_id: UUID <<FK>>
     +antecedent_id: UUID
     +consequent_id: UUID

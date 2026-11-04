@@ -86,8 +86,11 @@ infra/docker-compose.yml
 
 ## Commands
 - Infra: `docker compose -f infra/docker-compose.yml up -d`
-- Backend: `cd backend && uv sync` · `uv run alembic upgrade head` · `uv run uvicorn app.main:app --reload`
-- Tests: `cd backend && uv run pytest -q` · lint: `uv run ruff check --config pyproject.toml . ../data && uv run mypy`
+- Backend: `cd backend && uv sync` · `uv run alembic upgrade head` · `uv run python -m scripts.seed` ·
+  `uv run uvicorn app.main:app --reload --loop app.core.db:selector_event_loop` (selector loop: psycopg async
+  cannot use Windows' default Proactor loop, D-36)
+- Tests: `cd backend && uv run pytest -q` (integration tests need `docker compose … up -d`; they create and drop
+  the `retailpilot_test` database and are skipped with a reason when PostgreSQL is down) · lint: `uv run ruff check --config pyproject.toml . ../data && uv run mypy`
   (always pass `--config pyproject.toml` when ruff also checks `../data`: data/ has no config of its own, so
   without it ruff falls back to its defaults; mypy already covers app/ and ../data via pyproject.toml)
 - Worker: `uv run celery -A app.workers.celery_app worker -B -l info`

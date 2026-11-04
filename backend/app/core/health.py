@@ -3,7 +3,9 @@
 from typing import Literal
 
 import redis
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.logging import get_logger
 
@@ -12,17 +14,20 @@ logger = get_logger(__name__)
 CheckStatus = Literal["ok", "unavailable"]
 
 
-def check_database(url: str, timeout_s: float) -> CheckStatus:
-    engine = create_engine(url, connect_args={"connect_timeout": max(1, int(timeout_s))}, pool_pre_ping=False)
+async def check_database(url: str, timeout_s: float) -> CheckStatus:
+    """Async psycopg check (D-36) on its own unpooled connection, so a full API pool cannot fail the probe."""
+    engine = create_async_engine(
+        url, poolclass=NullPool, connect_args={"connect_timeout": max(1, int(timeout_s))}
+    )
     try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
         return "ok"
     except Exception as exc:  # any driver/network error means "unavailable"
         logger.warning("database health check failed: %s", type(exc).__name__)
         return "unavailable"
     finally:
-        engine.dispose()
+        await engine.dispose()
 
 
 def check_redis(url: str, timeout_s: float) -> CheckStatus:

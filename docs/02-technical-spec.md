@@ -1,7 +1,7 @@
 # RetailPilot AI — Technical Specification (implementation reference)
 
 Derived from business requirements v2.2, diagrams v3 (`docs/diagrams/`) and the decision log
-(`docs/05-decision-log.md`, D-01 … D-42). Use these names, formulas and states exactly. Values marked
+(`docs/05-decision-log.md`, D-01 … D-43). Use these names, formulas and states exactly. Values marked
 **(confirm)** are placeholder defaults stored in `BusinessRule` — never hard-code them.
 
 ## 1. Core formulas
@@ -370,6 +370,9 @@ Placeholder defaults to confirm with the business: `holding_cost_rate_per_day = 
   | expiring batches | partial `batch (store_id, expiry_date)` WHERE `qty > 0` |
   | unread notifications | partial `notification (user_id, created_at)` WHERE `read_at IS NULL` |
   | `q` product search | `pg_trgm` GIN on `product.name` and `product.sku` (extension enabled in migration 0001) |
+- Added in D-43 (to confirm): `sales_line.is_return`, `.is_voided`, `.is_promo_day`; `sales_transaction.txn_date`;
+  `association_rule.run_id`; integrity checks (supervisor has a store, two distinct stores per transfer/route,
+  non-negative quantities); `llm_usage.est_cost` NUMERIC(14,6); `kpi_snapshot.value` NUMERIC(18,4).
 - Seeding (D-35): BusinessRule defaults (§9) in migration `0002`; stores and PoC users in the idempotent
   `python -m scripts.seed` (password from `SEED_USER_PASSWORD`; `demo` only when `APP_ENV=local`).
 - New columns (D-02, D-05, D-06, D-07, D-08): `store_product.preferred_supplier_id`;
@@ -412,8 +415,9 @@ Decisions D-36 … D-42. Budgets are verified, not assumed: each item names wher
   materialized-view refresh are not cut off.
 - All values are settings (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_STATEMENT_TIMEOUT_MS`,
   `WORKER_DB_POOL_SIZE`, `WORKER_DB_MAX_OVERFLOW`, `WORKER_DB_STATEMENT_TIMEOUT_MS`).
-- On Windows, psycopg async needs the selector event loop (not the default Proactor loop); tests and the local run
-  command set it. Linux deployments are unaffected.
+- On Windows, psycopg async needs the selector event loop (not the default Proactor loop): run uvicorn with
+  `--loop app.core.db:selector_event_loop`; the test suite sets the selector policy. Linux deployments are
+  unaffected.
 
 **Connection budget (D-36)**
 

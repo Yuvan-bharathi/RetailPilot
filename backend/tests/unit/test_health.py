@@ -6,6 +6,13 @@ from app.core import health
 from app.main import create_app
 
 
+def _async_status(status: str):  # type: ignore[no-untyped-def]
+    async def check(url: str, timeout_s: float) -> str:
+        return status
+
+    return check
+
+
 def test_health_ok_when_dependencies_up(client: TestClient) -> None:
     response = client.get("/health")
 
@@ -18,7 +25,7 @@ def test_health_ok_when_dependencies_up(client: TestClient) -> None:
 
 
 def test_health_degraded_but_200_when_dependencies_down(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(health, "check_database", lambda url, timeout_s: "unavailable")
+    monkeypatch.setattr(health, "check_database", _async_status("unavailable"))
     monkeypatch.setattr(health, "check_redis", lambda url, timeout_s: "ok")
 
     with TestClient(create_app()) as test_client:
@@ -30,7 +37,9 @@ def test_health_degraded_but_200_when_dependencies_down(monkeypatch: pytest.Monk
     assert body["checks"] == {"database": "unavailable", "redis": "ok"}
 
 
-def test_real_checks_report_unavailable_for_unreachable_hosts() -> None:
+async def test_real_checks_report_unavailable_for_unreachable_hosts() -> None:
     # Port 1 on localhost refuses connections immediately: no network wait, no exception escapes.
-    assert health.check_database("postgresql+psycopg://u:p@127.0.0.1:1/db", timeout_s=1) == "unavailable"
+    assert (
+        await health.check_database("postgresql+psycopg://u:p@127.0.0.1:1/db", timeout_s=1) == "unavailable"
+    )
     assert health.check_redis("redis://127.0.0.1:1/0", timeout_s=1) == "unavailable"

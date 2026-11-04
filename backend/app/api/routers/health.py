@@ -28,7 +28,7 @@ class HealthResponse(BaseModel):
 async def get_health() -> HealthResponse:
     settings = get_settings()
     timeout = settings.health_check_timeout_s
-    database = await run_in_threadpool(health.check_database, settings.database_url, timeout)
+    database = await health.check_database(settings.database_url, timeout)
     cache = await run_in_threadpool(health.check_redis, settings.redis_url, timeout)
     overall: Literal["ok", "degraded"] = "ok" if database == "ok" and cache == "ok" else "degraded"
     return HealthResponse(

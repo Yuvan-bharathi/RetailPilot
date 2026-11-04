@@ -26,6 +26,20 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     database_url: str = "postgresql+psycopg://retailpilot:retailpilot@localhost:5432/retailpilot"
+
+    # API engine: async, pooled, short statement timeout (D-36, spec §11 connection budget)
+    db_pool_size: int = 10
+    db_max_overflow: int = 10
+    db_pool_timeout_s: float = 5.0
+    db_pool_recycle_s: int = 1800
+    db_statement_timeout_ms: int = 5_000
+    # Celery / scripts engine: sync, small pool, long statement timeout (nightly run, MV refresh)
+    worker_db_pool_size: int = 2
+    worker_db_max_overflow: int = 3
+    worker_db_statement_timeout_ms: int = 600_000
+
+    # PoC users created by `python -m scripts.seed` (D-35); "demo" is accepted only when app_env == "local"
+    seed_user_password: SecretStr | None = None
     redis_url: str = "redis://localhost:6379/0"
 
     jwt_secret: SecretStr = SecretStr("change-me")

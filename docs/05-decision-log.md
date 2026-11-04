@@ -437,7 +437,8 @@ frontend/scripts/check-no-hex.mjs.
 - **Connection budget** (spec §11): `api_workers × (pool_size + max_overflow) + celery_processes ×
   (worker pool + overflow) + headroom` must stay below PostgreSQL `max_connections` (default 100). PgBouncer
   (transaction mode, prepared statements off) is the production option.
-No new dependency: psycopg 3 already provides the async driver.
+psycopg 3 already provides the async driver; SQLAlchemy's asyncio layer needs `greenlet`, added through the
+`sqlalchemy[asyncio]` extra (correction found in Phase 2: the plan had said "no new dependency").
 **Changed.** Spec §11; `app/core/db.py`, `app/core/config.py`, `/health` (Phase 2).
 
 ---
@@ -497,3 +498,23 @@ Row-by-row ORM inserts are not used for bulk data.
 **Decision.** p95 < 200 ms for cached reads and < 500 ms for uncached reads, verified by a k6 or Locust load test
 in Phase 9 (tool chosen then). The nightly-run time limit on the `full` dataset is **measured in Phase 5** and
 then proposed for approval; it is recorded in spec §11.
+
+---
+
+## D-43 Phase 2 schema details beyond D-35 (to confirm)
+**Decision (implemented in migration 0001; confirm or tell me to change).** Found while building the models from
+CD-1/CD-2 against the sequence diagrams and the synthetic data:
+- **`sales_line.is_return`, `.is_voided`, `.is_promo_day`** (bool, default false): SD-05 `clean_bills` drops returns
+  and voided lines and optionally promotion days (requirements §6, D-27), and the synthetic data carries these flags,
+  but CD-1 had no columns for them. `mv_dashboard_store_day` uses them: revenue = sale lines (qty × price − discount)
+  − returns (qty × price); voided lines count nothing; gross profit uses the product's current cost price.
+- **`sales_transaction.txn_date`** — the IST business day of the bill (the synthetic data has it; avoids
+  timezone arithmetic in daily queries).
+- **`association_rule.run_id`** (FK agent_run) — CD-1's note says every planning output references the run that
+  produced it; the class itself lacked the column.
+- **Integrity checks** (no business rule changed): a Store Supervisor must have a store; a notification needs an
+  audience (role, store or user); transfers and routes need two different stores; quantities that cannot be
+  negative (`qty`, `received_qty`, `moq`, `pack_size`) are checked.
+- **`llm_usage.est_cost`** is NUMERIC(14,6): provider cost estimates are fractions of a cent (not ₹ money).
+- **`kpi_snapshot.value`** is NUMERIC(18,4): it stores rates as well as amounts.
+**Changed.** CD-1 v3.2, spec §10, migration 0001.
