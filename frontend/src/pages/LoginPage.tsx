@@ -75,12 +75,33 @@ export function LoginPage({ showDemoUsers }: { showDemoUsers: boolean }) {
             {busy ? "Signing in…" : "Sign in"}
           </Button>
         </form>
-        {showDemoUsers ? (
-          <p className="mt-6 text-xs text-ink-secondary">
-            Demo (mock data): <strong>admin</strong>, <strong>sup.a</strong>, <strong>sup.b</strong> or{" "}
-            <strong>sup.c</strong> with password <strong>demo</strong>.
-          </p>
-        ) : null}
+
+        {/* Demo Fast-Login Helpers */}
+        <div className="mt-6 border-t border-divider pt-4">
+          <p className="text-xs font-medium text-ink-secondary">Quick Demo Sign-In (password: demo):</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setUsername("admin");
+                setPassword("demo");
+              }}
+              className="rounded-button border border-border bg-app px-2.5 py-1 text-xs font-medium text-ink transition hover:border-brand hover:bg-brand-soft/40"
+            >
+              Super Admin (admin)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUsername("sup.c");
+                setPassword("demo");
+              }}
+              className="rounded-button border border-border bg-app px-2.5 py-1 text-xs font-medium text-ink transition hover:border-brand hover:bg-brand-soft/40"
+            >
+              Supervisor (sup.c)
+            </button>
+          </div>
+        </div>
       </div>
     </main>
   );
