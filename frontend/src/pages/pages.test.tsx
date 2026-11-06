@@ -31,12 +31,12 @@ describe("Store Inventory", () => {
     const first = renderApp("/inventory", "admin");
     expect(await screen.findByRole("heading", { name: "Choose a store" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: new RegExp(store("C").name) }));
-    expect(await screen.findByRole("region", { name: "Store inventory" })).toBeTruthy();
+    expect(await screen.findByRole("region", { name: "Store inventory" }, { timeout: 5_000 })).toBeTruthy();
     first.unmount();
 
     renderApp("/inventory", "admin"); // last store selected is the default next time
-    const select = (await screen.findByLabelText("Inventory for")) as HTMLSelectElement;
-    await waitFor(() => expect(select.value).toBe(store("C").store_id));
+    const select = (await screen.findByLabelText("Inventory for", {}, { timeout: 5_000 })) as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe(store("C").store_id), { timeout: 5_000 });
     expect(screen.queryByRole("heading", { name: "Choose a store" })).toBeNull();
   });
 

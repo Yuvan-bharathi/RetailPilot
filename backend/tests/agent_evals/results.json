@@ -1,6 +1,5 @@
 {
-  "generated": "2026-11-06T06:29:37.549079+00:00",
-  "source": "RECORDED",
+  "generated": "2026-11-06T09:28:15.719444+00:00",
   "results": [
     {
       "agent_key": "ask_retailpilot",
@@ -11,10 +10,10 @@
       "groundedness": 0.9167,
       "tool_use": 1.0,
       "failure_handling": 1.0,
-      "latency_p50_ms": 15,
-      "latency_p95_ms": 16,
+      "latency_p50_ms": 30,
+      "latency_p95_ms": 217,
       "tokens": 19760,
-      "est_cost_usd": "0.004161",
+      "est_cost_usd": "0.121600",
       "human_agreement": null,
       "details": {
         "cases": [
@@ -114,8 +113,8 @@
       "groundedness": 1.0,
       "tool_use": 1.0,
       "failure_handling": 0.5,
-      "latency_p50_ms": 15,
-      "latency_p95_ms": 16,
+      "latency_p50_ms": 31,
+      "latency_p95_ms": 47,
       "tokens": 0,
       "est_cost_usd": "0.000000",
       "human_agreement": null,
@@ -212,18 +211,39 @@
       "agent_key": "data_quality",
       "variant": "AGENT",
       "source": "RECORDED",
-      "cases": 11,
+      "cases": 14,
       "correctness": 1.0,
       "groundedness": 1.0,
       "tool_use": 1.0,
       "failure_handling": 1.0,
-      "latency_p50_ms": 125,
-      "latency_p95_ms": 187,
-      "tokens": 60880,
-      "est_cost_usd": "0.013308",
+      "latency_p50_ms": 194,
+      "latency_p95_ms": 266,
+      "tokens": 66720,
+      "est_cost_usd": "0.432000",
       "human_agreement": null,
       "details": {
         "cases": [
+          {
+            "name": "only_stale_signals",
+            "category": "normal",
+            "correct": true,
+            "grounded": true,
+            "detail": "LLM issues=[('STALE_SKU', 'MEDIUM')] drafts=1 rejected=0"
+          },
+          {
+            "name": "only_mismatch_signals",
+            "category": "ambiguous",
+            "correct": true,
+            "grounded": true,
+            "detail": "LLM issues=[('SNAPSHOT_MISMATCH', 'MEDIUM')] drafts=1 rejected=0"
+          },
+          {
+            "name": "clean_day_no_llm_call",
+            "category": "missing_data",
+            "correct": true,
+            "grounded": true,
+            "detail": "BASELINE issues=[] drafts=0 rejected=0"
+          },
           {
             "name": "classify_stale_and_mismatch",
             "category": "normal",
@@ -308,18 +328,39 @@
       "agent_key": "data_quality",
       "variant": "BASELINE",
       "source": "RECORDED",
-      "cases": 11,
-      "correctness": 0.0909,
+      "cases": 14,
+      "correctness": 0.1429,
       "groundedness": 1.0,
       "tool_use": 1.0,
-      "failure_handling": 0.1429,
-      "latency_p50_ms": 77,
-      "latency_p95_ms": 92,
+      "failure_handling": 0.25,
+      "latency_p50_ms": 117,
+      "latency_p95_ms": 141,
       "tokens": 0,
       "est_cost_usd": "0.000000",
       "human_agreement": null,
       "details": {
         "cases": [
+          {
+            "name": "only_stale_signals",
+            "category": "normal",
+            "correct": false,
+            "grounded": true,
+            "detail": "BASELINE issues=[('STALE_SKU', 'MEDIUM')] drafts=1 rejected=0"
+          },
+          {
+            "name": "only_mismatch_signals",
+            "category": "ambiguous",
+            "correct": false,
+            "grounded": true,
+            "detail": "BASELINE issues=[('SNAPSHOT_MISMATCH', 'MEDIUM')] drafts=1 rejected=0"
+          },
+          {
+            "name": "clean_day_no_llm_call",
+            "category": "missing_data",
+            "correct": true,
+            "grounded": true,
+            "detail": "BASELINE issues=[] drafts=0 rejected=0"
+          },
           {
             "name": "classify_stale_and_mismatch",
             "category": "normal",
@@ -409,10 +450,10 @@
       "groundedness": 1.0,
       "tool_use": 1.0,
       "failure_handling": 1.0,
-      "latency_p50_ms": 46,
-      "latency_p95_ms": 109,
+      "latency_p50_ms": 125,
+      "latency_p95_ms": 171,
       "tokens": 22880,
-      "est_cost_usd": "0.004818",
+      "est_cost_usd": "0.140800",
       "human_agreement": null,
       "details": {
         "cases": [
@@ -498,8 +539,8 @@
       "groundedness": 1.0,
       "tool_use": 1.0,
       "failure_handling": 0.5,
-      "latency_p50_ms": 46,
-      "latency_p95_ms": 109,
+      "latency_p50_ms": 117,
+      "latency_p95_ms": 328,
       "tokens": 0,
       "est_cost_usd": "0.000000",
       "human_agreement": null,
@@ -587,10 +628,10 @@
       "groundedness": 1.0,
       "tool_use": 1.0,
       "failure_handling": 1.0,
-      "latency_p50_ms": 30,
-      "latency_p95_ms": 46,
+      "latency_p50_ms": 62,
+      "latency_p95_ms": 94,
       "tokens": 16640,
-      "est_cost_usd": "0.003504",
+      "est_cost_usd": "0.102400",
       "human_agreement": null,
       "details": {
         "cases": [
@@ -676,8 +717,8 @@
       "groundedness": 1.0,
       "tool_use": 1.0,
       "failure_handling": 0.4,
-      "latency_p50_ms": 16,
-      "latency_p95_ms": 47,
+      "latency_p50_ms": 46,
+      "latency_p95_ms": 62,
       "tokens": 0,
       "est_cost_usd": "0.000000",
       "human_agreement": null,
@@ -765,10 +806,10 @@
       "groundedness": 1.0,
       "tool_use": 1.0,
       "failure_handling": 1.0,
-      "latency_p50_ms": 15,
-      "latency_p95_ms": 16,
+      "latency_p50_ms": 31,
+      "latency_p95_ms": 47,
       "tokens": 12000,
-      "est_cost_usd": "0.003600",
+      "est_cost_usd": "0.067200",
       "human_agreement": null,
       "details": {
         "cases": [
@@ -854,8 +895,8 @@
       "groundedness": 1.0,
       "tool_use": 1.0,
       "failure_handling": 0.5714,
-      "latency_p50_ms": 0,
-      "latency_p95_ms": 16,
+      "latency_p50_ms": 30,
+      "latency_p95_ms": 46,
       "tokens": 0,
       "est_cost_usd": "0.000000",
       "human_agreement": null,

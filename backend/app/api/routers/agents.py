@@ -8,7 +8,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Query, status
 
-from app.api.deps import DbSession, RequireSuperAdmin
+from app.api.deps import CurrentUser, DbSession, RequireSuperAdmin
 from app.domain.schemas.agents import (
     AgentDetailDTO,
     AgentListDTO,
@@ -16,6 +16,7 @@ from app.domain.schemas.agents import (
     AgentRunPage,
     AgentRunTraceDTO,
     AgentStatsDTO,
+    AgentStatusDTO,
     DecisionPage,
     DecisionStatDTO,
     OutcomeT,
@@ -43,6 +44,12 @@ _trigger = AgentTriggerService()
 AgentKey = Annotated[str, "registry key"]
 Cursor = Annotated[str | None, Query(max_length=200, pattern=r"^[A-Za-z0-9_-]+$")]
 PageSize = Annotated[int, Query(ge=1, le=200)]
+
+
+@router.get("/agent-status", response_model=AgentStatusDTO)
+async def agent_status(_user: CurrentUser, session: DbSession) -> AgentStatusDTO:
+    """For every signed-in user: the banners the agent switches cause (expiry checks off, replenishment paused)."""
+    return await _console.status(session)
 
 
 @router.get("/agents", response_model=AgentListDTO)

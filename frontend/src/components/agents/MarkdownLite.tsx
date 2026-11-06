@@ -15,7 +15,7 @@ function inline(text: string): ReactNode[] {
     const tok = m[0];
     out.push(
       tok.startsWith("`") ? (
-        <code key={i++} className="rounded bg-neutral-bg px-1 text-[12px]">
+        <code key={i++} className="rounded bg-neutral-bg px-1 text-[12px] break-all">
           {tok.slice(1, -1)}
         </code>
       ) : (
@@ -62,8 +62,13 @@ export function MarkdownLite({ source }: { source: string }) {
     }
     if (/^\s*[-*]\s+/.test(line)) {
       const items: string[] = [];
-      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i] ?? ""))
-        items.push((lines[i++] ?? "").replace(/^\s*[-*]\s+/, ""));
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i] ?? "")) {
+        let item = (lines[i++] ?? "").replace(/^\s*[-*]\s+/, "");
+        // a wrapped item continues until a blank line, a new item, a heading, a table or a code fence
+        while (i < lines.length && (lines[i] ?? "").trim() !== "" && !/^(\s*[-*]\s|#|\||```)/.test(lines[i] ?? ""))
+          item += " " + (lines[i++] ?? "").trim();
+        items.push(item);
+      }
       blocks.push(
         <ul key={key++} className="list-disc space-y-0.5 pl-5">
           {items.map((t, j) => (

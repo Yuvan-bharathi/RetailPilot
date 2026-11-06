@@ -12,7 +12,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { Tabs } from "../../components/Tabs";
 import { RunNowPanel, ToggleAgentButton } from "../../components/agents/AgentControls";
 import { MarkdownLite } from "../../components/agents/MarkdownLite";
-import { KindBadge, OutcomeBadge, Panel, RunStatusBadge, When } from "../../components/agents/agentUi";
+import { DemoBadge, KindBadge, OutcomeBadge, Panel, RunStatusBadge, When } from "../../components/agents/agentUi";
 import { decisionLabel, formatMs, formatRate, formatUsd, PATTERN_LABEL, TRIGGER_LABEL } from "../../lib/agentFormat";
 import { useCursorPaging } from "../../lib/useCursorPaging";
 import { formatNumber } from "../../lib/format";
@@ -28,7 +28,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function CardTab({ d }: { d: AgentDetailDTO }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <Panel title="4D — how this agent is delegated and controlled">
         <dl className="space-y-3">
           <Field label="Delegation — why an agent (or why not)">{d.delegation}</Field>
@@ -172,7 +172,13 @@ function DecisionsTab({ agentKey }: { agentKey: string }) {
 
 function EvalsTab({ d }: { d: AgentDetailDTO }) {
   if (d.evals.length === 0) {
-    return <p className="text-sm text-ink-secondary">No evaluation results recorded for this agent.</p>;
+    return (
+      <p className="text-sm text-ink-secondary">
+        {d.agent.kind === "DETERMINISTIC"
+          ? "Deterministic stage: judged by unit, property and scenario tests (listed in the agent card → Evaluation), not by the LLM evaluation harness."
+          : "No evaluation results recorded yet — run python -m scripts.run_agent_evals."}
+      </p>
+    );
   }
   return (
     <div className="overflow-x-auto">
@@ -235,6 +241,7 @@ function HistoryTab({ d }: { d: AgentDetailDTO }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="tabular text-xs text-ink-secondary">v{h.config_version}</span>
             <span className="font-medium">{h.agent_key ? "This agent" : "All LLM agents"}</span>
+            <DemoBadge show={h.is_demo} />
             <span>
               {h.previous_enabled === null ? "" : h.previous_enabled ? "on → " : "off → "}
               <strong>{h.enabled ? "on" : "off"}</strong>

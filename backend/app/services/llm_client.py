@@ -1,4 +1,4 @@
-"""Groq chat-completions client for explanation text (D-44).
+"""Groq chat-completions client (provider "groq", D-44/D-53) for explanation text; JsonLLM / LLMReply contracts.
 
 - Models: `llm_model` (default `openai/gpt-oss-120b`), then `llm_fallback_model` (`openai/gpt-oss-20b`) when the
   primary fails, times out or is rate-limited. Both are Groq *production* models.
@@ -36,16 +36,29 @@ PRICES_PER_MTOK: dict[str, tuple[Decimal, Decimal]] = {
 _RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
+def price_per_mtok(model: str) -> tuple[Decimal, Decimal]:
+    """(input, output) USD per 1M tokens for a Groq or Anthropic model; (0, 0) if unknown."""
+    if model in PRICES_PER_MTOK:
+        return PRICES_PER_MTOK[model]
+    from app.services.anthropic_client import PRICES  # Anthropic list prices (D-53)
+
+    p = PRICES.get(model)
+    return (p[0], p[1]) if p else (Decimal(0), Decimal(0))
+
+
 @dataclass(frozen=True)
 class LLMReply:
     data: dict[str, Any]
     model: str
     input_tokens: int
     output_tokens: int
+    cost: Decimal | None = None  # provider-computed (Anthropic: includes cache read/write pricing)
 
     @property
     def est_cost(self) -> Decimal:
-        price_in, price_out = PRICES_PER_MTOK.get(self.model, (Decimal(0), Decimal(0)))
+        if self.cost is not None:
+            return self.cost
+        price_in, price_out = price_per_mtok(self.model)
         return (price_in * self.input_tokens + price_out * self.output_tokens) / Decimal(1_000_000)
 
 
@@ -58,6 +71,8 @@ class JsonLLM(Protocol):
 
 
 class GroqClient:
+    provider = "groq"
+
     def __init__(self, settings: Settings, http: httpx.Client | None = None, sleep: Any = time.sleep) -> None:
         if settings.groq_api_key is None:
             raise ValueError("GROQ_API_KEY is not set")

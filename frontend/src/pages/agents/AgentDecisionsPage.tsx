@@ -7,7 +7,7 @@ import type { AgentDecisionDTO, DecisionOutcome, RunMode } from "../../api/types
 import { DataTable, type Column } from "../../components/DataTable";
 import { ErrorState } from "../../components/StateViews";
 import { StatusBadge } from "../../components/StatusBadge";
-import { AgentLink, ConsoleTabs, OutcomeBadge, Panel, Select, When } from "../../components/agents/agentUi";
+import { DemoBadge, AgentLink, ConsoleTabs, OutcomeBadge, Panel, Select, When } from "../../components/agents/agentUi";
 import { decisionLabel, formatRate, OUTCOMES } from "../../lib/agentFormat";
 import { useCursorPaging } from "../../lib/useCursorPaging";
 
@@ -41,6 +41,7 @@ export function AgentDecisionsPage() {
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search);
   const stats = useDecisionStats(agentKey || undefined);
+  const agentNames = new Map((agents.data?.items ?? []).map((a) => [a.agent_key, a.name]));
   const result = useDecisions({
     cursor: paging.cursor,
     page_size: paging.query.pageSize,
@@ -73,7 +74,8 @@ export function AgentDecisionsPage() {
             <span className="ml-1">
               <StatusBadge tone="info" label="Dry run" />
             </span>
-          ) : null}
+          ) : null}{" "}
+          <DemoBadge show={d.is_demo} />
         </span>
       ),
     },
@@ -122,7 +124,7 @@ export function AgentDecisionsPage() {
               <tbody>
                 {(stats.data ?? []).map((s) => (
                   <tr key={`${s.agent_key}-${s.decision_type}`} className="border-b border-divider">
-                    <td className="px-2 py-1.5">{s.agent_key}</td>
+                    <td className="px-2 py-1.5">{agentNames.get(s.agent_key) ?? s.agent_key}</td>
                     <td className="px-2 py-1.5">{decisionLabel(s.decision_type)}</td>
                     <td className="tabular px-2 py-1.5 text-right">{s.total}</td>
                     <td className="tabular px-2 py-1.5 text-right">{s.accepted}</td>

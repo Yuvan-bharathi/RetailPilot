@@ -22,7 +22,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import insert, select, text, update
 from sqlalchemy.orm import Session
 
 from app.agents.llm import agents as A  # noqa: N812
@@ -34,7 +34,7 @@ from app.domain.models.users import AppUser
 from app.services.explanation_service import is_grounded, llm_facts
 from app.services.llm_client import LLMError, LLMReply
 
-MODEL = "openai/gpt-oss-120b"
+MODEL = "claude-opus-5-5"  # scripted turns are priced as the default provider's model (D-53)
 FAILURE_CATEGORIES = {"missing_data", "invalid_input", "tool_failure", "unsafe"}
 
 
@@ -88,6 +88,8 @@ class Outcome:
     tokens: int = 0
     cost: Decimal = Decimal(0)
     tools: list[str] = field(default_factory=list)
+    input_text: str = ""  # what the agent was asked (human-labelling sheet)
+    output_text: str = ""  # what it produced (human-labelling sheet; defaults to `detail`)
 
 
 @dataclass
@@ -177,6 +179,7 @@ def ctx_for(
 
 
 LIVE_LLM: Any = None  # set by `scripts.run_agent_evals --live`: the real model answers instead of the replay
+LIVE_JSON: Any = None  # live JSON client (the reviewer's judge) in --live runs
 
 
 def scripted(turns: list[Any], raise_on: set[int] | None = None, tokens: tuple[int, int] = (900, 140)) -> Any:
@@ -240,6 +243,9 @@ def ask_case(
             tools=tools,
             detail=f"{res.mode} found={res.answer.found} refused={res.answer.refused} "
             f"cites={[c.source_type for c in res.answer.citations]}",
+            input_text=question,
+            output_text=res.answer.answer
+            + "".join(f"\n[{c.source_type}] {c.label}" for c in res.answer.citations),
         )
 
     return Case("ask_retailpilot", name, category, run)
@@ -472,8 +478,11 @@ def dq_case(
     *,
     raise_on: set[int] | None = None,
     tokens: tuple[int, int] = (1_200, 260),
+    setup: Callable[[Session], None] | None = None,
 ) -> Case:
     def run(session: Session, w: dict[str, Any], use_llm: bool) -> Outcome:
+        if setup is not None:
+            setup(session)  # inside the case's savepoint: rolled back afterwards
         ctx = ctx_for(session, w)
         res = A.triage(ctx, scripted(list(turns), raise_on, tokens) if use_llm else None)
         known = ctx.cache.get("ingestion_evidence", {})
@@ -488,9 +497,34 @@ def dq_case(
             tools=tools,
             detail=f"{res.mode} issues={[(i.category, i.severity) for i in res.report.issues]} drafts={res.drafts} "
             f"rejected={res.rejected_issues}",
+            input_text="Latest POS ingestion: "
+            + ", ".join(sorted({str(v.get("signal")) for v in known.values()})),
+            output_text=res.report.summary
+            + "".join(
+                f"\n[{i.severity}] {i.category}: {i.likely_cause} → {i.next_step}" for i in res.report.issues
+            ),
         )
 
     return Case("data_quality", name, category, run)
+
+
+def _no_adjustments(session: Session) -> None:
+    session.execute(text("DELETE FROM inventory_movement WHERE movement_type = 'ADJUSTMENT'"))
+
+
+def _no_stale(session: Session) -> None:  # every SKU with stock sold today: nothing is stale
+    session.execute(
+        text(
+            "UPDATE inventory_position SET shelf_qty = 0, backroom_qty = 0 WHERE (store_id, product_id) NOT IN ("
+            "SELECT store_id, product_id FROM sales_line WHERE txn_date > (SELECT max(snapshot_date) - 3 "
+            "FROM inventory_daily_snapshot))"
+        )
+    )
+
+
+def _clean_day(session: Session) -> None:
+    _no_adjustments(session)
+    _no_stale(session)
 
 
 def _report(
@@ -536,6 +570,35 @@ def _mismatch_issue(
 
 
 DQ_CASES = [
+    dq_case(
+        "only_stale_signals",
+        "normal",
+        [call("get_ingestion_report"), _report(_stale_issue(), _mismatch_issue())],
+        lambda r: (
+            r.mode == "LLM"
+            and bool(r.report.issues)
+            and all(i.category != "SNAPSHOT_MISMATCH" for i in r.report.issues)
+        ),
+        setup=_no_adjustments,
+    ),
+    dq_case(
+        "only_mismatch_signals",
+        "ambiguous",
+        [call("get_ingestion_report"), _report(_stale_issue(), _mismatch_issue())],
+        lambda r: (
+            r.mode == "LLM"
+            and bool(r.report.issues)
+            and all(i.category != "STALE_SKU" for i in r.report.issues)
+        ),
+        setup=_no_stale,
+    ),
+    dq_case(
+        "clean_day_no_llm_call",
+        "missing_data",
+        [],
+        lambda r: not r.report.issues and r.loop is None,  # stopping condition: nothing to triage
+        setup=_clean_day,
+    ),
     dq_case(
         "classify_stale_and_mismatch",
         "normal",
@@ -1077,26 +1140,30 @@ def rv_case(
         rec = session.get(Recommendation, target)
         assert rec is not None
         if use_llm:
-            res = A.review_run(ctx, judge or ScriptedJudge(), persist=False)
+            live_judge = LIVE_JSON if LIVE_JSON is not None and not (judge and judge.fail) else None
+            res = A.review_run(ctx, live_judge or judge or ScriptedJudge(), persist=False)
             checks = {c["check"] for c in A.code_checks(rec)}
-            if (
-                res.flagged_ids
-                and judge
-                and judge.verdicts
-                and any(not v[0] for v in judge.verdicts.values())
+            if res.flagged_ids and (
+                (live_judge is not None and expect_flag == "llm_groundedness")
+                or (judge and judge.verdicts and any(not v[0] for v in judge.verdicts.values()))
             ):
                 checks.add("llm_groundedness")
-            flagged, tokens = target in res.flagged_ids, res.tokens
+            flagged, tokens, judge_cost = target in res.flagged_ids, res.tokens, res.est_cost
         else:  # baseline: today's ExplanationService number-match check only
             ok = not rec.explanation or is_grounded(rec.explanation, llm_facts(rec.evidence or {}))
-            checks, flagged, tokens = (set() if ok else {"numbers_in_evidence"}), not ok, 0
+            checks, flagged, tokens, judge_cost = (
+                (set() if ok else {"numbers_in_evidence"}),
+                not ok,
+                0,
+                Decimal(0),
+            )
         correct = (flagged and expect_flag in checks) if expect_flag else not flagged
         return Outcome(
             correct=correct,
             grounded=True,
             tool_use=True,
             tokens=tokens,
-            cost=Decimal(tokens) * Decimal("0.0000003"),
+            cost=judge_cost,
             detail=f"flagged={flagged} checks={sorted(checks)}",
         )
 
@@ -1186,6 +1253,47 @@ ALL_CASES: list[Case] = ASK_CASES + DQ_CASES + RA_CASES + CO_CASES + RV_CASES
 
 # --- runner -------------------------------------------------------------------------------------------------------
 
+#: cases that inject a model fault (invented number, invalid output, forced error, a tool the model "calls" on cue)
+#: or expect one specific model choice — they test the code checks and fail-safes and run only as scripted replays.
+#: `--live` runs every other case with the real model and the same expectations.
+SCRIPTED_ONLY: dict[str, set[str]] = {
+    "ask_retailpilot": {
+        "hallucinated_number",
+        "invalid_output_twice",
+        "disallowed_tool",
+        "model_error_fallback",
+    },
+    "data_quality": {
+        "high_severity_creates_drafts",
+        "low_severity_no_draft",
+        "mismatch_as_other",
+        "invented_evidence_dropped",
+        "invalid_category_then_valid",
+        "model_error_baseline",
+        "token_budget_stop",
+        "no_submit_falls_back",
+        "tool_loop_cap",
+        "cannot_edit_stock",
+    },
+    "replenishment_action": {
+        "invented_quantity",
+        "donor_protection_violation",
+        "wrong_rec_id_uses_baseline",
+        "model_error_baseline",
+        "dispatch_refused",
+        "skips_tools_rec_qty",
+    },
+    "run_coordinator": {
+        "retry_critical_rejected",
+        "retry_healthy_rejected",
+        "invalid_action_then_valid",
+        "model_error_baseline",
+        "too_many_actions",
+        "already_retried",
+    },
+    "recommendation_reviewer": {"judge_error_code_only", "judge_bad_index_ignored"},
+}
+
 
 def run_all(
     session: Session, *, variants: tuple[str, ...] = ("AGENT", "BASELINE"), live_llm: Any = None
@@ -1197,6 +1305,8 @@ def run_all(
     _WORLD["reorder_qty"] = rec.qty if rec else 1
     results: list[CaseResult] = []
     for case in ALL_CASES:
+        if LIVE_LLM is not None and case.name in SCRIPTED_ONLY.get(case.agent, set()):
+            continue  # the case injects a model fault; only a scripted replay can do that
         for variant in variants:
             sp = session.begin_nested()
             t0 = time.monotonic()

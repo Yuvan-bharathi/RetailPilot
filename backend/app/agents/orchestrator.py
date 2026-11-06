@@ -208,6 +208,7 @@ class WorkflowOrchestrator:
         self._chat_llm = chat_llm
         self._json_llm = json_llm
         self.agent_overrides = agent_overrides or {}
+        self.last_child_run_id: UUID | None = None
 
     # --- helpers --------------------------------------------------------------------------------------------------
 
@@ -264,6 +265,7 @@ class WorkflowOrchestrator:
             trigger_type=trigger_type,
             mode=mode,
         )
+        self.last_child_run_id = child_run_id
         child_ctx = ctx.with_run(child_run_id)
         result: AgentResult | None = None
         attempts = 0
@@ -314,7 +316,11 @@ class WorkflowOrchestrator:
         run_date: date | None = None,
     ) -> RunSummary:
         from app.services.agent_config_service import snapshot, sync_registry
-        from app.services.agent_decision_service import mark_superseded, record_stage_decisions
+        from app.services.agent_decision_service import (
+            mark_inputs_missing,
+            mark_superseded,
+            record_stage_decisions,
+        )
 
         start_time = time.monotonic()
         if run_id is None:
@@ -466,6 +472,9 @@ class WorkflowOrchestrator:
             outcome[key] = result.status
             if result.status == "SUCCESS":
                 record_stage_decisions(self.session, run_id, key)
+                if absent and key == "stock_balancing":
+                    mark_inputs_missing(self.session, run_id, absent)
+                self.logger.store_stats(self.last_child_run_id)
             elif spec.critical:
                 critical_failure = f"Critical agent {spec.class_name or spec.name} failed: {result.error}"
                 overall_status = "FAILED"
@@ -595,6 +604,7 @@ class WorkflowOrchestrator:
                 outcome[action.agent_key] = res.status
                 if res.status == "SUCCESS":
                     record_stage_decisions(self.session, run_id, action.agent_key)
+                    self.logger.store_stats(self.last_child_run_id)
                     if (
                         all(v in ("SUCCESS", "SKIPPED_DISABLED") for v in outcome.values())
                         and status == "PARTIAL"

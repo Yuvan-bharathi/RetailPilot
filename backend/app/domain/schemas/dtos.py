@@ -132,6 +132,10 @@ class TransferEvidence(DTO):
     """
 
     kind: Literal["TRANSFER"]
+    inputs_missing: list[str] = Field(
+        default_factory=list,
+        description="Optional upstream agents that were off for this run, e.g. related_product (D-54)",
+    )
     destination_shortage: int
     donor: Counterpart | None
     donor_surplus: int | None = Field(None, description="Super Admin and the donor store's supervisor only")
@@ -158,6 +162,10 @@ class ReorderEvidence(DTO):
     """REORDER — own requirement vs available, and why a PO instead of a transfer (SD-06/07)."""
 
     kind: Literal["REORDER"]
+    inputs_missing: list[str] = Field(
+        default_factory=list,
+        description="Optional upstream agents that were off for this run, e.g. related_product (D-54)",
+    )
     reason: NeedReason
     daily_demand: float
     lead_time_days: int
@@ -180,6 +188,10 @@ class CoReplenishEvidence(DTO):
     """CO_REPLENISH — complement of a reordered product (D-02, D-13)."""
 
     kind: Literal["CO_REPLENISH"]
+    inputs_missing: list[str] = Field(
+        default_factory=list,
+        description="Optional upstream agents that were off for this run, e.g. related_product (D-54)",
+    )
     linked_product: ProductRef
     support: float
     confidence: float
@@ -218,6 +230,10 @@ class NeedsReviewEvidence(DTO):
     """NEEDS_REVIEW — no automatic action; a person decides (D-04, D-29, SD-09)."""
 
     kind: Literal["NEEDS_REVIEW"]
+    inputs_missing: list[str] = Field(
+        default_factory=list,
+        description="Optional upstream agents that were off for this run, e.g. related_product (D-54)",
+    )
     reason: ReviewReason
     own_requirement: int
     available: int

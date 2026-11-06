@@ -1,4 +1,5 @@
-"""Chat client with tool calling for the Objective III agents (docs/08, D-50).
+"""Chat contract (ChatLLM / ChatTurn) for the Objective III agents (docs/08, D-50, D-53). Providers: Anthropic
+(app/services/anthropic_client.py, default) and Groq (below); replays for evals.
 
 - `GroqChatClient`: Groq chat completions (OpenAI-compatible `tools` / `tool_calls`; same provider, models, retry
   and fallback as the explanation client, D-44). The final structured answer is a "submit_*" function call, so
@@ -20,7 +21,7 @@ import httpx
 
 from app.core.config import Settings
 from app.core.logging import get_logger
-from app.services.llm_client import GROQ_CHAT_URL, PRICES_PER_MTOK, LLMError
+from app.services.llm_client import GROQ_CHAT_URL, LLMError, price_per_mtok
 
 logger = get_logger(__name__)
 
@@ -43,10 +44,15 @@ class ChatTurn:
     output_tokens: int
     latency_ms: int
     finish_reason: str | None = None
+    #: provider-native assistant content to echo back unchanged next turn (Anthropic: thinking / fallback blocks)
+    raw: Any = None
+    cost: Decimal | None = None
 
     @property
     def est_cost(self) -> Decimal:
-        price_in, price_out = PRICES_PER_MTOK.get(self.model, (Decimal(0), Decimal(0)))
+        if self.cost is not None:
+            return self.cost
+        price_in, price_out = price_per_mtok(self.model)
         return (price_in * self.input_tokens + price_out * self.output_tokens) / Decimal(1_000_000)
 
 
@@ -57,6 +63,8 @@ class ChatLLM(Protocol):
 
 
 class GroqChatClient:
+    """Provider "groq": OpenAI-compatible tool calling on Groq (httpx)."""
+
     provider = "groq"
 
     def __init__(self, settings: Settings, http: httpx.Client | None = None, sleep: Any = time.sleep) -> None:
@@ -82,7 +90,8 @@ class GroqChatClient:
     ) -> ChatTurn:
         body: dict[str, Any] = {
             "model": model,
-            "messages": list(messages),
+            # framework-private keys (e.g. "_raw", another provider's native content) never go to Groq
+            "messages": [{k: v for k, v in m.items() if not k.startswith("_")} for m in messages],
             "temperature": self._settings.llm_temperature,
             "max_completion_tokens": self._settings.llm_max_completion_tokens,
             "reasoning_effort": self._settings.llm_reasoning_effort,

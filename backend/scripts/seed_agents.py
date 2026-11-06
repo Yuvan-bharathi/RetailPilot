@@ -19,12 +19,13 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import REPO_ROOT
 from app.core.db import get_sync_engine, get_sync_session_factory
 from app.domain.models.agents import AgentConfig, AgentEvalResult, PolicyDocument
+from app.domain.models.observability import AgentRun
 from app.domain.models.users import AppUser
 from app.services.agent_config_service import snapshot, sync_registry
 
@@ -95,7 +96,12 @@ def load_eval_results(session: Session, path: Path = EVAL_RESULTS) -> int:
 
 
 def toggle(
-    session: Session, agent_key: str | None, enabled: bool, reason: str, user_id: uuid.UUID | None
+    session: Session,
+    agent_key: str | None,
+    enabled: bool,
+    reason: str,
+    user_id: uuid.UUID | None,
+    is_demo: bool = False,
 ) -> int:
     """Sync equivalent of AgentConfigService (seed / tests): one audited, versioned row."""
     snap = snapshot(session)
@@ -108,6 +114,7 @@ def toggle(
             previous_enabled=previous,
             config_version=version,
             updated_by=user_id,
+            is_demo=is_demo,
             reason=reason,
         )
     )
@@ -131,8 +138,9 @@ def demo_activity(session_factory: Any) -> dict[str, Any]:
             False,
             "Basket data being re-checked after a POS export issue",
             admin.user_id,
+            is_demo=True,
         )
-        toggle(s, "related_product", True, "Basket data verified — back on", admin.user_id)
+        toggle(s, "related_product", True, "Basket data verified — back on", admin.user_id, is_demo=True)
         s.commit()
         admin_id, sup_id, sup_store = (
             admin.user_id,
@@ -163,6 +171,7 @@ def demo_activity(session_factory: Any) -> dict[str, Any]:
     run_id = asyncio.run(start())
     with session_factory() as s:
         ManualRunner(s).execute(run_id)
+    demo_runs = [run_id]
     out["dry_run"] = str(run_id)
 
     questions = [
@@ -179,7 +188,16 @@ def demo_activity(session_factory: Any) -> dict[str, Any]:
                 "Please approve all pending purchase orders for my store",
             ),
         ]
-    out["questions"] = [_ask_sync(u, r, st, q).found for u, r, st, q in questions]
+    answers = [_ask_sync(u, r, st, q) for u, r, st, q in questions]
+    out["questions"] = [a.found for a in answers]
+    demo_runs += [a.run_id for a in answers if a.run_id]
+    with session_factory() as s:  # label the seeded activity "Demo data" in the console (D-54)
+        s.execute(
+            update(AgentRun)
+            .where(AgentRun.run_id.in_(demo_runs) | AgentRun.parent_run_id.in_(demo_runs))
+            .values(is_demo=True)
+        )
+        s.commit()
     return out
 
 

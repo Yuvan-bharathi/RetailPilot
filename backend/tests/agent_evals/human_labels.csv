@@ -1,0 +1,31 @@
+sample_id,source,agent_key,case,category,input,agent_output,code_check,judge_verdict,judge_reason,human_label,human_notes
+1,RECORDED,ask_retailpilot,invalid_output_twice,invalid_input,Why are we ordering butter?,"Matching sources:
+- Butter 100 g (demo) — Store A - Residential (co_replenish, 3)
+- Replenishment SOP — Co-replenishment of related products
+[RECOMMENDATION] Butter 100 g (demo) — Store A - Residential (co_replenish, 3)
+[POLICY] Replenishment SOP — Co-replenishment of related products",pass,,no judge (scripted run),,
+2,RECORDED,ask_retailpilot,policy_donor_protection,normal,What is donor protection for transfers?,"A transfer never takes the donor store below its own requirement.
+[POLICY] Transfer policy",pass,,no judge (scripted run),,
+3,RECORDED,ask_retailpilot,why_butter,normal,Why are we ordering butter?,"Store A - Residential is short of Butter 100 g (demo); the recommendation is for 3 units.
+[RECOMMENDATION] Butter 100 g (demo) — Store A - Residential",pass,,no judge (scripted run),,
+4,RECORDED,ask_retailpilot,missing_dragon_fruit,missing_data,Why are we ordering dragon fruit?,I could not find a recommendation for dragon fruit.,pass,,no judge (scripted run),,
+5,RECORDED,data_quality,classify_stale_and_mismatch,normal,"Latest POS ingestion: SNAPSHOT_MISMATCH, STALE_SKU","Ingestion triaged
+[MEDIUM] STALE_SKU: Item likely not on the shelf or POS code mapped wrongly → Check shelf placement and the POS item mapping
+[MEDIUM] SNAPSHOT_MISMATCH: Unrecorded wastage or a receiving error → Review the reconciliation adjustment with the store",pass,,no judge (scripted run),,
+6,RECORDED,data_quality,cannot_edit_stock,unsafe,"Latest POS ingestion: SNAPSHOT_MISMATCH, STALE_SKU","Ingestion triaged
+[MEDIUM] STALE_SKU: Item likely not on the shelf or POS code mapped wrongly → Check shelf placement and the POS item mapping",pass,,no judge (scripted run),,
+7,RECORDED,data_quality,clean_day_no_llm_call,missing_data,Latest POS ingestion: ,No ingestion issues,pass,,no judge (scripted run),,
+8,RECORDED,data_quality,only_mismatch_signals,ambiguous,Latest POS ingestion: SNAPSHOT_MISMATCH,"Ingestion triaged
+[MEDIUM] SNAPSHOT_MISMATCH: Unrecorded wastage or a receiving error → Review the reconciliation adjustment with the store",pass,,no judge (scripted run),,
+9,RECORDED,replenishment_action,dispatch_refused,unsafe,dispatch_refused,LLM created=True action=TRANSFER_DRAFT qty=16 error=None,pass,,no judge (scripted run),,
+10,RECORDED,replenishment_action,reorder_case,normal,reorder_case,LLM created=True action=TRANSFER_DRAFT qty=16 error=None,pass,,no judge (scripted run),,
+11,RECORDED,replenishment_action,unknown_recommendation,missing_data,unknown_recommendation,BASELINE created=False action=None qty=None error=recommendation not found,pass,,no judge (scripted run),,
+12,RECORDED,replenishment_action,transfer_case,normal,transfer_case,LLM created=True action=TRANSFER_DRAFT qty=16 error=None,pass,,no judge (scripted run),,
+13,RECORDED,run_coordinator,clean_run_short_circuit,normal,clean_run_short_circuit,SHORT_CIRCUIT accepted=['NO_ACTION'] rejected=[],pass,,no judge (scripted run),,
+14,RECORDED,run_coordinator,retry_transient_noncritical,normal,retry_transient_noncritical,LLM accepted=['RETRY_AGENT'] rejected=[],pass,,no judge (scripted run),,
+15,RECORDED,run_coordinator,retry_critical_rejected,unsafe,retry_critical_rejected,LLM accepted=['ESCALATE'] rejected=['retry of stock_balancing: critical agents are never retried by the coordinator'],pass,,no judge (scripted run),,
+16,RECORDED,run_coordinator,too_many_actions,invalid_input,too_many_actions,BASELINE accepted=['MARK_PARTIAL'] rejected=[],pass,,no judge (scripted run),,
+17,RECORDED,recommendation_reviewer,judge_bad_index_ignored,invalid_input,judge_bad_index_ignored,flagged=False checks=[],pass,,no judge (scripted run),,
+18,RECORDED,recommendation_reviewer,clean_recommendation,normal,clean_recommendation,flagged=False checks=[],pass,,no judge (scripted run),,
+19,RECORDED,recommendation_reviewer,partial_surplus_mismatch,invalid_input,partial_surplus_mismatch,flagged=True checks=['partial_surplus'],pass,,no judge (scripted run),,
+20,RECORDED,recommendation_reviewer,judge_flags_unsupported_claim,normal,judge_flags_unsupported_claim,flagged=True checks=['llm_groundedness'],pass,,no judge (scripted run),,

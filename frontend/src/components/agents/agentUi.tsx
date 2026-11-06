@@ -1,5 +1,5 @@
 /** Shared display helpers of the agent console (docs/09 §6): statuses use semantic tokens + icon + text label. */
-import { Bot, Cpu, Sparkles } from "lucide-react";
+import { Bot, Cpu, FlaskConical, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
@@ -25,6 +25,11 @@ const OUTCOME: Record<DecisionOutcome, { tone: Tone; label: string }> = {
 export function OutcomeBadge({ outcome }: { outcome: DecisionOutcome }) {
   const s = OUTCOME[outcome];
   return <StatusBadge tone={s.tone} label={s.label} />;
+}
+
+/** Seeded demo activity (scripts.seed_agents --demo) is labelled so it is never mistaken for real use (D-54). */
+export function DemoBadge({ show }: { show: boolean | undefined }) {
+  return show ? <StatusBadge tone="attention" label="Demo data" icon={FlaskConical} /> : null;
 }
 
 export function KindBadge({ kind }: { kind: "DETERMINISTIC" | "LLM" }) {

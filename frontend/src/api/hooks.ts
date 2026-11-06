@@ -244,3 +244,9 @@ export function useAssistantStatus() {
   const api = useApi();
   return useQuery({ queryKey: ["assistant-status"], queryFn: () => api.getAssistantStatus() });
 }
+
+/** Agent-switch banners for every role (expiry checks off, replenishment paused) — D-54. */
+export function useAgentStatus() {
+  const api = useApi();
+  return useQuery({ queryKey: ["agent-status"], queryFn: () => api.getAgentStatus(), staleTime: 60_000 });
+}

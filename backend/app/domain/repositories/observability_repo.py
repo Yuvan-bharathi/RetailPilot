@@ -10,10 +10,28 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.domain.models.observability import AgentRun, DecisionEvidence, LLMUsage, ToolCall
+
+#: per-run stats stored when a run finishes (D-54); same definition as migration 0005's backfill
+RUN_STATS_SQL = text(
+    """
+    UPDATE agent_run r SET
+        duration_ms = CASE WHEN r.ended_at IS NULL THEN NULL
+                           ELSE (extract(epoch FROM r.ended_at - r.started_at) * 1000)::int END,
+        tool_calls_count = (SELECT count(*) FROM tool_call t WHERE t.run_id = r.run_id),
+        llm_calls_count = (SELECT count(*) FROM llm_usage u WHERE u.run_id = r.run_id),
+        tokens = (SELECT coalesce(sum(u.input_tokens + u.output_tokens), 0) FROM llm_usage u WHERE u.run_id = r.run_id),
+        est_cost_usd = (SELECT coalesce(sum(u.est_cost), 0) FROM llm_usage u WHERE u.run_id = r.run_id),
+        decisions_count = CASE WHEN r.parent_run_id IS NULL
+            THEN (SELECT count(*) FROM agent_decision d WHERE d.run_id = r.run_id)
+            ELSE (SELECT count(*) FROM agent_decision d
+                  WHERE d.run_id = r.parent_run_id AND d.agent_key = r.agent_key) END
+    WHERE r.run_id = :run
+    """
+)
 
 
 class AgentRunLogger:
@@ -147,3 +165,13 @@ class AgentRunLogger:
             if retries is not None:
                 run.retries = retries
             self.session.flush()
+            self.store_stats(run_id)
+
+    def store_stats(self, run_id: UUID | None) -> None:
+        """Write the run's stats once (D-54); also called again after a stage's decisions are recorded."""
+        if run_id is None:
+            return
+        self.session.execute(RUN_STATS_SQL, {"run": run_id})
+        for obj in list(self.session.identity_map.values()):
+            if isinstance(obj, AgentRun) and obj.run_id == run_id:
+                self.session.expire(obj)

@@ -1,7 +1,11 @@
 # Agent patterns vs deterministic baselines (Objective III, docs/08 §8)
 
-Source data: `docs/notes/agent-eval-report.md` (RECORDED run of `python -m scripts.run_agent_evals`, 53 cases × 2
+Source data: `docs/notes/agent-eval-report.md` (RECORDED run of `python -m scripts.run_agent_evals`, 56 cases × 2
 variants on the synthetic small dataset). Each agent and its baseline ran on the same inputs.
+
+> **Update pending (D-53/D-55):** this comparison is based on scripted replays. It will be updated after the first
+> `scripts.run_agent_evals --live` run on Anthropic (`claude-opus-5-5`) and the human labelling of
+> `backend/tests/agent_evals/human_labels.csv`. Scripted token costs below are now priced as `claude-opus-5-5`.
 
 ## Read this first — what the numbers can and cannot tell
 
@@ -13,18 +17,18 @@ variants on the synthetic small dataset). Each agent and its baseline ran on the
 - BASELINE correctness is scored against the same case expectations. Several expectations need a behaviour only
   an agent has (a prose answer citing a business rule; classifying a mismatch as OTHER). A low baseline score
   shows what the baseline *cannot do*, not that it makes mistakes: every baseline output was grounded (100%).
-- A live comparison (`--live`, Groq `openai/gpt-oss-120b`) is the decision-grade measurement. It is manual and
-  costs tokens; it has **not been run** for this report (no approval for the spend yet; the shared Groq key also
+- A live comparison (`--live`, Anthropic `claude-opus-5-5`, D-53) is the decision-grade measurement. It is manual and
+  costs tokens; it has **not been run** for this report (no Anthropic key yet; the earlier Groq key had also
   hit rate limits during development). Human agreement is pending: no reviewer labels yet
-  (`backend/tests/agent_evals/human_review.json`).
+  (`backend/tests/agent_evals/human_labels.csv`, filled after the live run).
 
-| Pattern | Agent correct / grounded | Baseline correct / grounded | Agent tokens per case (est.) | p95 agent / baseline (scripted, local DB) |
+| Pattern | Agent correct / grounded | Baseline correct / grounded | Agent tokens per case (est., priced as claude-opus-5-5) | p95 agent / baseline (scripted, local DB) |
 |---|---|---|---|---|
-| Retrieval — Ask RetailPilot | 100% / 92%¹ | 50% / 100% | ≈ 1.6k | 16 / 16 ms |
-| Validation — Data Quality | 100% / 100% | 9% / 100% | ≈ 5.5k | 187 / 92 ms |
-| Action — Replenishment Action | 100% / 100% | 40% / 100% | ≈ 2.3k | 109 / 109 ms |
-| Coordinator — Run Coordinator | 100% / 100% | 50% / 100% | ≈ 1.7k | 46 / 47 ms |
-| Reviewer — Recommendation Reviewer | 100% / 100% | 60% / 100% | ≈ 1.2k | 16 / 16 ms |
+| Retrieval — Ask RetailPilot | 100% / 92%¹ | 50% / 100% | ≈ 1.6k (≈ $0.0101) | 217 / 47 ms |
+| Validation — Data Quality | 100% / 100% | 14% / 100% | ≈ 4.8k (≈ $0.0309) | 266 / 141 ms |
+| Action — Replenishment Action | 100% / 100% | 40% / 100% | ≈ 2.3k (≈ $0.0141) | 171 / 328 ms |
+| Coordinator — Run Coordinator | 100% / 100% | 50% / 100% | ≈ 1.7k (≈ $0.0102) | 94 / 62 ms |
+| Reviewer — Recommendation Reviewer | 100% / 100% | 60% / 100% | ≈ 1.2k (≈ $0.0067) | 47 / 46 ms |
 
 ¹ The one ungrounded AGENT case is `hallucinated_number`: the scripted model invents "98765 units"; the code
 check rejects it and the user gets the retrieval-only answer. That is the intended outcome (counted as correct).
@@ -42,7 +46,7 @@ Latency of scripted runs excludes model time; a live call adds roughly 1–5 s p
   user gets the retrieval-only answer — never an unchecked one.
 - *Retrieval decision:* PostgreSQL full-text search is enough for 26 policy sections and product-name lookups;
   pgvector is **not** added. Revisit only if the live eval shows FTS misses (e.g. synonyms such as "dahi"/"curd").
-- *Cost:* ≈ 1.6k tokens per question ≈ $0.0004 at gpt-oss-120b prices.
+- *Cost:* ≈ 1.6k tokens per question ≈ $0.0101 at claude-opus-5-5 list prices (scripted token counts; live usage pending).
 
 ### 2. Validation — Data Quality → **adopt with the baseline kept as fallback**
 - The SD-02 rules already flag stale SKUs and mismatches; the agent adds a likely cause, severity and a next step,

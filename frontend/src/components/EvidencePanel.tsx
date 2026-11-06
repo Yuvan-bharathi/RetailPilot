@@ -186,8 +186,29 @@ function NeedsReviewView({ e }: { e: NeedsReviewEvidence }) {
   );
 }
 
+const INPUT_LABEL: Record<string, string> = {
+  related_product: "Related products (co-replenishment and basket rules)",
+  sales_analytics: "Sales analytics (lost sales)",
+};
+
+/** D-54: an optional upstream agent was off for this run — the recommendation was made without its input. */
+function InputsMissing({ evidence }: { evidence: Evidence }) {
+  const missing = "inputs_missing" in evidence ? (evidence.inputs_missing ?? []) : [];
+  if (missing.length === 0) return null;
+  return (
+    <p role="note" className="mb-3 rounded-input bg-info-bg px-3 py-2 text-sm text-info">
+      Made without: {missing.map((m) => INPUT_LABEL[m] ?? m).join(", ")} — that agent was switched off for this run.
+    </p>
+  );
+}
+
 export function EvidenceView({ evidence, label }: { evidence: Evidence; label?: string }) {
-  const view = renderEvidence(evidence);
+  const view = (
+    <>
+      <InputsMissing evidence={evidence} />
+      {renderEvidence(evidence)}
+    </>
+  );
   return label ? <LabelContext.Provider value={label}>{view}</LabelContext.Provider> : view;
 }
 

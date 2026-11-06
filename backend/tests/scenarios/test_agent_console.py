@@ -11,7 +11,7 @@ import tempfile
 from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
 import pytest
@@ -32,6 +32,31 @@ from data.synthetic.generate import generate
 from data.synthetic.reader import load_dataset
 from tests.integration.conftest import alembic_config, drop_database, recreate_database
 from tests.scenarios.test_demo_scenarios import NoCache
+
+
+class RecordingCache(NoCache):
+    """Cache double that records every write/invalidation (D-51: dry runs touch no cache)."""
+
+    calls: ClassVar[list[str]] = []
+
+    def set(self, *args: Any, **kwargs: Any) -> bool:
+        RecordingCache.calls.append("set")
+        return True
+
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith("get"):
+            return lambda *a, **k: None
+        return lambda *a, **k: RecordingCache.calls.append(name) or 0
+
+
+def _dashboards(env: dict[str, Any]) -> tuple[Any, Any]:
+    """Content hashes of the dashboard materialized views (what the dashboards read)."""
+    with Session(env["engine"]) as s:
+        return tuple(  # type: ignore[return-value]
+            s.scalar(text(f"SELECT md5(coalesce(string_agg(t::text, '|' ORDER BY t::text), '')) FROM {mv} t"))
+            for mv in ("mv_dashboard_store_day", "mv_inbox_counts")
+        )
+
 
 pytestmark = pytest.mark.scenario
 DB = "retailpilot_test_agents"
@@ -77,7 +102,7 @@ def env(admin_engine: Engine) -> Iterator[dict[str, Any]]:
             s.commit()
         mp.setenv("DATABASE_URL", url.render_as_string(hide_password=False))
         mp.setenv("JWT_SECRET", "agent-console-tests-" + "x" * 32)
-        mp.setattr("app.services.cache_service.CacheService", NoCache)
+        mp.setattr("app.services.cache_service.CacheService", RecordingCache)
         for c in caches:
             c.cache_clear()
         with TestClient(create_app()) as client:
@@ -311,7 +336,8 @@ def test_dry_run_never_changes_inbox_pos_or_transfers(env: dict[str, Any]) -> No
             ),
         )
 
-    before, pending = counts(), _pending(env)
+    before, pending, dashboards = counts(), _pending(env), _dashboards(env)
+    RecordingCache.calls.clear()
     preview = c.get("/api/v1/agents/stock_balancing/trigger-preview?mode=DRY_RUN", headers=h).json()
     assert preview["allowed"] is True
     assert {u["agent_key"] for u in preview["upstream"]} >= {"demand_forecasting"}
@@ -322,7 +348,9 @@ def test_dry_run_never_changes_inbox_pos_or_transfers(env: dict[str, Any]) -> No
     assert trace["run"]["status"] == "SUCCESS", trace
     assert trace["run"]["trigger_type"] == "MANUAL_DRY_RUN"
     assert trace["previews"], "a dry run stores its outputs as previews"
-    assert counts() == before and _pending(env) == pending
+    assert counts() == before and _pending(env) == pending  # inbox, POs, transfers unchanged
+    assert _dashboards(env) == dashboards  # dashboard views unchanged (no refresh)
+    assert RecordingCache.calls == []  # no cache write or invalidation
     assert (
         _scalar(
             env,
@@ -362,6 +390,26 @@ def test_live_run_needs_reason_and_confirmation(env: dict[str, Any]) -> None:
 
 def test_live_run_supersedes_and_publishes(env: dict[str, Any]) -> None:
     c, h = env["client"], env["as"]("admin")
+    preview = c.get("/api/v1/agents/stock_balancing/trigger-preview?mode=LIVE", headers=h).json()
+    assert preview["allowed"] is True and preview["recommendations_to_supersede"] > 0
+    assert preview["downstream"] == ["purchase_order"]
+    assert any("superseded" in x for x in preview["consequences"])
+    to_supersede = set(
+        _scalar_list(
+            env,
+            select(Recommendation.rec_id).where(
+                Recommendation.status == "PENDING",
+                Recommendation.rec_id.in_(
+                    select(AgentDecision.rec_id).where(
+                        AgentDecision.agent_key.in_(["stock_balancing", "purchase_order"]),
+                        AgentDecision.mode == "LIVE",
+                    )
+                ),
+            ),
+        )
+    )
+    assert len(to_supersede) == preview["recommendations_to_supersede"]
+    RecordingCache.calls.clear()
     old = set(
         _scalar_list(
             env,
@@ -396,6 +444,11 @@ def test_live_run_supersedes_and_publishes(env: dict[str, Any]) -> None:
         & set(_scalar_list(env, select(Recommendation.rec_id).where(Recommendation.status == "PENDING")))
     )
     assert not still_pending  # earlier stock-balancing recommendations were superseded
+    now_superseded = set(
+        _scalar_list(env, select(Recommendation.rec_id).where(Recommendation.status == "SUPERSEDED"))
+    )
+    assert to_supersede <= now_superseded  # exactly what the confirmation listed was superseded
+    assert "invalidate_store_keys" in RecordingCache.calls  # live publishes: cached views dropped
     assert (
         _scalar(
             env,
@@ -451,9 +504,8 @@ def test_trigger_blocked_when_disabled_running_or_rate_limited(env: dict[str, An
             )
         )
         s.commit()
-    assert (
-        c.post("/api/v1/agents/sales_analytics/runs", json={"mode": "DRY_RUN"}, headers=h).status_code == 409
-    )
+    r = c.post("/api/v1/agents/sales_analytics/runs", json={"mode": "DRY_RUN"}, headers=h)
+    assert r.status_code == 409 and "in progress" in r.json()["error"]["message"]  # nightly lock
     # cancel: the running run stops after its current step
     r = c.post(f"/api/v1/agent-runs/{running}/cancel", headers=h)
     assert r.status_code == 200 and _scalar(
@@ -463,6 +515,35 @@ def test_trigger_blocked_when_disabled_running_or_rate_limited(env: dict[str, An
         s.execute(text("UPDATE agent_run SET status = 'CANCELLED' WHERE run_id = :r"), {"r": running})
         s.commit()
     assert c.post(f"/api/v1/agent-runs/{running}/cancel", headers=h).status_code == 409
+
+
+def test_a_running_manual_run_is_also_a_lock(env: dict[str, Any]) -> None:
+    c, h = env["client"], env["as"]("admin")
+    rid = uuid4()
+    with Session(env["engine"]) as s:
+        s.execute(
+            insert(AgentRun).values(
+                run_id=rid,
+                agent_name="manual:freshness",
+                agent_key="freshness",
+                status="RUNNING",
+                trigger_type="MANUAL_LIVE",
+                mode="LIVE",
+            )
+        )
+        s.commit()
+    p = c.get("/api/v1/agents/demand_forecasting/trigger-preview?mode=DRY_RUN", headers=h).json()
+    assert p["allowed"] is False and "in progress" in p["blocked_reason"]
+    assert (
+        c.post("/api/v1/agents/demand_forecasting/runs", json={"mode": "DRY_RUN"}, headers=h).status_code
+        == 409
+    )
+    with Session(env["engine"]) as s:
+        s.execute(text("UPDATE agent_run SET status = 'SUCCESS' WHERE run_id = :r"), {"r": rid})
+        s.commit()
+    assert c.get("/api/v1/agents/demand_forecasting/trigger-preview?mode=DRY_RUN", headers=h).json()[
+        "allowed"
+    ]
 
 
 def test_cancelled_manual_run_stops_before_the_next_stage(env: dict[str, Any]) -> None:

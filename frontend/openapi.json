@@ -4420,6 +4420,106 @@
         }
       }
     },
+    "/api/v1/agent-status": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Agent Status",
+        "description": "For every signed-in user: the banners the agent switches cause (expiry checks off, replenishment paused).",
+        "operationId": "agent_status",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentStatusDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
     "/api/v1/agents": {
       "get": {
         "tags": [
@@ -6740,6 +6840,11 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "is_demo": {
+            "type": "boolean",
+            "title": "Is Demo",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -7121,6 +7226,12 @@
               }
             ],
             "title": "Reason"
+          },
+          "is_demo": {
+            "type": "boolean",
+            "title": "Is Demo",
+            "description": "Seeded demo activity (scripts.seed_agents --demo)",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -7280,6 +7391,45 @@
         ],
         "title": "AgentStatsDTO"
       },
+      "AgentStatusDTO": {
+        "properties": {
+          "expiry_checks_on": {
+            "type": "boolean",
+            "title": "Expiry Checks On",
+            "description": "Freshness agent on — else the inventory shows 'Expiry checks off'"
+          },
+          "reviewer_on": {
+            "type": "boolean",
+            "title": "Reviewer On"
+          },
+          "ask_enabled": {
+            "type": "boolean",
+            "title": "Ask Enabled"
+          },
+          "replenishment_paused": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replenishment Paused",
+            "description": "'Replenishment paused by <user>: <reason>' or null"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expiry_checks_on",
+          "reviewer_on",
+          "ask_enabled",
+          "replenishment_paused"
+        ],
+        "title": "AgentStatusDTO",
+        "description": "What every signed-in user may know about the agents (banners), D-54."
+      },
       "AgentSummaryDTO": {
         "properties": {
           "agent_key": {
@@ -7403,7 +7553,7 @@
           "recommendations_7d": {
             "type": "integer",
             "title": "Recommendations 7D",
-            "description": "Decisions linked to a recommendation in the last 7 days"
+            "description": "Live decisions of the last 7 days (recommendations, POs, flags, answers…)"
           },
           "acceptance_rate": {
             "anyOf": [
@@ -8085,6 +8235,14 @@
             "type": "string",
             "const": "CO_REPLENISH",
             "title": "Kind"
+          },
+          "inputs_missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Inputs Missing",
+            "description": "Optional upstream agents that were off for this run, e.g. related_product (D-54)"
           },
           "linked_product": {
             "$ref": "#/components/schemas/ProductRef"
@@ -9528,6 +9686,14 @@
             "const": "NEEDS_REVIEW",
             "title": "Kind"
           },
+          "inputs_missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Inputs Missing",
+            "description": "Optional upstream agents that were off for this run, e.g. related_product (D-54)"
+          },
           "reason": {
             "type": "string",
             "enum": [
@@ -10031,6 +10197,11 @@
           "has_partial": {
             "type": "boolean",
             "title": "Has Partial"
+          },
+          "is_demo": {
+            "type": "boolean",
+            "title": "Is Demo",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -10618,6 +10789,14 @@
             "const": "REORDER",
             "title": "Kind"
           },
+          "inputs_missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Inputs Missing",
+            "description": "Optional upstream agents that were off for this run, e.g. related_product (D-54)"
+          },
           "reason": {
             "type": "string",
             "enum": [
@@ -11190,6 +11369,11 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "is_demo": {
+            "type": "boolean",
+            "title": "Is Demo",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -11384,6 +11568,14 @@
             "type": "string",
             "const": "TRANSFER",
             "title": "Kind"
+          },
+          "inputs_missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Inputs Missing",
+            "description": "Optional upstream agents that were off for this run, e.g. related_product (D-54)"
           },
           "destination_shortage": {
             "type": "integer",

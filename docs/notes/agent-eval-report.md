@@ -1,27 +1,24 @@
 # Agent evaluation report (Objective III)
 
-Generated 2026-11-06 06:29 UTC by `python -m scripts.run_agent_evals` — source **RECORDED**.
+Generated 2026-11-06 09:28 UTC by `python -m scripts.run_agent_evals` — source **RECORDED**.
 
-- **RECORDED** = scripted model replays (hand-authored tool-call turns, no live model) — they test the
-  framework, tools, code checks, stopping conditions and failure handling deterministically in CI. They do
-  NOT measure the live model's judgement; run `--live` for that (manual, logged, costs tokens).
+- **RECORDED** = scripted model replays (hand-authored tool-call turns, no live model): they test the framework, tools, code checks, stopping conditions and failure handling in CI. They do NOT measure the live model's judgement — run `--live` for that (manual, costs tokens).
 - **BASELINE** = the deterministic path on the same inputs (no LLM).
-- Tokens and cost of RECORDED runs are the scripted token counts priced as `openai/gpt-oss-120b`
-  — an estimate of what a live run of the same turns would cost, not a measurement.
-- Human agreement: filled only when a reviewer has labelled cases in `tests/agent_evals/human_review.json`.
+- Tokens/cost of RECORDED runs are scripted token counts priced as `claude-opus-5-5` — an estimate, not a measurement. Latency excludes model time.
+- Human agreement: from `backend/tests/agent_evals/human_labels.csv` after a reviewer labels it (`--agreement`).
 
-| Agent | Variant | Cases | Correct | Grounded | Tool use | Failure handling | p50 / p95 | Tokens | Est. cost | Human agreement |
+| Agent | Variant | Cases | Correct | Grounded | Tool use | Failure handling | p50 / p95 | Tokens | Est. cost | Judge–human agreement |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Ask RetailPilot (retrieval) | AGENT | 12 | 100% | 92% | 100% | 100% | 15 / 16 ms | 19,760 | $0.004161 | pending |
-| Ask RetailPilot (retrieval) | BASELINE | 12 | 50% | 100% | 100% | 50% | 15 / 16 ms | 0 | $0.000000 | pending |
-| Data Quality (validation) | AGENT | 11 | 100% | 100% | 100% | 100% | 125 / 187 ms | 60,880 | $0.013308 | pending |
-| Data Quality (validation) | BASELINE | 11 | 9% | 100% | 100% | 14% | 77 / 92 ms | 0 | $0.000000 | pending |
-| Replenishment Action (action, drafts only) | AGENT | 10 | 100% | 100% | 100% | 100% | 46 / 109 ms | 22,880 | $0.004818 | pending |
-| Replenishment Action (action, drafts only) | BASELINE | 10 | 40% | 100% | 100% | 50% | 46 / 109 ms | 0 | $0.000000 | pending |
-| Run Coordinator (coordinator) | AGENT | 10 | 100% | 100% | 100% | 100% | 30 / 46 ms | 16,640 | $0.003504 | pending |
-| Run Coordinator (coordinator) | BASELINE | 10 | 50% | 100% | 100% | 40% | 16 / 47 ms | 0 | $0.000000 | pending |
-| Recommendation Reviewer (reviewer) | AGENT | 10 | 100% | 100% | 100% | 100% | 15 / 16 ms | 12,000 | $0.003600 | pending |
-| Recommendation Reviewer (reviewer) | BASELINE | 10 | 60% | 100% | 100% | 57% | 0 / 16 ms | 0 | $0.000000 | pending |
+| Ask RetailPilot (retrieval) | AGENT | 12 | 100% | 92% | 100% | 100% | 30 / 217 ms | 19,760 | $0.121600 | pending |
+| Ask RetailPilot (retrieval) | BASELINE | 12 | 50% | 100% | 100% | 50% | 31 / 47 ms | 0 | $0.000000 | pending |
+| Data Quality (validation) | AGENT | 14 | 100% | 100% | 100% | 100% | 194 / 266 ms | 66,720 | $0.432000 | pending |
+| Data Quality (validation) | BASELINE | 14 | 14% | 100% | 100% | 25% | 117 / 141 ms | 0 | $0.000000 | pending |
+| Replenishment Action (action, drafts only) | AGENT | 10 | 100% | 100% | 100% | 100% | 125 / 171 ms | 22,880 | $0.140800 | pending |
+| Replenishment Action (action, drafts only) | BASELINE | 10 | 40% | 100% | 100% | 50% | 117 / 328 ms | 0 | $0.000000 | pending |
+| Run Coordinator (coordinator) | AGENT | 10 | 100% | 100% | 100% | 100% | 62 / 94 ms | 16,640 | $0.102400 | pending |
+| Run Coordinator (coordinator) | BASELINE | 10 | 50% | 100% | 100% | 40% | 46 / 62 ms | 0 | $0.000000 | pending |
+| Recommendation Reviewer (reviewer) | AGENT | 10 | 100% | 100% | 100% | 100% | 31 / 47 ms | 12,000 | $0.067200 | pending |
+| Recommendation Reviewer (reviewer) | BASELINE | 10 | 60% | 100% | 100% | 57% | 30 / 46 ms | 0 | $0.000000 | pending |
 
 ## Cases
 
@@ -46,6 +43,9 @@ Generated 2026-11-06 06:29 UTC by `python -m scripts.run_agent_evals` — source
 
 | Case | Category | Agent | Baseline | Agent detail |
 |---|---|---|---|---|
+| only_stale_signals | normal | pass | fail | LLM issues=[('STALE_SKU', 'MEDIUM')] drafts=1 rejected=0 |
+| only_mismatch_signals | ambiguous | pass | fail | LLM issues=[('SNAPSHOT_MISMATCH', 'MEDIUM')] drafts=1 rejected=0 |
+| clean_day_no_llm_call | missing_data | pass | pass | BASELINE issues=[] drafts=0 rejected=0 |
 | classify_stale_and_mismatch | normal | pass | fail | LLM issues=[('STALE_SKU', 'MEDIUM'), ('SNAPSHOT_MISMATCH', 'MEDIUM')] drafts=2 rejected=0 |
 | high_severity_creates_drafts | normal | pass | fail | LLM issues=[('STALE_SKU', 'HIGH')] drafts=1 rejected=0 |
 | low_severity_no_draft | normal | pass | fail | LLM issues=[('STALE_SKU', 'LOW')] drafts=0 rejected=0 |

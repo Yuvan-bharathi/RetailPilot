@@ -40,6 +40,7 @@ type AgentMethods = Pick<
   | "listPipelineRuns"
   | "getRunGraph"
   | "getAssistantStatus"
+  | "getAgentStatus"
   | "ask"
 >;
 
@@ -215,7 +216,7 @@ const PIPELINE_ORDER = [
   "run_coordinator",
 ];
 
-const COL = [20, 210, 400, 590, 780, 970];
+const COL = [20, 250, 480, 710, 940, 1170];
 const ROW = [20, 120, 220, 320, 420];
 
 /** Fixed layout of the visual flow — same positions as the backend graph (D-50). */
@@ -308,7 +309,7 @@ export const GRAPH_EDGES: GraphEdgeDTO[] = [
   { source: "demand_forecasting", target: "stock_balancing", label: "forecasts", kind: "DATA" },
   { source: "related_product", target: "stock_balancing", label: "basket rules", kind: "DATA" },
   { source: "demand_forecasting", target: "freshness", label: "forecasts", kind: "DATA" },
-  { source: "stock_balancing", target: "tool_transfer_engine", label: "calls", kind: "DATA" },
+  { source: "stock_balancing", target: "tool_transfer_engine", label: null, kind: "DATA" },
   { source: "stock_balancing", target: "purchase_order", label: "PO needs", kind: "DATA" },
   { source: "stock_balancing", target: "recommendation_reviewer", label: "recommendations", kind: "REVIEW" },
   { source: "freshness", target: "recommendation_reviewer", label: null, kind: "REVIEW" },
@@ -359,6 +360,7 @@ export function createAgentMockApi(
       reason: "Initial configuration (all agents on)",
       updated_by: null,
       created_at: "2026-11-01T18:00:00Z",
+      is_demo: false,
     },
     {
       config_version: 2,
@@ -368,6 +370,7 @@ export function createAgentMockApi(
       reason: "Basket data being re-cleaned after a POS export bug",
       updated_by: "Super Admin",
       created_at: "2026-11-02T10:15:00Z",
+      is_demo: true,
     },
     {
       config_version: 3,
@@ -377,6 +380,7 @@ export function createAgentMockApi(
       reason: "Basket data fixed and verified",
       updated_by: "Super Admin",
       created_at: "2026-11-02T16:40:00Z",
+      is_demo: true,
     },
   ];
 
@@ -424,6 +428,7 @@ export function createAgentMockApi(
       reason: null,
       input_ref: { run_date: runDate },
       config_version: n === 1 ? 2 : 3,
+      is_demo: false,
     });
     let t = start + 1_000;
     PIPELINE_ORDER.forEach((key, i) => {
@@ -455,11 +460,37 @@ export function createAgentMockApi(
         reason: null,
         input_ref: { run_date: runDate },
         config_version: n === 1 ? 2 : 3,
+        is_demo: false,
       });
       t += dur + 200;
     });
   };
   nightly(0, "SUCCESS", () => ({ status: "SUCCESS" }));
+  runs.push({
+    run_id: "00000000-0000-4000-8000-0000000000d1",
+    parent_run_id: null,
+    agent_key: "stock_balancing",
+    agent_name: "Manual: Stock Balancing",
+    trigger_type: "MANUAL_DRY_RUN",
+    mode: "DRY_RUN",
+    status: "SUCCESS",
+    run_date: data.latest_run.run_date,
+    started_at: iso(latest - 3_600_000),
+    finished_at: iso(latest - 3_597_600),
+    duration_ms: 2_400,
+    tool_calls: 3,
+    llm_calls: 0,
+    tokens: 0,
+    est_cost_usd: "0.000000",
+    retries: 0,
+    stop_reason: "completed",
+    error: null,
+    triggered_by: "Super Admin",
+    reason: "Demo: preview tonight's balancing",
+    input_ref: { agent_key: "stock_balancing" },
+    config_version: 3,
+    is_demo: true,
+  });
   nightly(1, "PARTIAL", (k) =>
     k === "related_product"
       ? { status: "SKIPPED_DISABLED" }
@@ -518,6 +549,7 @@ export function createAgentMockApi(
       outcome_reason: rec.status === "REJECTED" ? "Shelf space not available" : null,
       outcome_at: rec.status === "PENDING" ? null : rec.created_at,
       created_at: rec.created_at,
+      is_demo: false,
     };
   });
   decisions.push(
@@ -540,6 +572,7 @@ export function createAgentMockApi(
       outcome_reason: null,
       outcome_at: null,
       created_at: latestNightly.finished_at ?? latestNightly.started_at,
+      is_demo: false,
     },
     {
       decision_id: "dec-review",
@@ -560,6 +593,7 @@ export function createAgentMockApi(
       outcome_reason: null,
       outcome_at: null,
       created_at: latestNightly.finished_at ?? latestNightly.started_at,
+      is_demo: false,
     },
   );
   decisions.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
@@ -722,6 +756,7 @@ export function createAgentMockApi(
     stages: stagesOf(root),
     escalations: stagesOf(root).some((s) => s.status === "FAILED") ? 1 : 0,
     has_partial: root.status === "PARTIAL",
+    is_demo: root.is_demo,
   });
 
   return {
@@ -754,6 +789,7 @@ export function createAgentMockApi(
         reason: body.reason,
         updated_by: currentUser().name,
         created_at: new Date().toISOString(),
+        is_demo: false,
       });
       return detailOf(key);
     },
@@ -771,6 +807,7 @@ export function createAgentMockApi(
         reason: body.reason,
         updated_by: currentUser().name,
         created_at: new Date().toISOString(),
+        is_demo: false,
       });
       return listAgents();
     },
@@ -823,7 +860,9 @@ export function createAgentMockApi(
           mode === "LIVE"
             ? [
                 `Pending recommendations of ${spec.name} from earlier runs are superseded`,
-                downstream.length ? `Re-runs: ${downstream.join(", ")}` : "No downstream agents re-run",
+                downstream.length
+                  ? `Downstream agents re-run: ${downstream.join(", ")}`
+                  : "No downstream agent re-runs",
                 "New outputs reach the inbox, POs and transfers like a nightly stage",
               ]
             : ["Outputs are stored in a preview set only — inbox, POs, transfers and dashboards do not change"],
@@ -863,6 +902,7 @@ export function createAgentMockApi(
         reason: body.reason ?? null,
         input_ref: { agent_key: key },
         config_version: configVersion,
+        is_demo: false,
       };
       runs.unshift({ ...run, run_id: `${runId}-0`, parent_run_id: runId, agent_name: spec.name, triggered_by: null });
       runs.unshift(run);
@@ -1055,6 +1095,16 @@ export function createAgentMockApi(
         edges: GRAPH_EDGES,
       };
       return graph;
+    },
+    async getAgentStatus() {
+      await wait();
+      currentUser();
+      return {
+        expiry_checks_on: enabled.get("freshness") ?? true,
+        reviewer_on: (enabled.get("recommendation_reviewer") ?? true) && llmEnabled,
+        ask_enabled: (enabled.get("ask_retailpilot") ?? true) && llmEnabled,
+        replenishment_paused: pausedBanner(),
+      };
     },
     async getAssistantStatus() {
       await wait();

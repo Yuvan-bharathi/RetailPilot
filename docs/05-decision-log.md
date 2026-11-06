@@ -729,3 +729,67 @@ admin-only config; needs a small public status field); "Related products off" is
 agent stats are computed per request (no per-run stats cache yet).
 **Evaluation.** `backend/tests/agent_evals` (53 cases, scripted replays, no live model) and
 `scripts.run_agent_evals` → docs/notes/agent-eval-report.md; the live run and human labels are still to do.
+
+---
+
+## D-53 LLM provider is pluggable; Anthropic is the default (2026-11-06)
+**Context.** CLAUDE.md originally fixed the Anthropic SDK. Commit 227c3d7 added a Groq integration and 8f2105b recorded
+it as D-44 (product owner: "use any model of OpenAI which is useful for our use case from Groq API"); D-48 then removed
+the unused `anthropic` dependency. The product owner now requires Anthropic as the provider, with Groq kept as an option.
+**Decision.**
+- `LLM_PROVIDER=anthropic|groq|template`, default `anthropic` (`app/core/config.py`). One factory
+  (`app/services/llm_factory.py`) builds the clients; nothing else knows the provider.
+- **Same contract for both.** `JsonLLM.complete_json` (explanations, the reviewer's LLM judge): Anthropic uses
+  `output_config.format` json_schema; Groq strict `json_schema`. `ChatLLM.chat` (Objective III tool loop): tools in the
+  provider's shape, the agent ends with its submit tool, Pydantic validates (invalid → one retry → fail safe). The
+  framework keeps a neutral transcript; the Anthropic adapter replays Claude's assistant content verbatim (thinking and
+  `fallback` blocks are never edited — preserved thinking) and sends tool results as one user message.
+- **Anthropic request:** official `anthropic` SDK (dependency added, 2.6.0), `claude-opus-5-5`, `output_config.effort`
+  `medium` set explicitly, no `temperature` / `thinking` / forced `tool_choice` (rejected by this model), top-level
+  `cache_control` for the stable system + tools prefix, server-side refusal fallback `fallbacks: "default"` (beta
+  `server-side-fallback-2026-07-01`). A final `refusal` or `max_tokens` stop is an error → deterministic path. Cost is
+  priced from usage incl. cache reads/writes ($4 / $20 per MTok, cache read $0.20).
+- **Groq** keeps D-44's settings and one retry on `400 tool_use_failed`. Observed 2026-11-06: on the Ask tool loop
+  gpt-oss returned `400 tool_use_failed` on every attempt (both models), so on Groq the LLM agents end in their
+  deterministic fail-safe; not investigated further because Anthropic is the default provider.
+- The **live evaluation and the Managed Agents comparison run on Anthropic**; `--live` refuses another provider.
+- Tests never call a live model (`LLM_PROVIDER=template` forced); the adapter is tested against a fake SDK client.
+**Changed.** CLAUDE.md stack line; `.env.example`; config, `anthropic_client.py`, `llm_factory.py`, ExplanationService and
+the agents use the factory. The local `.env` still says `LLM_PROVIDER=groq` — switch it to `anthropic` with the key.
+
+## D-54 Console gaps closed (2026-11-06)
+**Decision.**
+- **Stats stored per run** (migration 0005): `duration_ms`, `tool_calls_count`, `llm_calls_count`, `tokens`,
+  `est_cost_usd`, `decisions_count` on `agent_run`, written once when a run finishes (and a stage's decision count again
+  after its decisions are recorded); existing runs backfilled. The console reads these columns — no per-request
+  aggregation of tool calls or LLM usage. A RUNNING run shows its stats after it finishes.
+- **"Expiry checks off"** banner on the inventory page and the **"Replenishment paused by …"** banner for every role,
+  from `GET /agent-status` (any signed-in user; it exposes only these switch states, not the console).
+- **"Related products off" in evidence:** `inputs_missing` (default empty) on the TRANSFER / REORDER / CO_REPLENISH /
+  NEEDS_REVIEW evidence DTOs; set on every stock-balancing recommendation of a run whose optional inputs did not run
+  (nightly and manual), and shown on the recommendation ("Made without: …"). Additive field; existing evidence valid.
+- **Demo data:** `is_demo` on `agent_run` and `agent_config`; `scripts.seed_agents --demo` marks the activity it
+  creates (toggle history, the dry run, the Ask questions); the console labels it "Demo data" (logs, pipeline, trace,
+  decisions, toggle history).
+- **Live runs invalidate every store's cached inbox / dashboard / inventory keys** (found by the D-51 tests: before,
+  they only invalidated when Redis held a latest-run id).
+
+## D-55 Live evaluation and human review (2026-11-06)
+**Decision.** `scripts.run_agent_evals --live` (Anthropic only) runs every case that does not inject a model fault
+(`cases.SCRIPTED_ONLY`; 28 of 56 cases, at least 4 per agent; three data-varying Data Quality cases were added so that
+agent is measurable live) and records per agent correctness, groundedness, tool use, failures handled, p50/p95 latency,
+tokens and cost (provider usage). A stratified, seeded sample of 20 agent outputs (4 per agent) is graded by a separate
+LLM judge (`tests/agent_evals/judge_rubric.md`, never the agent's prompt) and written to
+`backend/tests/agent_evals/human_labels.csv`; a reviewer fills `human_label` and `--agreement` records judge–human and
+code-check–human agreement per agent (labels are never overwritten — a new sheet is written next to a labelled one).
+Results of each source (RECORDED, LIVE) are kept side by side. **Not yet run:** no Anthropic key was available.
+
+**Screenshot review (D-54, 2026-11-06)** of all agent pages in Chrome (Playwright, 1440 px and 390 px) found and fixed:
+the header's Store/Period selectors overflowed every page on phones (they are now hidden on the agent pages and Ask,
+where they do not apply, and wrap elsewhere); the visual flow overflowed the page and its edge labels collided (graph
+scales to fit down to 75 %, wider gaps, label halos, defaults to the latest nightly run, reused upstream agents shown as
+done); the pipeline table's off-screen labels widened the page; the agent detail tabs and card grid overflowed on phones;
+wrapped markdown list items broke apart; the overview counted reviewer flags as "recommendations" (now "Decisions 7d");
+"Po" in decision labels; raw agent keys in the acceptance table; a duplicated consequence in the live confirmation; the
+detail page was titled "Overview"; the trace showed `__llm__`; and no-LLM (baseline) runs had empty traces (their tool
+calls are now logged).

@@ -89,11 +89,11 @@ function AgentCard({ agent }: { agent: AgentSummaryDTO }) {
           </>
         ) : null}
         <div>
-          <dt className="text-ink-secondary">Recommendations</dt>
+          <dt className="text-ink-secondary">Decisions 7d</dt>
           <dd className="tabular font-semibold text-ink">{agent.recommendations_7d}</dd>
         </div>
         <div>
-          <dt className="text-ink-secondary">Accepted</dt>
+          <dt className="text-ink-secondary">Accepted by people</dt>
           <dd className="tabular font-semibold text-ink">{formatRate(agent.acceptance_rate)}</dd>
         </div>
       </dl>
@@ -224,7 +224,7 @@ export function AgentsOverviewPage() {
               meta={formatUsd(llm.reduce((s, a) => s + Number(a.est_cost_7d_usd), 0))}
             />
             <KpiCard
-              title="Recommendations (7 days)"
+              title="Decisions (7 days)"
               value={formatNumber(items.reduce((s, a) => s + a.recommendations_7d, 0))}
             />
           </div>

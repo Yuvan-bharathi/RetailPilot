@@ -58,7 +58,9 @@ class AgentSummaryDTO(DTO):
     p95_latency_ms: int | None
     tokens_7d: int
     est_cost_7d_usd: UsdCost
-    recommendations_7d: int = Field(description="Decisions linked to a recommendation in the last 7 days")
+    recommendations_7d: int = Field(
+        description="Live decisions of the last 7 days (recommendations, POs, flags, answers…)"
+    )
     acceptance_rate: float | None = Field(
         description="Accepted or edited / decided (all time, live decisions)"
     )
@@ -93,6 +95,7 @@ class ToggleEventDTO(DTO):
     reason: str
     updated_by: str | None = Field(description="Name of the user; null for the seeded initial version")
     created_at: datetime
+    is_demo: bool = False
 
 
 class EvalResultDTO(DTO):
@@ -202,6 +205,7 @@ class AgentRunItemDTO(DTO):
     error: str | None
     triggered_by: str | None
     reason: str | None
+    is_demo: bool = Field(False, description="Seeded demo activity (scripts.seed_agents --demo)")
 
 
 class TraceStepDTO(DTO):
@@ -256,6 +260,7 @@ class AgentDecisionDTO(DTO):
     outcome_reason: str | None
     outcome_at: datetime | None
     created_at: datetime
+    is_demo: bool = False
 
 
 class DecisionStatDTO(DTO):
@@ -298,6 +303,7 @@ class PipelineRunDTO(DTO):
     stages: list[PipelineStageDTO]
     escalations: int
     has_partial: bool
+    is_demo: bool = False
 
 
 class GraphNodeDTO(DTO):
@@ -365,6 +371,17 @@ class AskAnswerDTO(DTO):
     mode: Literal["LLM", "RETRIEVAL_ONLY"] = Field(
         description="RETRIEVAL_ONLY: no LLM (no key, or the global LLM switch is off) — sources listed, no prose"
     )
+
+
+class AgentStatusDTO(DTO):
+    """What every signed-in user may know about the agents (banners), D-54."""
+
+    expiry_checks_on: bool = Field(
+        description="Freshness agent on — else the inventory shows 'Expiry checks off'"
+    )
+    reviewer_on: bool
+    ask_enabled: bool
+    replenishment_paused: str | None = Field(description="'Replenishment paused by <user>: <reason>' or null")
 
 
 class AskStatusDTO(DTO):

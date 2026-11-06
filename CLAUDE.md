@@ -21,8 +21,12 @@ If code and docs disagree, follow the docs and tell me. Never silently change a 
 - Frontend: React + TypeScript (Vite), TanStack Query, TanStack Table, React Router,
   Recharts, Tailwind v4 with tokens mapped via `@theme` to CSS variables from `frontend/src/styles/tokens.css`
 - API types: generate TS types from FastAPI's OpenAPI spec (openapi-typescript); never hand-write DTO types
-- LLM (explanations only, D-44): Groq chat completions (httpx) with OpenAI open-weight models —
-  `LLM_MODEL` default `openai/gpt-oss-120b`, `LLM_FALLBACK_MODEL` `openai/gpt-oss-20b`; key `GROQ_API_KEY`;
+- LLM (D-53, pluggable; numbers never from the LLM): `LLM_PROVIDER=anthropic|groq|template`, default **anthropic** —
+  official `anthropic` SDK, `ANTHROPIC_MODEL` default `claude-opus-5-5`, effort `ANTHROPIC_EFFORT` (medium), key
+  `ANTHROPIC_API_KEY`, server-side refusal fallback on. Groq (httpx, OpenAI-compatible) remains selectable:
+  `LLM_MODEL` `openai/gpt-oss-120b`, `LLM_FALLBACK_MODEL` `openai/gpt-oss-20b`, key `GROQ_API_KEY` (D-44).
+  One factory (`app/services/llm_factory.py`) and one contract for both: JSON-schema output for explanations and
+  the reviewer's judge; tool calling with a submit tool for the Objective III agents;
   strict JSON-schema output; every number checked against the evidence; deterministic template fallback
 - Local infra: docker-compose (postgres, redis)
 - Later extensions only (do NOT build unless a phase asks): 3D twin (react-three-fiber), statsforecast models,
@@ -113,7 +117,8 @@ infra/docker-compose.yml
   `frontend/src/mocks/data/fixtures.json` from the synthetic data with the real tools (a test fails if it is stale)
 - Agents (D-50): `uv run python -m scripts.seed_agents [--demo]` (registry, policies, eval results; seed_demo runs it) ·
   evaluation: `uv run python -m scripts.run_agent_evals` (scripted replays → docs/notes/agent-eval-report.md;
-  `--live` uses Groq, manual) · MCP server: `uv run python -m app.agents.llm.mcp_server --user admin [--allow-drafts]`.
+  `--live` runs on Anthropic, manual, costs tokens; it writes `backend/tests/agent_evals/human_labels.csv` — label it,
+  then `--agreement`) · MCP server: `uv run python -m app.agents.llm.mcp_server --user admin [--allow-drafts]`.
   Tests force `LLM_PROVIDER=template` (tests/conftest.py) — never a live model in tests.
 - API contract: after changing a DTO/route run `cd backend && uv run python -m scripts.export_openapi ../frontend/openapi.json`
   then `cd ../frontend && npm run gen:api` — both sides are checked (test_contract.py, check:api)

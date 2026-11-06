@@ -1,4 +1,4 @@
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach, expect } from "vitest";
 import * as axeMatchers from "vitest-axe/matchers";
 
@@ -29,3 +29,7 @@ if (typeof window.matchMedia !== "function") {
     }),
   });
 }
+
+// Under the full parallel run (10 jsdom workers) a mock response can take longer than Testing Library's default
+// 1 s wait; 3 s removes load-dependent flakes without hiding real failures (a missing element still fails).
+configure({ asyncUtilTimeout: 3_000 });

@@ -50,16 +50,24 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
 
-    # LLM explanations (D-44): Groq, OpenAI open-weight models. Numbers are never taken from the LLM — every
-    # number in its text must appear in the evidence, else the deterministic template is used (rule 11).
+    # LLM provider (D-53, supersedes the provider part of D-44): pluggable. "anthropic" (default) = Claude via the
+    # official Anthropic SDK; "groq" = OpenAI open-weight models on Groq (httpx); "template" = never call an LLM.
+    # Same contract for both: tool calling with a submit tool for agents, JSON-schema output for explanations and
+    # the reviewer's judge. Numbers never come from the LLM (rule 11).
+    llm_provider: Literal["anthropic", "groq", "template"] = "anthropic"
+    anthropic_api_key: SecretStr | None = None
+    anthropic_model: str = "claude-opus-5-5"
+    anthropic_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
+    anthropic_max_tokens: int = 16_000
+    #: server-side refusal fallback (beta server-side-fallback-2026-07-01, `fallbacks: "default"`)
+    anthropic_refusal_fallback: bool = True
     groq_api_key: SecretStr | None = None
-    llm_provider: Literal["groq", "template"] = "groq"  # "template": never call an LLM
-    llm_model: str = "openai/gpt-oss-120b"  # production model; best grounding for short factual text
-    llm_fallback_model: str = "openai/gpt-oss-20b"  # production model; used on errors / rate limits
-    llm_reasoning_effort: Literal["low", "medium", "high"] = "low"
-    llm_temperature: float = 0.0  # spec Phase 5: temperature 0
-    llm_max_completion_tokens: int = 4096  # reasoning tokens count toward this limit
-    llm_timeout_s: float = 30.0
+    llm_model: str = "openai/gpt-oss-120b"  # Groq production model; best grounding for short factual text
+    llm_fallback_model: str = "openai/gpt-oss-20b"  # Groq production model; used on errors / rate limits
+    llm_reasoning_effort: Literal["low", "medium", "high"] = "low"  # Groq gpt-oss
+    llm_temperature: float = 0.0  # Groq only (current Claude models reject sampling parameters)
+    llm_max_completion_tokens: int = 4096  # Groq: reasoning tokens count toward this limit
+    llm_timeout_s: float = 60.0
     llm_batch_size: int = 20
 
     app_timezone: str = "Asia/Kolkata"

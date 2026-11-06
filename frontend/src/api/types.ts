@@ -94,6 +94,7 @@ export type RunGraphDTO = Schemas["RunGraphDTO"];
 export type GraphNodeDTO = Schemas["GraphNodeDTO"];
 export type GraphEdgeDTO = Schemas["GraphEdgeDTO"];
 export type AgentStatsDTO = Schemas["AgentStatsDTO"];
+export type AgentStatusDTO = Schemas["AgentStatusDTO"];
 export type AskRequest = Schemas["AskRequest"];
 export type AskAnswerDTO = Schemas["AskAnswerDTO"];
 export type AskStatusDTO = Schemas["AskStatusDTO"];

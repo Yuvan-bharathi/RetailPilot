@@ -4,6 +4,7 @@ import { useDeferredValue, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
 import {
+  useAgentStatus,
   useRecommendations,
   useStoreBatches,
   useStoreExpiring,
@@ -530,6 +531,17 @@ function StorePicker({ stores, onPick }: { stores: StoreDTO[]; onPick: (id: stri
   );
 }
 
+/** docs/09 §4: Freshness off → no expiry transfers or alerts; say so where people look at stock. */
+function ExpiryChecksOffBanner() {
+  const status = useAgentStatus();
+  if (!status.data || status.data.expiry_checks_on) return null;
+  return (
+    <div role="status" className="rounded-card bg-warning-bg px-4 py-3 text-sm font-medium text-warning">
+      Expiry checks off — the Freshness agent is switched off, so no expiry transfers or alerts are being raised.
+    </div>
+  );
+}
+
 export function InventoryPage() {
   const { user } = useAuth();
   const shell = useShell();
@@ -561,6 +573,7 @@ export function InventoryPage() {
 
   return (
     <div className="space-y-4">
+      <ExpiryChecksOffBanner />
       {isAdmin ? (
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-ink-secondary">

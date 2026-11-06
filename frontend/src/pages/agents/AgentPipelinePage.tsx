@@ -11,7 +11,7 @@ import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/Modal";
 import { EmptyState, ErrorState, SkeletonLine } from "../../components/StateViews";
 import { StatusBadge } from "../../components/StatusBadge";
-import { ConsoleTabs, RunStatusBadge, Select, When } from "../../components/agents/agentUi";
+import { DemoBadge, ConsoleTabs, RunStatusBadge, Select, When } from "../../components/agents/agentUi";
 import { formatMs, RUN_STATUS, RUN_STATUSES, TRIGGER_LABEL, TRIGGER_TYPES } from "../../lib/agentFormat";
 import { useCursorPaging } from "../../lib/useCursorPaging";
 
@@ -131,7 +131,7 @@ export function AgentPipelinePage() {
           options={RUN_STATUSES.map((s) => ({ value: s, label: RUN_STATUS[s].label }))}
         />
       </div>
-      <div className="overflow-x-auto rounded-card border border-border bg-surface shadow-card">
+      <div className="relative overflow-x-auto rounded-card border border-border bg-surface shadow-card">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Pipeline runs, newest first</caption>
           <thead className="border-b border-border bg-elevated text-xs text-ink-secondary">
@@ -196,7 +196,7 @@ export function AgentPipelinePage() {
                         <RunStatusBadge status={r.status} />
                       </td>
                       <td className="px-3 py-2">
-                        {TRIGGER_LABEL[r.trigger_type]}
+                        {TRIGGER_LABEL[r.trigger_type]} <DemoBadge show={r.is_demo} />
                         {r.agent_key ? <span className="block text-xs text-ink-secondary">{r.agent_key}</span> : null}
                       </td>
                       <td className="px-3 py-2">

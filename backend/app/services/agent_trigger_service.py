@@ -520,7 +520,11 @@ class ManualRunner:
 
     def execute(self, run_id: UUID) -> None:
         from app.agents.orchestrator import WorkflowOrchestrator
-        from app.services.agent_decision_service import record_decision, record_stage_decisions
+        from app.services.agent_decision_service import (
+            mark_inputs_missing,
+            record_decision,
+            record_stage_decisions,
+        )
 
         root = self.session.get(AgentRun, run_id)
         if root is None or root.status != "RUNNING" or not root.agent_key:
@@ -582,6 +586,10 @@ class ManualRunner:
                     outcome[k] = res.status
                     if res.status == "SUCCESS":
                         record_stage_decisions(self.session, root.run_id, k, mode)
+                        absent = [o for o in BY_KEY[k].optional_inputs if outcome.get(o) != "SUCCESS"]
+                        if absent and k == "stock_balancing":
+                            mark_inputs_missing(self.session, root.run_id, absent)
+                        logger_.store_stats(orch.last_child_run_id)
                     if mode == "LIVE":
                         self.session.commit()
             else:
@@ -663,6 +671,8 @@ class ManualRunner:
         root.output_summary = _json.dumps(
             {"stages": outcome, **notes, "duration_s": round(time.monotonic() - t0, 2)}, default=str
         )
+        self.session.flush()
+        logger_.store_stats(run_id)
         self.session.commit()
 
     def _cancelled(self, run_id: UUID) -> bool:
@@ -675,9 +685,13 @@ class ManualRunner:
         except Exception as e:  # pragma: no cover - views optional in some test schemas
             logger.warning("view refresh failed: %s", e)
         try:
+            from app.domain.models.master import Store
             from app.services.cache_service import CacheService
 
             cs = CacheService()
+            # a live run changes the inbox, POs, transfers and dashboards of every store: drop their cached views
+            stores = list(self.session.scalars(select(Store.store_id)))
+            cs.invalidate_store_keys(stores, ["inbox", "dash", "inv", "twin"])
             prev = cs.get_latest_run_id()
             if prev:
                 cs.invalidate_run(prev)

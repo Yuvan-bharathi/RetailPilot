@@ -66,6 +66,7 @@ class AgentConfig(Timestamps, Base):
     config_version: Mapped[int] = mapped_column(index=True)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("app_user.user_id"), index=True)
     reason: Mapped[str] = mapped_column(Text)
+    is_demo: Mapped[bool] = mapped_column(server_default=text("false"))  # seeded demo toggle (D-54)
 
 
 class AgentDecision(Timestamps, Base):

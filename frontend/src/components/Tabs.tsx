@@ -51,7 +51,12 @@ export function Tabs({
 
   return (
     <div>
-      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className="flex gap-1 border-b border-border">
+      <div
+        role="tablist"
+        aria-label={label}
+        onKeyDown={onKeyDown}
+        className="flex gap-1 overflow-x-auto border-b border-border"
+      >
         {items.map((item) => {
           const selected = item.key === value;
           return (

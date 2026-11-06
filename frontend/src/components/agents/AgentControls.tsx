@@ -229,7 +229,6 @@ export function RunNowPanel({ agent }: { agent: AgentSummaryDTO }) {
               {p && p.recommendations_to_supersede > 0 ? (
                 <li>{p.recommendations_to_supersede} pending recommendations will be superseded</li>
               ) : null}
-              {p && p.downstream.length > 0 ? <li>Downstream agents re-run: {p.downstream.join(", ")}</li> : null}
             </ul>
           </div>
           <div>

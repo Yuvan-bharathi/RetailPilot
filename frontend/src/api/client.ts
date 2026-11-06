@@ -6,6 +6,7 @@ import type {
   AgentRunQuery,
   AgentRunTraceDTO,
   AgentStatsDTO,
+  AgentStatusDTO,
   AskAnswerDTO,
   AskStatusDTO,
   DecisionQuery,
@@ -106,6 +107,8 @@ export interface ApiClient {
   getRunGraph(runId: string): Promise<RunGraphDTO>;
   // Ask RetailPilot — any signed-in user, scoped to their store
   getAssistantStatus(): Promise<AskStatusDTO>;
+  /** Any signed-in user: banners caused by agent switches (D-54). */
+  getAgentStatus(): Promise<AgentStatusDTO>;
   ask(question: string): Promise<AskAnswerDTO>;
   triggerNightlyRun(body?: TriggerRunRequest): Promise<{ message: string; run_id?: string; run_date: string }>;
 }
@@ -213,6 +216,7 @@ export function createHttpClient(getToken: () => string | null, baseUrl = "/api/
     listPipelineRuns: (query) => request("GET", `/pipeline/runs${toQueryString(query)}`),
     getRunGraph: (runId) => request("GET", `/pipeline/runs/${encodeURIComponent(runId)}/graph`),
     getAssistantStatus: () => request("GET", "/assistant/status"),
+    getAgentStatus: () => request("GET", "/agent-status"),
     ask: (question) => request("POST", "/assistant/ask", { question }),
     triggerNightlyRun: (body) => request("POST", "/admin/runs", body ?? {}),
   };

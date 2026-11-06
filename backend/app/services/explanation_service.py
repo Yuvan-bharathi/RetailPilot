@@ -22,7 +22,7 @@ from uuid import UUID
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
-from app.services.llm_client import GroqClient, JsonLLM, LLMError, LLMReply
+from app.services.llm_client import JsonLLM, LLMError, LLMReply
 
 logger = get_logger(__name__)
 
@@ -260,8 +260,10 @@ class ExplanationService:
         self.session = session
         self._usage_logger = usage_logger
         self.client: JsonLLM | None = client
-        if client is None and self.settings.llm_provider == "groq" and self.settings.groq_api_key is not None:
-            self.client = GroqClient(self.settings)
+        if client is None:  # provider chosen by LLM_PROVIDER (D-53); None → deterministic templates
+            from app.services.llm_factory import make_json_llm
+
+            self.client = make_json_llm(self.settings)
 
     def explain(self, items: Sequence[ExplanationInput], run_id: UUID | None = None) -> list[str]:
         """One text per item, in order. Never raises because of the LLM."""

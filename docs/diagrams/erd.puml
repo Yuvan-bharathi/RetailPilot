@@ -397,6 +397,13 @@ package "Observability" as O {
     +stop_reason: str
     +retries: int
     +cancel_requested: bool
+    +is_demo: bool
+    +duration_ms: int
+    +tool_calls_count: int
+    +llm_calls_count: int
+    +tokens: int
+    +est_cost_usd: Decimal
+    +decisions_count: int
     +created_at: datetime
     +updated_at: datetime
   }
@@ -480,6 +487,7 @@ package "Other" as O {
     +config_version: int
     +updated_by: UUID <<FK>>
     +reason: str
+    +is_demo: bool
     +created_at: datetime
     +updated_at: datetime
   }

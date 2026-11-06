@@ -13,7 +13,8 @@ export function AgentFlowPage() {
   const [params, setParams] = useSearchParams();
   const runs = usePipelineRuns({ page_size: 30 });
   const requested = params.get("run");
-  const runId = requested ?? runs.data?.items[0]?.run_id ?? null;
+  const items = runs.data?.items ?? [];
+  const runId = requested ?? (items.find((r) => r.trigger_type === "NIGHTLY") ?? items[0])?.run_id ?? null;
   const graph = useRunGraph(runId);
   const [selected, setSelected] = useState<GraphNodeDTO | null>(null);
 
@@ -21,10 +22,10 @@ export function AgentFlowPage() {
     <div className="space-y-5">
       <ConsoleTabs />
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-xs font-medium text-ink-secondary">
+        <label className="flex min-w-0 max-w-full items-center gap-2 text-xs font-medium text-ink-secondary">
           Run
           <select
-            className="h-8 max-w-md rounded-input border border-border bg-surface px-2 text-xs text-ink"
+            className="h-8 w-full min-w-0 max-w-md rounded-input border border-border bg-surface px-2 text-xs text-ink"
             value={runId ?? ""}
             onChange={(e) => {
               setSelected(null);
@@ -58,7 +59,7 @@ export function AgentFlowPage() {
           <SkeletonLine width="50%" />
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
+        <div className="grid min-w-0 grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_20rem]">
           <AgentFlowGraph
             nodes={graph.data.nodes}
             edges={graph.data.edges}

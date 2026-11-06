@@ -4,6 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { axe } from "vitest-axe";
 
+import { render } from "@testing-library/react";
+
+import { EvidenceView } from "../components/EvidencePanel";
+import { FIXTURES } from "../mocks/fixtures";
 import { renderApp } from "./render";
 
 describe("agent console — access", () => {
@@ -68,6 +72,9 @@ describe("agent console — run now", () => {
     await user.click(screen.getByLabelText(/Live \(publishes\)/));
     await user.click(await screen.findByRole("button", { name: "Run live…" }));
     const dialog = await screen.findByRole("dialog", { name: "Run Stock Balancing live?" });
+    // D-51: the confirmation states what will be superseded and which downstream agents re-run
+    expect(within(dialog).getByText(/pending recommendations will be superseded/)).toBeTruthy();
+    expect(within(dialog).getByText(/Downstream agents re-run: purchase_order/)).toBeTruthy();
     await user.click(within(dialog).getByRole("button", { name: "Run live" }));
     expect(within(dialog).getByText("Enter a reason (5+ characters).")).toBeTruthy();
     expect(within(dialog).getByText("Confirm the consequences first.")).toBeTruthy();
@@ -135,4 +142,35 @@ describe("Ask RetailPilot", () => {
     expect(await screen.findByText("Not allowed — read-only assistant")).toBeTruthy();
     expect(await axe(container)).toHaveNoViolations();
   }, 20_000);
+});
+
+describe("agent switch banners and demo data (D-54)", () => {
+  const status = { expiry_checks_on: true, reviewer_on: true, ask_enabled: true, replenishment_paused: null };
+
+  it("shows 'Expiry checks off' on the inventory when Freshness is off", async () => {
+    renderApp("/inventory", "sup.a", { getAgentStatus: async () => ({ ...status, expiry_checks_on: false }) });
+    expect(await screen.findByText(/Expiry checks off/)).toBeTruthy();
+  });
+
+  it("shows the replenishment-paused banner to supervisors too", async () => {
+    renderApp("/", "sup.b", {
+      getAgentStatus: async () => ({
+        ...status,
+        replenishment_paused: "Replenishment paused by Super Admin: migration",
+      }),
+    });
+    expect(await screen.findByText(/Replenishment paused by Super Admin: migration/)).toBeTruthy();
+  });
+
+  it("labels seeded demo activity in the logs", async () => {
+    renderApp("/agents/logs", "admin");
+    expect((await screen.findAllByText("Demo data")).length).toBeGreaterThan(0);
+  });
+
+  it("says in the evidence when an optional input agent was off", () => {
+    const transfer = Object.values(FIXTURES.evidence).find((e) => e.kind === "TRANSFER");
+    if (!transfer || transfer.kind !== "TRANSFER") throw new Error("fixture has no transfer evidence");
+    render(<EvidenceView evidence={{ ...transfer, inputs_missing: ["related_product"] }} />);
+    expect(screen.getByText(/Made without: Related products/)).toBeTruthy();
+  });
 });

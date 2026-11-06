@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass, field
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 from uuid import UUID
@@ -19,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from app.agents.base import AgentResult, BaseAgent, RunContext
-from app.agents.llm.chat import ChatLLM, GroqChatClient
+from app.agents.llm.chat import ChatLLM
 from app.agents.llm.framework import Limits, LoopResult, ToolContext, ToolError, ToolLoopAgent, remember
 from app.agents.llm.tools import (
     DataReviewArgs,
@@ -42,13 +43,13 @@ from app.agents.llm.tools import (
     tools_for,
 )
 from app.agents.registry import BY_KEY
-from app.core.config import Settings, get_settings
+from app.core.config import Settings
 from app.domain.models.agents import RecommendationReview
 from app.domain.models.enums import RecStatus
 from app.domain.models.planning import Recommendation
 from app.services.agent_decision_service import record_decision
 from app.services.explanation_service import PRIVATE_FIELDS, fact_numbers, is_grounded, llm_facts
-from app.services.llm_client import GroqClient, JsonLLM, LLMError
+from app.services.llm_client import JsonLLM, LLMError
 
 PROMPTS = Path(__file__).parent / "prompts"
 
@@ -67,18 +68,16 @@ def limits_for(agent_key: str) -> Limits:
 
 
 def make_chat_llm(settings: Settings | None = None) -> ChatLLM | None:
-    """The live model, or None when LLM agents must use their deterministic baseline."""
-    settings = settings or get_settings()
-    if settings.llm_provider == "template" or settings.groq_api_key is None:
-        return None
-    return GroqChatClient(settings)
+    """The configured provider's chat client (D-53), or None → deterministic baselines."""
+    from app.services.llm_factory import make_chat_llm as factory
+
+    return factory(settings)  # type: ignore[no-any-return]
 
 
 def make_json_llm(settings: Settings | None = None) -> JsonLLM | None:
-    settings = settings or get_settings()
-    if settings.llm_provider == "template" or settings.groq_api_key is None:
-        return None
-    return GroqClient(settings)
+    from app.services.llm_factory import make_json_llm as factory
+
+    return factory(settings)  # type: ignore[no-any-return]
 
 
 # =====================================================================================================================
@@ -124,10 +123,32 @@ class AskResult:
     decision_type: str = "ANSWER_GIVEN"
 
 
-def ask_baseline(ctx: ToolContext, question: str) -> AskAnswer:
+def _logged(ctx: ToolContext, logger: Any, name: str, fn: Any, args: Any) -> dict[str, Any]:
+    """Run a tool on the deterministic path and log it like the tool loop does (trace stays complete)."""
+    t0 = time.monotonic()
+    result: dict[str, Any] = fn(ctx, args)
+    if logger is not None:
+        from app.agents.llm.framework import compact
+
+        logger.log_tool_call(
+            ctx.run_id,
+            name,
+            args.model_dump(),
+            compact(result)[:2_000],
+            int((time.monotonic() - t0) * 1000),
+            "OK",
+        )
+    return result
+
+
+def ask_baseline(ctx: ToolContext, question: str, logger: Any = None) -> AskAnswer:
     """No LLM: retrieval only — list the matching sources, no prose (cannot paraphrase without a model)."""
-    recs = search_records(ctx, SearchArgs(query=question, limit=3))["items"]
-    pols = search_policies(ctx, SearchArgs(query=question, limit=2))["items"]
+    recs = _logged(ctx, logger, "search_records", search_records, SearchArgs(query=question, limit=3))[
+        "items"
+    ]
+    pols = _logged(ctx, logger, "search_policies", search_policies, SearchArgs(query=question, limit=2))[
+        "items"
+    ]
     remember(ctx, {"r": recs, "p": pols})
     citations = [
         Citation(
@@ -158,7 +179,7 @@ def answer_question(ctx: ToolContext, question: str, llm: ChatLLM | None, logger
             decision_type="REQUEST_REFUSED",
         )
     if llm is None:
-        a = ask_baseline(ctx, question)
+        a = ask_baseline(ctx, question, logger)
         return AskResult(a, "RETRIEVAL_ONLY", decision_type="ANSWER_GIVEN" if a.found else "NOT_FOUND")
     agent = ToolLoopAgent(
         agent_key="ask_retailpilot",
@@ -173,14 +194,14 @@ def answer_question(ctx: ToolContext, question: str, llm: ChatLLM | None, logger
     )
     loop = agent.run(ctx, f"Question from a {ctx.role.replace('_', ' ').lower()}: {question}")
     if loop.output is None:  # fail safe: retrieval-only answer
-        a = ask_baseline(ctx, question)
+        a = ask_baseline(ctx, question, logger)
         return AskResult(a, "RETRIEVAL_ONLY", loop, decision_type="ANSWER_GIVEN" if a.found else "NOT_FOUND")
     out = loop.output
     # code checks: citations must reference ids a tool returned; numbers must come from tool results (rule 11)
     kept = [c for c in out.citations if c.source_id in ctx.seen_ids or c.source_id == "business_rules"]
     grounded = is_grounded(out.answer, {"n": list(ctx.seen_numbers)}) if out.found else True
     if out.found and (not grounded or not kept):
-        a = ask_baseline(ctx, question)
+        a = ask_baseline(ctx, question, logger)
         return AskResult(
             a,
             "RETRIEVAL_ONLY",
@@ -256,7 +277,7 @@ class DQResult:
 
 
 def triage(ctx: ToolContext, llm: ChatLLM | None, logger: Any = None, create_drafts: bool = True) -> DQResult:
-    report = get_ingestion_report(ctx, IngestionArgs())
+    report = _logged(ctx, logger, "get_ingestion_report", get_ingestion_report, IngestionArgs())
     if not report["issues"]:
         return DQResult(DQReport(summary="No ingestion issues", issues=[]), "BASELINE")
     mode: Literal["LLM", "BASELINE"] = "BASELINE"
@@ -581,6 +602,7 @@ class ReviewResult:
     judged_by_llm: int = 0
     llm_calls: int = 0
     tokens: int = 0
+    est_cost: Decimal = Decimal(0)
     flagged_ids: list[UUID] = field(default_factory=list)
 
 
@@ -619,10 +641,11 @@ def review_run(
             continue  # defined outcome: code checks still apply; these items are judged by code only
         result.llm_calls += 1
         result.tokens += reply.input_tokens + reply.output_tokens
+        result.est_cost += reply.est_cost
         if logger is not None:
             logger.log_llm_usage(
                 run_id=ctx.run_id,
-                provider="groq",
+                provider=str(getattr(judge, "provider", "llm")),
                 model=reply.model,
                 input_tokens=reply.input_tokens,
                 output_tokens=reply.output_tokens,

@@ -2,7 +2,7 @@ import { Bell, Check, ChevronsLeft, ChevronsRight, LogOut, ShoppingBasket, X } f
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router";
 
-import { useLatestRun, useNotifications, useStores } from "../api/hooks";
+import { useAgentStatus, useLatestRun, useNotifications, useStores } from "../api/hooks";
 import type { MeDTO, Period } from "../api/types";
 import { useApi } from "../app/ApiContext";
 import { navFor, titleFor } from "../app/nav";
@@ -155,16 +155,19 @@ function Header({ user, title, onSignOut }: { user: MeDTO; title: string; onSign
   const [showNotifs, setShowNotifs] = useState(false);
 
   const unreadCount = notifs.data?.length ?? 0;
+  // the agent console and Ask are not filtered by store or period: no selectors there
+  const path = useLocation().pathname;
+  const scopeless = path.startsWith("/agents") || path === "/ask";
 
   return (
     <header className="sticky top-0 z-40 flex min-h-16 flex-wrap items-center gap-3 border-b border-border bg-surface px-6 py-2">
       <h1 className="mr-auto text-[20px] font-bold tracking-tight text-ink">{title}</h1>
-      {isAdmin ? (
-        <div className="flex items-center gap-3">
+      {isAdmin && !scopeless ? (
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-xs font-medium text-ink-secondary">
             Store
             <select
-              className="h-8 rounded-input border border-border bg-surface px-2.5 text-xs text-ink focus:outline-none"
+              className="h-8 max-w-[11rem] min-w-0 rounded-input border border-border bg-surface px-2.5 text-xs text-ink focus:outline-none"
               value={storeId ?? ""}
               onChange={(e) => setStoreId(e.target.value || null)}
             >
@@ -179,7 +182,7 @@ function Header({ user, title, onSignOut }: { user: MeDTO; title: string; onSign
           <label className="flex items-center gap-2 text-xs font-medium text-ink-secondary">
             Period
             <select
-              className="h-8 rounded-input border border-border bg-surface px-2.5 text-xs text-ink focus:outline-none"
+              className="h-8 max-w-[11rem] min-w-0 rounded-input border border-border bg-surface px-2.5 text-xs text-ink focus:outline-none"
               value={period}
               onChange={(e) => setPeriod(e.target.value as Period)}
             >
@@ -237,6 +240,18 @@ function Header({ user, title, onSignOut }: { user: MeDTO; title: string; onSign
   );
 }
 
+/** "Replenishment paused by <user>: <reason>" for every role while a critical agent is off (docs/09 §4). */
+function PausedBanner() {
+  const status = useAgentStatus();
+  const text = status.data?.replenishment_paused;
+  if (!text) return null;
+  return (
+    <div role="status" className="mb-4 rounded-card bg-attention-bg px-4 py-3 text-sm font-medium text-attention">
+      {text}. Recommendations and purchase orders from the last run stay available.
+    </div>
+  );
+}
+
 export function AppShell({ user, onSignOut, children }: { user: MeDTO; onSignOut: () => void; children: ReactNode }) {
   const narrow = useMediaQuery(NARROW);
   const [override, setOverride] = useState<boolean | null>(null);
@@ -259,6 +274,7 @@ export function AppShell({ user, onSignOut, children }: { user: MeDTO; onSignOut
       <div className="flex min-w-0 flex-1 flex-col">
         <Header user={user} title={title} onSignOut={onSignOut} />
         <main id="main" className="min-w-0 flex-1 p-6">
+          <PausedBanner />
           {children}
         </main>
       </div>

@@ -35,6 +35,7 @@ from app.domain.schemas.agents import (
     AgentRunPage,
     AgentRunTraceDTO,
     AgentStatsDTO,
+    AgentStatusDTO,
     AgentSummaryDTO,
     DailyRunCountDTO,
     DecisionPage,
@@ -60,7 +61,7 @@ from app.services.agent_config_service import snapshot_async
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "agents" / "llm" / "prompts"
 
 # Fixed layout of the visual flow (docs/09 §3.4): columns × rows, no physics. Same positions as the UI mock.
-_COL = [20, 210, 400, 590, 780, 970]
+_COL = [20, 250, 480, 710, 940, 1170]  # 70 px gaps leave room for edge labels
 _ROW = [20, 120, 220, 320, 420]
 GRAPH_NODES: list[tuple[str, str, Literal["AGENT", "TOOL", "GATE", "DATA"], str | None, int, int]] = [
     ("ingestion", "POS ingestion", "DATA", None, 0, 2),
@@ -89,7 +90,7 @@ GRAPH_EDGES: list[GraphEdgeDTO] = [
         ("demand_forecasting", "stock_balancing", "forecasts", "DATA"),
         ("related_product", "stock_balancing", "basket rules", "DATA"),
         ("demand_forecasting", "freshness", "forecasts", "DATA"),
-        ("stock_balancing", "tool_transfer_engine", "calls", "DATA"),
+        ("stock_balancing", "tool_transfer_engine", None, "DATA"),
         ("stock_balancing", "purchase_order", "PO needs", "DATA"),
         ("stock_balancing", "recommendation_reviewer", "recommendations", "REVIEW"),
         ("freshness", "recommendation_reviewer", None, "REVIEW"),
@@ -121,6 +122,11 @@ def _parse(value: str | None) -> Any:
         return value
 
 
+def _escalations(root: AgentRun) -> int:
+    summary = _parse(root.output_summary)
+    return int(summary.get("escalations", 0)) if isinstance(summary, dict) else 0
+
+
 def _rate(num: int, den: int) -> float | None:
     return round(num / den, 4) if den else None
 
@@ -135,7 +141,7 @@ class AgentConsoleService:
             AgentRun.agent_key.is_not(None),
             ~AgentRun.agent_name.like("manual:%"),
         )
-        dur = func.extract("epoch", AgentRun.ended_at - AgentRun.started_at) * 1000
+        dur = AgentRun.duration_ms  # stored per run (D-54)
         stats = {
             k: (runs, ok, fin, p95)
             for k, runs, ok, fin, p95 in (
@@ -158,13 +164,8 @@ class AgentConsoleService:
             k: (int(t or 0), Decimal(c or 0))
             for k, t, c in (
                 await session.execute(
-                    select(
-                        AgentRun.agent_key,
-                        func.sum(LLMUsage.input_tokens + LLMUsage.output_tokens),
-                        func.sum(LLMUsage.est_cost),
-                    )
-                    .join(AgentRun, AgentRun.run_id == LLMUsage.run_id)
-                    .where(agent_runs, LLMUsage.created_at >= since)
+                    select(AgentRun.agent_key, func.sum(AgentRun.tokens), func.sum(AgentRun.est_cost_usd))
+                    .where(agent_runs, AgentRun.started_at >= since)
                     .group_by(AgentRun.agent_key)
                 )
             ).all()
@@ -184,9 +185,7 @@ class AgentConsoleService:
                 await session.execute(
                     select(
                         AgentDecision.agent_key,
-                        func.count().filter(
-                            AgentDecision.rec_id.is_not(None), AgentDecision.created_at >= since
-                        ),
+                        func.count().filter(AgentDecision.created_at >= since),
                         func.count().filter(AgentDecision.outcome.in_(["ACCEPTED", "EDITED"])),
                         func.count().filter(AgentDecision.outcome.in_(["ACCEPTED", "EDITED", "REJECTED"])),
                     )
@@ -236,31 +235,43 @@ class AgentConsoleService:
             )
         return out
 
-    async def list_agents(self, session: AsyncSession) -> AgentListDTO:
-        snap = await snapshot_async(session)
-        banner = None
+    async def paused_banner(self, session: AsyncSession, snap: Any = None) -> str | None:
+        snap = snap or await snapshot_async(session)
         off = [
             a for a in AGENTS if a.group == "PIPELINE" and a.critical and not snap.enabled.get(a.key, True)
         ]
-        if off:
-            row = (
-                await session.execute(
-                    select(AgentConfig, AppUser.name)
-                    .outerjoin(AppUser, AppUser.user_id == AgentConfig.updated_by)
-                    .where(AgentConfig.agent_key == off[0].key)
-                    .order_by(desc(AgentConfig.config_version))
-                    .limit(1)
-                )
-            ).first()
-            who, why = (
-                (row[1] or "Super Admin", row[0].reason) if row else ("Super Admin", f"{off[0].name} is off")
+        if not off:
+            return None
+        row = (
+            await session.execute(
+                select(AgentConfig, AppUser.name)
+                .outerjoin(AppUser, AppUser.user_id == AgentConfig.updated_by)
+                .where(AgentConfig.agent_key == off[0].key)
+                .order_by(desc(AgentConfig.config_version))
+                .limit(1)
             )
-            banner = f"Replenishment paused by {who}: {why}"
+        ).first()
+        who, why = (
+            (row[1] or "Super Admin", row[0].reason) if row else ("Super Admin", f"{off[0].name} is off")
+        )
+        return f"Replenishment paused by {who}: {why}"
+
+    async def status(self, session: AsyncSession) -> AgentStatusDTO:
+        snap = await snapshot_async(session)
+        return AgentStatusDTO(
+            expiry_checks_on=snap.is_on("freshness"),
+            reviewer_on=snap.is_on("recommendation_reviewer"),
+            ask_enabled=snap.is_on("ask_retailpilot"),
+            replenishment_paused=await self.paused_banner(session, snap),
+        )
+
+    async def list_agents(self, session: AsyncSession) -> AgentListDTO:
+        snap = await snapshot_async(session)
         return AgentListDTO(
             items=await self._summaries(session),
             llm_enabled=snap.llm_enabled,
             config_version=snap.version,
-            paused_banner=banner,
+            paused_banner=await self.paused_banner(session, snap),
         )
 
     async def get_agent(self, session: AsyncSession, agent_key: str) -> AgentDetailDTO:
@@ -277,6 +288,7 @@ class AgentConsoleService:
                 reason=c.reason,
                 updated_by=name,
                 created_at=c.created_at,
+                is_demo=c.is_demo,
             )
             for c, name in (
                 await session.execute(
@@ -375,7 +387,7 @@ class AgentConsoleService:
             .group_by(day)
             .order_by(day)
         )
-        dur = func.extract("epoch", AgentRun.ended_at - AgentRun.started_at) * 1000
+        dur = AgentRun.duration_ms
         p50, p95 = (
             await session.execute(
                 select(
@@ -401,31 +413,6 @@ class AgentConsoleService:
     async def _items(self, session: AsyncSession, runs: list[AgentRun]) -> list[AgentRunItemDTO]:
         if not runs:
             return []
-        ids = [r.run_id for r in runs]
-        tools = dict(
-            (
-                await session.execute(
-                    select(ToolCall.run_id, func.count())
-                    .where(ToolCall.run_id.in_(ids))
-                    .group_by(ToolCall.run_id)
-                )
-            ).all()
-        )
-        llm = {
-            rid: (int(n), int(t or 0), Decimal(c or 0))
-            for rid, n, t, c in (
-                await session.execute(
-                    select(
-                        LLMUsage.run_id,
-                        func.count(),
-                        func.sum(LLMUsage.input_tokens + LLMUsage.output_tokens),
-                        func.sum(LLMUsage.est_cost),
-                    )
-                    .where(LLMUsage.run_id.in_(ids))
-                    .group_by(LLMUsage.run_id)
-                )
-            ).all()
-        }
         users = {r.triggered_by for r in runs if r.triggered_by}
         names = (
             dict(
@@ -440,7 +427,6 @@ class AgentConsoleService:
         )
         out = []
         for r in runs:
-            n, tok, cost = llm.get(r.run_id, (0, 0, Decimal(0)))
             spec = BY_KEY.get(r.agent_key or "")
             label = (
                 "Nightly pipeline"
@@ -463,16 +449,17 @@ class AgentConsoleService:
                     run_date=r.run_date,
                     started_at=r.started_at,
                     finished_at=r.ended_at,
-                    duration_ms=_duration_ms(r),
-                    tool_calls=int(tools.get(r.run_id, 0)),
-                    llm_calls=n,
-                    tokens=tok,
-                    est_cost_usd=cost,
+                    duration_ms=r.duration_ms if r.duration_ms is not None else _duration_ms(r),
+                    tool_calls=r.tool_calls_count or 0,
+                    llm_calls=r.llm_calls_count or 0,
+                    tokens=r.tokens or 0,
+                    est_cost_usd=r.est_cost_usd or Decimal(0),
                     retries=r.retries,
                     stop_reason=r.stop_reason,
                     error=r.error,
                     triggered_by=names.get(r.triggered_by) if r.triggered_by else None,
                     reason=r.reason,
+                    is_demo=r.is_demo,
                 )
             )
         return out
@@ -617,8 +604,12 @@ class AgentConsoleService:
                 )
             ).scalars()
         ]
-        n_decisions = await session.scalar(
-            select(func.count()).select_from(AgentDecision).where(AgentDecision.run_id == run_id)
+        n_decisions = (
+            run.decisions_count
+            if run.decisions_count is not None
+            else await session.scalar(
+                select(func.count()).select_from(AgentDecision).where(AgentDecision.run_id == run_id)
+            )
         )
         return AgentRunTraceDTO(
             run=item,
@@ -649,7 +640,8 @@ class AgentConsoleService:
         q: str | None,
     ) -> DecisionPage:
         stmt = (
-            select(AgentDecision, Store, Product)
+            select(AgentDecision, Store, Product, AgentRun.is_demo)
+            .join(AgentRun, AgentRun.run_id == AgentDecision.run_id)
             .outerjoin(Store, Store.store_id == AgentDecision.store_id)
             .outerjoin(Product, Product.product_id == AgentDecision.product_id)
         )
@@ -709,8 +701,9 @@ class AgentConsoleService:
                 outcome_reason=d.outcome_reason,
                 outcome_at=d.outcome_at,
                 created_at=d.created_at,
+                is_demo=bool(demo),
             )
-            for d, s, p in rows[:page_size]
+            for d, s, p, demo in rows[:page_size]
         ]
         last = rows[page_size - 1][0] if len(rows) > page_size else None
         return DecisionPage(
@@ -796,24 +789,6 @@ class AgentConsoleService:
             ).scalars():
                 if child.parent_run_id is not None:
                     children[child.parent_run_id].append(child)
-        outputs: dict[tuple[UUID, str], int] = {}
-        escal: dict[UUID, int] = {}
-        if ids:
-            for rid, key, dtype, n in (
-                await session.execute(
-                    select(
-                        AgentDecision.run_id,
-                        AgentDecision.agent_key,
-                        AgentDecision.decision_type,
-                        func.count(),
-                    )
-                    .where(AgentDecision.run_id.in_(ids))
-                    .group_by(AgentDecision.run_id, AgentDecision.agent_key, AgentDecision.decision_type)
-                )
-            ).all():
-                outputs[(rid, key)] = outputs.get((rid, key), 0) + int(n)
-                if dtype == "COORDINATOR_ESCALATE":
-                    escal[rid] = escal.get(rid, 0) + int(n)
         users = {r.triggered_by for r in page if r.triggered_by}
         names = (
             dict(
@@ -836,7 +811,7 @@ class AgentConsoleService:
                     run_id=c.run_id,
                     duration_ms=_duration_ms(c),
                     retries=c.retries,
-                    outputs=outputs.get((r.run_id, c.agent_key or "")) if c.status == "SUCCESS" else None,
+                    outputs=c.decisions_count if c.status == "SUCCESS" else None,
                     error=c.error,
                 )
                 for c in children[r.run_id]
@@ -857,8 +832,9 @@ class AgentConsoleService:
                     reason=r.reason,
                     stop_reason=r.stop_reason,
                     stages=stages,
-                    escalations=escal.get(r.run_id, 0),
+                    escalations=_escalations(r),
                     has_partial=r.status == "PARTIAL" or any(s.status == "FAILED" for s in stages),
+                    is_demo=r.is_demo,
                 )
             )
         nxt = encode_keyset(page[-1].started_at, page[-1].run_id) if len(roots) > page_size else None
@@ -888,21 +864,17 @@ class AgentConsoleService:
         for c in children:  # a retry is a later child of the same agent: the last attempt wins
             if c.agent_key:
                 by_key[c.agent_key] = c
-        tool_counts = dict(
-            (
-                await session.execute(
-                    select(ToolCall.run_id, func.count())
-                    .where(ToolCall.run_id.in_([c.run_id for c in children] or [root.run_id]))
-                    .group_by(ToolCall.run_id)
-                )
-            ).all()
-        )
         pending = await session.scalar(
             select(func.count())
             .select_from(AgentDecision)
             .where(AgentDecision.run_id == root.run_id, AgentDecision.outcome == "PENDING")
         )
         in_progress = root.status == "RUNNING"
+        reused = {
+            u.get("agent_key")
+            for u in (root.input_ref or {}).get("upstream", [])
+            if isinstance(u, dict) and u.get("action") == "REUSE"
+        }
         nodes = []
         for nid, label, ntype, key, col, row in GRAPH_NODES:
             child = by_key.get(key) if key else None
@@ -912,6 +884,8 @@ class AgentConsoleService:
                 )
                 if child is None and in_progress:
                     status = "NOT_RUN"
+                if child is None and key in reused:
+                    status = "DONE"  # a manual run reused this agent's outputs from the nightly run (D-51)
             elif ntype == "GATE":
                 status = "NOT_RUN" if root.mode == "DRY_RUN" else "WAITING" if pending else "DONE"
             elif ntype == "TOOL":
@@ -924,9 +898,11 @@ class AgentConsoleService:
                 retries = (
                     f" · {child.retries} retr{'y' if child.retries == 1 else 'ies'}" if child.retries else ""
                 )
-                detail = f"{(_duration_ms(child) or 0) / 1000:.1f} s · {tool_counts.get(child.run_id, 0)} tool calls{retries}"
+                detail = f"{(child.duration_ms or _duration_ms(child) or 0) / 1000:.1f} s · {child.tool_calls_count or 0} tool calls{retries}"
                 if child.error:
                     detail += f" · {child.error[:120]}"
+            elif key in reused:
+                detail = "Outputs reused from the latest nightly run"
             elif key == "ask_retailpilot":
                 detail = "On demand (questions)"
             elif ntype == "GATE":

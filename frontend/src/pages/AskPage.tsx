@@ -106,7 +106,7 @@ export function AskPage() {
               maxLength={500}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="e.g. Why are we ordering butter?"
-              className="h-10 flex-1 rounded-input border border-border px-3 text-sm"
+              className="h-10 min-w-0 flex-1 rounded-input border border-border px-3 text-sm"
             />
             <Button type="submit" icon={<Send size={15} />} disabled={question.trim().length < 3 || ask.isPending}>
               {ask.isPending ? "Thinking…" : "Ask"}

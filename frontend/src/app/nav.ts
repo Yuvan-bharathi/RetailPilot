@@ -98,6 +98,7 @@ export function titleFor(role: Role, path: string): string | null {
   const item = navItemFor(path);
   const label = item?.label[role];
   if (!item || !label) return null;
+  if (item.path === "/agents" && path !== "/agents") return "Agents · Agent detail";
   return item.group ? item.group + " · " + label : label;
 }
 

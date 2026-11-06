@@ -260,7 +260,7 @@ class ToolLoopAgent[T: BaseModel]:
                 if nudged:
                     return done("no_submit", "The model answered without calling the submit tool")
                 nudged = True
-                messages.append({"role": "assistant", "content": turn.content or ""})
+                messages.append({"role": "assistant", "content": turn.content or "", "_raw": turn.raw})
                 messages.append(
                     {
                         "role": "user",
@@ -272,6 +272,7 @@ class ToolLoopAgent[T: BaseModel]:
                 {
                     "role": "assistant",
                     "content": turn.content or "",
+                    "_raw": turn.raw,  # provider-native content, echoed back unchanged (preserved thinking)
                     "tool_calls": [
                         {
                             "id": c.id,

@@ -7,6 +7,7 @@ run without a decision yet belongs to the stage that just finished (stages run i
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
@@ -253,3 +254,24 @@ async def update_outcome(
             .where(AgentDraft.source_rec_id.in_(list(rec_ids)), AgentDraft.status == DraftStatus.DRAFT.value)
             .values(status=draft_status)
         )
+
+
+def mark_inputs_missing(session: Session, run_id: UUID, missing: list[str]) -> int:
+    """Stock balancing ran without some optional inputs (e.g. Related Products off): say so in the evidence of
+    each of its recommendations of this run (`inputs_missing`, D-54) and in the logged decision evidence."""
+    from sqlalchemy import text as sql
+
+    payload = json.dumps({"inputs_missing": sorted(missing)})
+    recs = (
+        "SELECT rec_id FROM agent_decision WHERE run_id = :run AND agent_key = 'stock_balancing' "
+        "AND rec_id IS NOT NULL"
+    )
+    n = session.execute(
+        sql(f"UPDATE recommendation SET evidence = evidence || CAST(:p AS jsonb) WHERE rec_id IN ({recs})"),
+        {"p": payload, "run": run_id},
+    )
+    session.execute(
+        sql(f"UPDATE decision_evidence SET data = data || CAST(:p AS jsonb) WHERE rec_id IN ({recs})"),
+        {"p": payload, "run": run_id},
+    )
+    return int(getattr(n, "rowcount", 0) or 0)

@@ -69,7 +69,7 @@ export const TRIGGER_TYPES: TriggerType[] = ["NIGHTLY", "MANUAL_DRY_RUN", "MANUA
 
 export function decisionLabel(type: string): string {
   const t = type.replaceAll("_", " ").toLowerCase();
-  return t.charAt(0).toUpperCase() + t.slice(1);
+  return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/\bpo\b/g, "PO").replace(/\bllm\b/g, "LLM");
 }
 
 export function formatMs(ms: number | null | undefined): string {

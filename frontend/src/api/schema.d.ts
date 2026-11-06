@@ -655,6 +655,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agent Status
+         * @description For every signed-in user: the banners the agent switches cause (expiry checks off, replenishment paused).
+         */
+        get: operations["agent_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents": {
         parameters: {
             query?: never;
@@ -1018,6 +1038,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Is Demo
+             * @default false
+             */
+            is_demo: boolean;
         };
         /** AgentDetailDTO */
         AgentDetailDTO: {
@@ -1144,6 +1169,12 @@ export interface components {
             triggered_by: string | null;
             /** Reason */
             reason: string | null;
+            /**
+             * Is Demo
+             * @description Seeded demo activity (scripts.seed_agents --demo)
+             * @default false
+             */
+            is_demo: boolean;
         };
         /** AgentRunTraceDTO */
         AgentRunTraceDTO: {
@@ -1181,6 +1212,26 @@ export interface components {
             latency_p95_ms: number | null;
             /** Decisions By Type */
             decisions_by_type: components["schemas"]["DecisionStatDTO"][];
+        };
+        /**
+         * AgentStatusDTO
+         * @description What every signed-in user may know about the agents (banners), D-54.
+         */
+        AgentStatusDTO: {
+            /**
+             * Expiry Checks On
+             * @description Freshness agent on — else the inventory shows 'Expiry checks off'
+             */
+            expiry_checks_on: boolean;
+            /** Reviewer On */
+            reviewer_on: boolean;
+            /** Ask Enabled */
+            ask_enabled: boolean;
+            /**
+             * Replenishment Paused
+             * @description 'Replenishment paused by <user>: <reason>' or null
+             */
+            replenishment_paused: string | null;
         };
         /** AgentSummaryDTO */
         AgentSummaryDTO: {
@@ -1242,7 +1293,7 @@ export interface components {
             est_cost_7d_usd: string;
             /**
              * Recommendations 7D
-             * @description Decisions linked to a recommendation in the last 7 days
+             * @description Live decisions of the last 7 days (recommendations, POs, flags, answers…)
              */
             recommendations_7d: number;
             /**
@@ -1506,6 +1557,11 @@ export interface components {
              * @enum {string}
              */
             kind: "CO_REPLENISH";
+            /**
+             * Inputs Missing
+             * @description Optional upstream agents that were off for this run, e.g. related_product (D-54)
+             */
+            inputs_missing?: string[];
             linked_product: components["schemas"]["ProductRef"];
             /** Support */
             support: number;
@@ -2090,6 +2146,11 @@ export interface components {
              */
             kind: "NEEDS_REVIEW";
             /**
+             * Inputs Missing
+             * @description Optional upstream agents that were off for this run, e.g. related_product (D-54)
+             */
+            inputs_missing?: string[];
+            /**
              * Reason
              * @enum {string}
              */
@@ -2287,6 +2348,11 @@ export interface components {
             escalations: number;
             /** Has Partial */
             has_partial: boolean;
+            /**
+             * Is Demo
+             * @default false
+             */
+            is_demo: boolean;
         };
         /** PipelineStageDTO */
         PipelineStageDTO: {
@@ -2484,6 +2550,11 @@ export interface components {
              * @enum {string}
              */
             kind: "REORDER";
+            /**
+             * Inputs Missing
+             * @description Optional upstream agents that were off for this run, e.g. related_product (D-54)
+             */
+            inputs_missing?: string[];
             /**
              * Reason
              * @enum {string}
@@ -2729,6 +2800,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Is Demo
+             * @default false
+             */
+            is_demo: boolean;
         };
         /** ToggleLLMRequest */
         ToggleLLMRequest: {
@@ -2798,6 +2874,11 @@ export interface components {
              * @enum {string}
              */
             kind: "TRANSFER";
+            /**
+             * Inputs Missing
+             * @description Optional upstream agents that were off for this run, e.g. related_product (D-54)
+             */
+            inputs_missing?: string[];
             /** Destination Shortage */
             destination_shortage: number;
             donor: components["schemas"]["Counterpart"] | null;
@@ -5566,6 +5647,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BusinessRuleDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    agent_status: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentStatusDTO"];
                 };
             };
             /** @description Unauthorized */

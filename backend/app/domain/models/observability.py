@@ -61,6 +61,15 @@ class AgentRun(Timestamps, Base):
     stop_reason: Mapped[str | None] = mapped_column(Text)
     retries: Mapped[int] = mapped_column(server_default="0")
     cancel_requested: Mapped[bool] = mapped_column(server_default=text("false"))
+    #: seeded demo activity (scripts.seed_agents --demo), labelled "Demo data" in the console (D-54)
+    is_demo: Mapped[bool] = mapped_column(server_default=text("false"))
+    # stats stored once when the run finishes (D-54) — the console never re-aggregates tool calls / LLM usage
+    duration_ms: Mapped[int | None]
+    tool_calls_count: Mapped[int | None]
+    llm_calls_count: Mapped[int | None]
+    tokens: Mapped[int | None]
+    est_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(14, 6))
+    decisions_count: Mapped[int | None]
 
     tool_calls: Mapped[list["ToolCall"]] = rel(back_populates="run")
 

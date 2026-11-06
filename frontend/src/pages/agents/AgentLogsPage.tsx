@@ -12,7 +12,15 @@ import { DataTable, type Column } from "../../components/DataTable";
 import { ConfirmDialog } from "../../components/Modal";
 import { ErrorState, SkeletonLine } from "../../components/StateViews";
 import { StatusBadge } from "../../components/StatusBadge";
-import { AgentLink, ConsoleTabs, Panel, RunStatusBadge, Select, When } from "../../components/agents/agentUi";
+import {
+  DemoBadge,
+  AgentLink,
+  ConsoleTabs,
+  Panel,
+  RunStatusBadge,
+  Select,
+  When,
+} from "../../components/agents/agentUi";
 import { formatMs, formatUsd, RUN_STATUS, RUN_STATUSES, TRIGGER_LABEL, TRIGGER_TYPES } from "../../lib/agentFormat";
 import { formatNumber } from "../../lib/format";
 import { useCursorPaging } from "../../lib/useCursorPaging";
@@ -60,7 +68,7 @@ export function AgentLogsPage() {
       header: "Trigger",
       cell: (r) => (
         <span>
-          {TRIGGER_LABEL[r.trigger_type]}
+          {TRIGGER_LABEL[r.trigger_type]} <DemoBadge show={r.is_demo} />
           {r.triggered_by ? <span className="block text-xs text-ink-secondary">by {r.triggered_by}</span> : null}
         </span>
       ),
@@ -251,6 +259,7 @@ export function AgentRunTracePage() {
             {r.agent_key ? <AgentLink agentKey={r.agent_key} name={r.agent_name} /> : "Nightly pipeline"}
             <RunStatusBadge status={r.status} />
             {r.mode === "DRY_RUN" ? <StatusBadge tone="info" label="Dry run — preview only" /> : null}
+            <DemoBadge show={r.is_demo} />
           </h2>
           <p className="font-mono text-xs text-ink-secondary">{r.run_id}</p>
           <dl className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-sm">
@@ -368,7 +377,7 @@ export function AgentRunTracePage() {
               <ul className="space-y-0.5 text-xs">
                 {Object.entries(t.config_snapshot).map(([k, v]) => (
                   <li key={k} className="flex justify-between gap-2">
-                    <span className="font-mono">{k}</span>
+                    <span className="font-mono">{k === "__llm__" ? "All LLM agents" : k}</span>
                     <span>{v === true ? "on" : v === false ? "off" : JSON.stringify(v)}</span>
                   </li>
                 ))}
