@@ -7,6 +7,7 @@ import type { Priority, RecommendationDTO, RecStatus, RecType } from "../api/typ
 import { useAuth } from "../app/AuthContext";
 import { useShell } from "../app/ShellContext";
 import { DataTable, type Column, type TableQuery } from "../components/DataTable";
+import { ReviewBadge } from "../components/ReviewBadge";
 import { StatusBadge, StatusPill } from "../components/StatusBadge";
 import { formatINR, formatNumber } from "../lib/format";
 import { REC_TYPE_LABEL } from "../lib/labels";
@@ -61,6 +62,7 @@ function columns(showStore: boolean): Column<RecommendationDTO>[] {
         ),
     },
     { id: "status", header: "Status", sortable: true, cell: (r) => <StatusPill status={r.status} /> },
+    { id: "review", header: "Review", cell: (r) => <ReviewBadge status={r.review_status} /> },
   ];
   return all.filter((c): c is Column<RecommendationDTO> => c !== null);
 }

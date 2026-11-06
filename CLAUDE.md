@@ -33,7 +33,9 @@ If code and docs disagree, follow the docs and tell me. Never silently change a 
 backend/app/
   api/routers/      FastAPI routers (thin: auth, validation, call service)
   services/         business workflows (approval, transfer, dashboard, store inventory, ingestion, ledger)
-  agents/           6 agents + orchestrator (modules, implement BaseAgent.run(ctx))
+  agents/           6 agents + orchestrator (modules, implement BaseAgent.run(ctx)); registry.py (all agents, D-50)
+    llm/            Objective III LLM agents: framework (tool loop), tools (scoped; read + draft only), prompts/,
+                    agents.py (5 patterns + baselines), mcp_server.py (retailpilot-tools)
   tools/            deterministic, pure functions (requirement, cost model, transfer engine, PO builder,
                     forecast, basket, lost sales) — 100% unit-tested, no DB access
   domain/
@@ -109,6 +111,10 @@ infra/docker-compose.yml
   existing files are reformatted in a separate commit when approved)
 - Mock data (frontend): `cd backend && uv run python -m scripts.export_mock_fixtures` regenerates
   `frontend/src/mocks/data/fixtures.json` from the synthetic data with the real tools (a test fails if it is stale)
+- Agents (D-50): `uv run python -m scripts.seed_agents [--demo]` (registry, policies, eval results; seed_demo runs it) ·
+  evaluation: `uv run python -m scripts.run_agent_evals` (scripted replays → docs/notes/agent-eval-report.md;
+  `--live` uses Groq, manual) · MCP server: `uv run python -m app.agents.llm.mcp_server --user admin [--allow-drafts]`.
+  Tests force `LLM_PROVIDER=template` (tests/conftest.py) — never a live model in tests.
 - API contract: after changing a DTO/route run `cd backend && uv run python -m scripts.export_openapi ../frontend/openapi.json`
   then `cd ../frontend && npm run gen:api` — both sides are checked (test_contract.py, check:api)
 

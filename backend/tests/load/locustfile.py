@@ -92,7 +92,7 @@ class RetailPilotUser(HttpUser):
     @task(2)
     def test_uncached_agent_runs(self) -> None:
         """Agent runs observability telemetry list."""
-        with self.client.get("/api/v1/agent-runs?limit=50", catch_response=True) as resp:
+        with self.client.get("/api/v1/agent-runs?page_size=50", catch_response=True) as resp:
             if resp.status_code == 200:
                 if resp.elapsed.total_seconds() > 0.500:
                     resp.failure(f"Telemetry SLA exceeded: {resp.elapsed.total_seconds():.3f}s > 0.500s")

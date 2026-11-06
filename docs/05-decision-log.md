@@ -668,3 +668,64 @@ so it can be repeated. `@playwright/test` 1.64.1 is pinned (dev dependency). The
 and Vite (:5177) and never reuses an existing server: during setup another project's dev server was answering on
 :5173 (IPv6) and the tests silently talked to it. The Vite proxy target is configurable (`RETAILPILOT_API`).
 The earlier "E2E" vitest file only checked that headings render; it remains as a smoke test.
+
+---
+
+## D-50 Agent console and the Objective III agent layer (2026-11-06)
+**Decision.** docs/08 (agent engineering brief) and docs/09 (agent console) are implemented.
+- **Which agents.** The registry (`app/agents/registry.py`) holds 11 agents: the six deterministic pipeline stages
+  and exactly one LLM agent per Objective III pattern — Ask RetailPilot (retrieval), Data Quality (validation),
+  Replenishment Action (action, drafts only), Run Coordinator (coordinator), Recommendation Reviewer (reviewer).
+  All five are needed because the brief evaluates each pattern; no other agents were added. The Managed Agents and
+  Vertex AI items are documented, not prototyped (no approval / GCP project).
+- **LLM and tools.** Groq tool calling (D-44, no new dependency); the final answer is a `submit_*` function call
+  validated by Pydantic (invalid → one retry → fail safe). Tools do all calculation; there is no tool that approves,
+  submits, dispatches, receives, changes rules or stock. Tools enforce store scoping from the caller.
+  Every LLM agent has a deterministic baseline used when no model is available and for the comparison.
+- **MCP.** `retailpilot-tools` (`app/agents/llm/mcp_server.py`) is a stdio JSON-RPC MCP server written without the
+  SDK (no new dependency), run as a user (scoping); draft tools only with `--allow-drafts`.
+- **Retrieval.** PostgreSQL full-text search over `policy_document` (data/policies, synthetic SOPs restating the
+  frozen rules, no new rule) and recommendations; pgvector not added (FTS sufficient for this corpus).
+- **Schema (migration 0004).** agent_definition, agent_config (append-only, global `config_version`, NULL key =
+  global LLM switch), agent_decision, agent_preview_output, agent_draft, recommendation_review, policy_document,
+  agent_eval_result; agent_run gains agent_key, trigger_type, mode, config_version, config_snapshot, triggered_by,
+  reason, stop_reason, retries, cancel_requested; statuses SKIPPED_DISABLED / SKIPPED_DEPENDENCY / PAUSED / CANCELLED;
+  llm_usage.latency_ms. Old child runs get their agent_key backfilled.
+- **Orchestrator.** Config snapshot at run start (toggles apply from the next run). Stage order: Data Quality,
+  the six stages, Reviewer; then the Run Coordinator on exceptions (clean run → no LLM call). Disabled →
+  SKIPPED_DISABLED; required upstream not run → SKIPPED_DEPENDENCY; a critical agent off → run PAUSED (no
+  supersession, no new items, only Data Quality and Sales Analytics run). Cancel is honoured between stages.
+  Callers that need live progress (Celery, scripts, manual live runs) commit after each stage (`commit_per_stage`);
+  finished stages were already committed on failure (D-47), so semantics do not change.
+  The coordinator's actions are allow-listed in code: never retry a critical agent, one retry per stage, ≤ 3 actions.
+- **Decisions.** Every recommendation / transfer / PO-need / PO created by a stage writes an `agent_decision`
+  (attributed by stage order); the recommendation action, transfer accept/reject and PO approval update the
+  outcome; supersession sets SUPERSEDED.
+- **Reviewer label.** RecommendationDTO.review_status (REVIEWED / FLAGGED / NOT_REVIEWED) and detail review_issues.
+- **Global LLM switch off** → LLM stages skipped and explanations use templates.
+**Changed.** Spec §5; new routers agents.py, assistant.py; the old `/agent-runs` list (non-paged) is replaced by
+the cursor-paged one; the System monitoring page is replaced by the Agents section (/monitoring redirects).
+
+## D-51 Manual "Run now" semantics (2026-11-06)
+**Decision.** Agent outputs are keyed by the run that produced them, so a manual trigger gets its own root run
+(`agent_name = manual:<key>`). Upstream: data-only outputs (forecasts, lost sales + KPIs, basket rules) of the
+latest nightly run are COPIED when that run is for the current planning day; otherwise the upstream agent is
+re-run; stock balancing is always re-run (needs and recommendations are never copied). LLM agents read the
+latest nightly outputs in place. DRY_RUN: the whole run executes in a SAVEPOINT; outputs are copied to
+`agent_preview_output` and the savepoint is rolled back (run logs re-inserted; decisions kept as DRY_RUN without
+links). LIVE: reason + confirmation; pending outputs of the re-run agents are superseded first; downstream pipeline
+dependants re-run; views refreshed; cache invalidated. Blocked when disabled, while any root run is RUNNING, or
+after 3 live triggers per agent per hour. A dry run after the nightly may show fewer reorders than the nightly:
+the nightly's PENDING_L1 lines already count as incoming (D-14). Manual Run Coordinator runs only plan (decisions
+marked "planned"); executing recovery happens inside the nightly run.
+
+## D-52 Agent console UI choices (2026-11-06)
+**Decision.** Visual flow is a hand-built SVG + positioned buttons with fixed positions (React Flow not added — it
+needs approval as a dependency, docs/09 §6). "Ask RetailPilot" gets its own page for both roles (the agent answers
+supervisors too, scoped). The nightly trigger button moved from the removed System monitoring page to
+Agents → Pipeline. Known gaps: no "Expiry checks off" banner on the inventory screen (supervisors cannot read the
+admin-only config; needs a small public status field); "Related products off" is stated in the run log
+(`input_missing`, WARN), not inside each recommendation's evidence (would change the frozen evidence DTOs);
+agent stats are computed per request (no per-run stats cache yet).
+**Evaluation.** `backend/tests/agent_evals` (53 cases, scripted replays, no live model) and
+`scripts.run_agent_evals` → docs/notes/agent-eval-report.md; the live run and human labels are still to do.

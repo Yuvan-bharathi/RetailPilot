@@ -17,6 +17,7 @@ from app.domain.models.transfers import Approval, TransferOrder
 from app.domain.models.users import AppUser
 from app.domain.schemas.common import Page, ProductRef, StoreRef
 from app.domain.schemas.dtos import TransferOrderDTO
+from app.services.agent_decision_service import update_outcome
 from app.services.cache_service import CacheService
 
 
@@ -114,6 +115,7 @@ class TransferService:
         # Apply soft reservation: receiver incoming += qty, donor reserved += qty
         await self._adjust_commitment(session, t.to_store_id, t.product_id, incoming_delta=t.qty)
         await self._adjust_commitment(session, t.from_store_id, t.product_id, reserved_delta=t.qty)
+        await update_outcome(session, action="ACCEPT", user_id=user.user_id, transfer_ids=[t.transfer_id])
 
         await session.commit()
         self.cache_service.invalidate_store_keys(
@@ -195,6 +197,9 @@ class TransferService:
             decided_at=now,
         )
         session.add(appr)
+        await update_outcome(
+            session, action="REJECT", user_id=user.user_id, reason=reason, transfer_ids=[t.transfer_id]
+        )
 
         await session.commit()
         self.cache_service.invalidate_store_keys(

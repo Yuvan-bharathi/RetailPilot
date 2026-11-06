@@ -44,3 +44,20 @@ def decode_movement_cursor(token: str) -> MovementCursor:
     if occurred_at.tzinfo is None:
         raise ValidationError("Invalid cursor", details=[_MALFORMED])
     return MovementCursor(occurred_at=occurred_at, movement_id=movement_id)
+
+
+@dataclass(frozen=True, slots=True)
+class KeysetCursor:
+    """Generic newest-first keyset cursor `(created/started at, id)` — agent runs, decisions, pipeline (D-50)."""
+
+    at: datetime
+    row_id: UUID
+
+
+def encode_keyset(at: datetime, row_id: UUID) -> str:
+    return encode_movement_cursor(MovementCursor(occurred_at=at, movement_id=row_id))
+
+
+def decode_keyset(token: str) -> KeysetCursor:
+    c = decode_movement_cursor(token)
+    return KeysetCursor(at=c.occurred_at, row_id=c.movement_id)

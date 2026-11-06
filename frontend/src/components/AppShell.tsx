@@ -5,7 +5,7 @@ import { NavLink, useLocation } from "react-router";
 import { useLatestRun, useNotifications, useStores } from "../api/hooks";
 import type { MeDTO, Period } from "../api/types";
 import { useApi } from "../app/ApiContext";
-import { navFor } from "../app/nav";
+import { navFor, titleFor } from "../app/nav";
 import { useShell } from "../app/ShellContext";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { formatDateTimeIST } from "../lib/format";
@@ -42,11 +42,20 @@ function Sidebar({ user, collapsed, onToggle }: { user: MeDTO; collapsed: boolea
       </div>
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-2">
         <ul className="space-y-1">
-          {items.map((item) => (
+          {items.map((item, i) => (
             <li key={item.path}>
+              {item.group && items[i - 1]?.group !== item.group ? (
+                collapsed ? (
+                  <hr className="my-2 border-divider" />
+                ) : (
+                  <p className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-secondary">
+                    {item.group}
+                  </p>
+                )
+              ) : null}
               <NavLink
                 to={item.path}
-                end={item.path === "/"}
+                end={item.path === "/" || item.path === "/agents"}
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
                   `flex h-10 items-center gap-3 rounded-button px-3 text-sm font-medium transition-colors ${
@@ -233,10 +242,10 @@ export function AppShell({ user, onSignOut, children }: { user: MeDTO; onSignOut
   const [override, setOverride] = useState<boolean | null>(null);
   const collapsed = override ?? narrow;
   const location = useLocation();
-  const current = navFor(user.role).find((i) =>
-    i.path === "/" ? location.pathname === "/" : location.pathname.startsWith(i.path),
-  );
-  const title = location.pathname === "/components" ? "Design system" : (current?.label ?? "RetailPilot AI");
+  const title =
+    location.pathname === "/components"
+      ? "Design system"
+      : (titleFor(user.role, location.pathname) ?? "RetailPilot AI");
 
   return (
     <div className="flex min-h-screen bg-app">

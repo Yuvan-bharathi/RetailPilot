@@ -16,6 +16,7 @@ from uuid import UUID
 from sqlalchemy import select, update
 
 from app.agents.base import AgentResult, BaseAgent, RunContext
+from app.core.config import get_settings
 from app.domain.models.enums import ApprovalLevelRequired, LineStatus, POStatus, Priority, RecStatus
 from app.domain.models.master import StoreProduct, Supplier, SupplierStoreTerms
 from app.domain.models.observability import DecisionEvidence
@@ -207,7 +208,12 @@ class PurchaseOrderAgent(BaseAgent):
             purchasing_repo.insert_purchase_orders(pos_to_insert)
 
         # 7. Natural-language explanations via ExplanationService
-        explanation_service = ExplanationService(ctx.session)
+        # global "All LLM agents" switch off (D-50) → explanations use the deterministic templates
+        llm_off = ctx.extra.get("llm_enabled") is False
+        explanation_service = ExplanationService(
+            ctx.session,
+            settings=get_settings().model_copy(update={"llm_provider": "template"}) if llm_off else None,
+        )
         items_to_explain: list[tuple[str, UUID, ExplanationInput]] = []
 
         all_recs = planning_repo.get_recs_by_run(ctx.run_id)

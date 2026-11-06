@@ -3,7 +3,9 @@
 from fastapi import APIRouter
 
 from app.api.routers import (
+    agents,
     approvals,
+    assistant,
     auth,
     business_rules,
     dashboard,
@@ -30,3 +32,5 @@ api_router.include_router(transfers.router)
 api_router.include_router(inventory.router)
 api_router.include_router(notifications.router)
 api_router.include_router(business_rules.router)
+api_router.include_router(agents.router)
+api_router.include_router(assistant.router)

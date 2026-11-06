@@ -187,7 +187,12 @@ business meaning, never alphabetically.
 | GET /transfers?store_id&status&product_id · GET /transfers/{id} | TransferService queries | – |
 | POST /transfers/{id}/accept · /approve-release · /reject · /dispatch · /receive | TransferService | SD-12 |
 | GET /notifications?unread · POST /notifications/{id}/read | NotificationService | SD-14 |
-| GET /agent-runs · GET /agent-runs/{run_id} | ObservabilityService | – |
+| GET /agents · GET /agents/{key} · PATCH /agents/{key} (enabled + reason; critical off needs `confirm_critical`) · PATCH /agents/llm (global LLM switch) · GET /agents/{key}/stats · GET /agents/{key}/trigger-preview?mode | AgentConsoleService / AgentConfigService — registry, versioned audited config (Super Admin, D-50) | docs/09 |
+| POST /agents/{key}/runs (mode DRY_RUN \| LIVE, reason, confirm → 202) · POST /agent-runs/{run_id}/cancel | AgentTriggerService / ManualRunner (background) | docs/09 §3.6 |
+| GET /agent-runs?cursor&agent_key&status&trigger_type&date_from&date_to&roots_only · GET /agent-runs/{run_id} (trace) | AgentConsoleService — keyset paging (Super Admin) | docs/09 §3.5 |
+| GET /agent-decisions?cursor&agent_key&decision_type&outcome&store_id&mode&run_id&q · GET /agent-decisions/stats | AgentConsoleService (Super Admin) | docs/09 §3.7 |
+| GET /pipeline/runs?cursor&trigger_type&status · GET /pipeline/runs/{run_id \| latest}/graph | AgentConsoleService (Super Admin) | docs/09 §3.3–3.4 |
+| GET /assistant/status · POST /assistant/ask | AssistantService — Ask RetailPilot, any signed-in user, store-scoped; 409 when disabled (D-50) | docs/08 |
 | POST /admin/runs (trigger nightly run manually, Super Admin) | nightly_run_task.delay | SD-01 |
 | GET /admin/business-rules · PUT /admin/business-rules/{key} | BusinessRuleService — typed, range-checked registry of the editable global rules; dotted keys inside basket / co_replenish (Super Admin, D-48) | – |
 | GET /analytics?store_id&period | AnalyticsService — ABC-XYZ counts, category revenue / margin, forecast method mix, top lost sales (D-48) | – |
@@ -395,7 +400,8 @@ Placeholder defaults to confirm with the business: `holding_cost_rate_per_day = 
   batch, inventory_daily_snapshot, forecast, association_rule, recommendation, replenishment_need, kpi_snapshot,
   lost_sales_estimate, app_user, purchase_order, po_line, goods_receipt, goods_receipt_line, transfer_order,
   transfer_route, approval, business_rule, notification, agent_run, tool_call, decision_evidence, llm_usage,
-  store_layout(ext), shelf_location(ext).
+  store_layout(ext), shelf_location(ext), agent_definition, agent_config, agent_decision, agent_preview_output,
+  agent_draft, recommendation_review, policy_document, agent_eval_result.
 
 ## 11. Performance requirements
 Decisions D-36 … D-42. Budgets are verified, not assumed: each item names where it is measured.

@@ -60,7 +60,7 @@ def test_upgrade_head_and_downgrade_base_on_a_clean_database(scratch_db: Engine)
 
     command.upgrade(config, "head")
     with scratch_db.connect() as conn:
-        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0003"
+        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0004"
         after_upgrade = _relations(conn)
         assert set(Base.metadata.tables) | set(MATERIALIZED_VIEWS) <= after_upgrade
         assert conn.execute(text("SELECT count(*) FROM business_rule")).scalar() == 16

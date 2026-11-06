@@ -7,6 +7,7 @@ import { ApiError } from "../api/client";
 import { useRecommendation } from "../api/hooks";
 import { EvidenceView } from "../components/EvidencePanel";
 import { ErrorState } from "../components/StateViews";
+import { ReviewBadge } from "../components/ReviewBadge";
 import { StatusBadge, StatusPill } from "../components/StatusBadge";
 import { formatDateTimeIST, formatINR, formatNumber } from "../lib/format";
 import { categoryLabel, REC_TYPE_LABEL } from "../lib/labels";
@@ -86,10 +87,21 @@ export function RecommendationDetailPage() {
             <div className="flex flex-wrap gap-2">
               {rec.priority === "HIGH" ? <StatusBadge tone="attention" label="High priority" /> : null}
               <StatusPill status={rec.status} />
+              <ReviewBadge status={rec.review_status} />
             </div>
           </div>
 
           {rec.explanation ? <p className="text-sm text-ink">{rec.explanation}</p> : null}
+          {detail.data.review_issues?.length ? (
+            <div role="note" className="rounded-input bg-warning-bg px-3 py-2 text-sm text-warning">
+              <p className="font-medium">The Recommendation Reviewer flagged this item:</p>
+              <ul className="list-disc pl-5">
+                {detail.data.review_issues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {/* design doc §6: transfer quantity and PO remainder shown separately */}
           <div className="grid gap-3 sm:grid-cols-3">

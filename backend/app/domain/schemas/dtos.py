@@ -106,6 +106,10 @@ class RecommendationDTO(DTO):
         None, description="Other store of a transfer (donor or destination): name + quantity only"
     )
     created_at: datetime
+    review_status: Literal["REVIEWED", "FLAGGED", "NOT_REVIEWED"] = Field(
+        "NOT_REVIEWED",
+        description="Recommendation Reviewer verdict (D-50); NOT_REVIEWED when the reviewer is off",
+    )
 
 
 class BatchRiskRef(DTO):
@@ -235,6 +239,7 @@ Evidence = Annotated[
 class RecommendationDetailDTO(DTO):
     recommendation: RecommendationDTO
     evidence: Evidence | None
+    review_issues: list[str] = Field(default_factory=list, description="Reviewer flags (D-50)")
 
 
 # --- store inventory (SD-15) ----------------------------------------------------------------------------------------

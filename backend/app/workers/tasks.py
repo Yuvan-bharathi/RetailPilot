@@ -30,7 +30,7 @@ def nightly_run_task(run_date_str: str | None = None) -> dict[str, Any]:
         run_date = (
             datetime.strptime(run_date_str, "%Y-%m-%d").date() if run_date_str else next_run_date(session)
         )
-        orchestrator = WorkflowOrchestrator(session)
+        orchestrator = WorkflowOrchestrator(session, commit_per_stage=True)  # console sees progress (D-50)
         summary = orchestrator.run_nightly(run_date=run_date)
         session.commit()  # the run's outputs AND a FAILED status must persist (was never committed)
         return {

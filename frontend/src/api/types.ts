@@ -63,9 +63,42 @@ export type GoodsReceiptRequest = Schemas["GoodsReceiptRequest"];
 export type ResolvePORequest = Schemas["ResolvePORequest"];
 export type CloseShortRequest = Schemas["CloseShortRequest"];
 export type RecActionRequest = Schemas["RecActionRequest"];
-export type AgentRunDetailDTO = Schemas["AgentRunDetailDTO"];
 export type TriggerRunRequest = Schemas["TriggerRunRequest"];
 export type NotificationDTO = Schemas["NotificationDTO"];
+
+// --- agent console (docs/09, D-50) ---
+export type AgentSummaryDTO = Schemas["AgentSummaryDTO"];
+export type AgentListDTO = Schemas["AgentListDTO"];
+export type AgentDetailDTO = Schemas["AgentDetailDTO"];
+export type AgentKind = AgentSummaryDTO["kind"];
+export type AgentPattern = AgentSummaryDTO["pattern"];
+export type ToggleEventDTO = Schemas["ToggleEventDTO"];
+export type EvalResultDTO = Schemas["EvalResultDTO"];
+export type ToggleAgentRequest = Schemas["ToggleAgentRequest"];
+export type ToggleLLMRequest = Schemas["ToggleLLMRequest"];
+export type TriggerAgentRequest = Schemas["TriggerAgentRequest"];
+export type TriggerPreviewDTO = Schemas["TriggerPreviewDTO"];
+export type TriggerResultDTO = Schemas["TriggerResultDTO"];
+export type RunMode = NonNullable<TriggerAgentRequest["mode"]>;
+export type AgentRunItemDTO = Schemas["AgentRunItemDTO"];
+export type RunStatus = AgentRunItemDTO["status"];
+export type TriggerType = AgentRunItemDTO["trigger_type"];
+export type AgentRunTraceDTO = Schemas["AgentRunTraceDTO"];
+export type TraceStepDTO = Schemas["TraceStepDTO"];
+export type AgentDecisionDTO = Schemas["AgentDecisionDTO"];
+export type DecisionOutcome = AgentDecisionDTO["outcome"];
+export type DecisionStatDTO = Schemas["DecisionStatDTO"];
+export type PipelineRunDTO = Schemas["PipelineRunDTO"];
+export type PipelineStageDTO = Schemas["PipelineStageDTO"];
+export type RunGraphDTO = Schemas["RunGraphDTO"];
+export type GraphNodeDTO = Schemas["GraphNodeDTO"];
+export type GraphEdgeDTO = Schemas["GraphEdgeDTO"];
+export type AgentStatsDTO = Schemas["AgentStatsDTO"];
+export type AskRequest = Schemas["AskRequest"];
+export type AskAnswerDTO = Schemas["AskAnswerDTO"];
+export type AskStatusDTO = Schemas["AskStatusDTO"];
+export type CitationDTO = Schemas["CitationDTO"];
+export type ReviewStatus = NonNullable<RecommendationDTO["review_status"]>;
 
 /** Page[T] (backend generic) — derived from a generated page type, with the item type swapped in. */
 export type Page<T> = Omit<Schemas["Page_RecommendationDTO_"], "items"> & { items: T[] };
@@ -81,5 +114,8 @@ export type ExpiringQuery = Query<"list_store_expiring">;
 export type TransferQuery = Query<"list_transfers">;
 export type PurchaseOrderQuery = Query<"list_purchase_orders">;
 export type DashboardQuery = Query<"get_dashboard">;
+export type AgentRunQuery = Query<"list_agent_runs">;
+export type DecisionQuery = Query<"list_decisions">;
+export type PipelineQuery = Query<"list_pipeline_runs">;
 /** page, page_size, sort ("field" or "-field"), q — shared by every list endpoint (PageParams). */
 export type PageQuery = Pick<RecommendationQuery, "page" | "page_size" | "sort" | "q">;

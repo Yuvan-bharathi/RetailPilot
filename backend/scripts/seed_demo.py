@@ -6,7 +6,9 @@
 1. Generate the synthetic dataset (fixed seed; the five scenarios of docs/04-demo-scenarios.md are planted).
 2. Bulk-load master data and history (COPY) — app/services/synthetic_loader.py.
 3. Create the PoC users (scripts.seed): admin, sup.a, sup.b, sup.c.
-4. Run the nightly pipeline for the dataset's run date (explanations by the configured LLM, else templates).
+4. Register the agents, load the policy corpus and evaluation results (scripts.seed_agents, D-50).
+5. Run the nightly pipeline for the dataset's run date (explanations by the configured LLM, else templates).
+6. Demo agent-console activity through the real code paths: a toggle history, a dry run, Ask RetailPilot questions.
 """
 
 from __future__ import annotations
@@ -22,13 +24,15 @@ from sqlalchemy.orm import Session
 
 from app.agents.orchestrator import WorkflowOrchestrator
 from app.core.config import get_settings
-from app.core.db import get_sync_engine
+from app.core.db import get_sync_engine, get_sync_session_factory
 from app.services.pos_source import SyntheticPosSource
 from app.services.synthetic_loader import load_synthetic
 from data.synthetic.config import GeneratorConfig
 from data.synthetic.generate import generate
 from data.synthetic.reader import load_dataset
 from scripts.seed import seed, seed_password
+from scripts.seed_agents import demo_activity
+from scripts.seed_agents import main as seed_agents_main
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -67,14 +71,16 @@ def main(argv: list[str] | None = None) -> None:
     users = seed(engine, seed_password(get_settings()))
     print(f"Users: {users.users_created} created (admin, sup.a, sup.b, sup.c)")
 
+    seed_agents_main([])
+
     if args.no_run:
         return
     run_date = date.fromisoformat(manifest["run_date"])
     t0 = time.perf_counter()
     with Session(engine) as session:
-        summary = WorkflowOrchestrator(session, pos_source=SyntheticPosSource(ds)).run_nightly(
-            run_date=run_date
-        )
+        summary = WorkflowOrchestrator(
+            session, pos_source=SyntheticPosSource(ds), commit_per_stage=True
+        ).run_nightly(run_date=run_date)
         session.commit()
     print(
         f"Nightly run {run_date}: {summary.status} in {time.perf_counter() - t0:.1f}s — "
@@ -83,6 +89,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     if summary.error:
         raise SystemExit(f"Run failed: {summary.error}")
+    print(f"Demo agent activity: {demo_activity(get_sync_session_factory())}")
 
 
 if __name__ == "__main__":

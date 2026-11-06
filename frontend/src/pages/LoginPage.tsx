@@ -6,7 +6,9 @@ import { ApiError } from "../api/client";
 import { useAuth } from "../app/AuthContext";
 import { Button } from "../components/Button";
 
-export function LoginPage({ showDemoUsers }: { showDemoUsers: boolean }) {
+// demo-login buttons are always shown since ba0528b; the prop is kept for the route signature
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function LoginPage(_props: { showDemoUsers: boolean }) {
   const { user, signIn } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

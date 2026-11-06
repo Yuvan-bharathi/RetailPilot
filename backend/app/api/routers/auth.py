@@ -21,9 +21,7 @@ router = APIRouter(tags=["auth"])
 async def login(body: LoginRequest, session: DbSession) -> TokenResponse:
     raw_username = body.username.strip()
     clean_username = raw_username.split("@")[0] if "@" in raw_username else raw_username
-    stmt = select(AppUser).where(
-        (AppUser.username == raw_username) | (AppUser.username == clean_username)
-    )
+    stmt = select(AppUser).where((AppUser.username == raw_username) | (AppUser.username == clean_username))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
 

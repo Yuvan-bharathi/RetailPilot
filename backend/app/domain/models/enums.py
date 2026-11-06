@@ -166,6 +166,86 @@ class AgentRunStatus(StrEnum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     PARTIAL = "PARTIAL"
+    # agent console (D-50): a stage not run because its agent is off / an upstream stage did not run
+    SKIPPED_DISABLED = "SKIPPED_DISABLED"
+    SKIPPED_DEPENDENCY = "SKIPPED_DEPENDENCY"
+    PAUSED = "PAUSED"  # a critical agent is off: replenishment paused, previous results kept
+    CANCELLED = "CANCELLED"  # a Super Admin cancelled the run; it stopped after the current step
+
+
+class TriggerType(StrEnum):
+    NIGHTLY = "NIGHTLY"
+    MANUAL_DRY_RUN = "MANUAL_DRY_RUN"
+    MANUAL_LIVE = "MANUAL_LIVE"
+    ON_DEMAND = "ON_DEMAND"  # a user question (Ask RetailPilot) or a coordinator-invoked agent
+
+
+class RunMode(StrEnum):
+    LIVE = "LIVE"
+    DRY_RUN = "DRY_RUN"
+
+
+class AgentGroup(StrEnum):
+    PIPELINE = "PIPELINE"
+    OBJECTIVE_III = "OBJECTIVE_III"
+
+
+class AgentKind(StrEnum):
+    DETERMINISTIC = "DETERMINISTIC"
+    LLM = "LLM"
+
+
+class AgentPattern(StrEnum):
+    PIPELINE_STAGE = "PIPELINE_STAGE"
+    RETRIEVAL = "RETRIEVAL"
+    VALIDATION = "VALIDATION"
+    ACTION = "ACTION"
+    COORDINATOR = "COORDINATOR"
+    REVIEWER = "REVIEWER"
+
+
+class DecisionType(StrEnum):
+    TRANSFER_CHOSEN_OVER_PO = "TRANSFER_CHOSEN_OVER_PO"
+    PO_NEED_CREATED = "PO_NEED_CREATED"
+    PO_DRAFTED = "PO_DRAFTED"
+    CO_REPLENISH_LINKED = "CO_REPLENISH_LINKED"
+    EXPIRY_TRANSFER = "EXPIRY_TRANSFER"
+    EXPIRY_ALERT_RAISED = "EXPIRY_ALERT_RAISED"
+    ASSORTMENT_GAP_FOUND = "ASSORTMENT_GAP_FOUND"
+    SUPERSEDED = "SUPERSEDED"
+    NEEDS_REVIEW_RAISED = "NEEDS_REVIEW_RAISED"
+    DATA_ISSUE_CLASSIFIED = "DATA_ISSUE_CLASSIFIED"
+    DRAFT_CREATED = "DRAFT_CREATED"
+    REVIEWER_FLAGGED = "REVIEWER_FLAGGED"
+    COORDINATOR_RETRY = "COORDINATOR_RETRY"
+    COORDINATOR_ESCALATE = "COORDINATOR_ESCALATE"
+    COORDINATOR_MARK_PARTIAL = "COORDINATOR_MARK_PARTIAL"
+    COORDINATOR_INVOKE = "COORDINATOR_INVOKE"
+    COORDINATOR_NO_ACTION = "COORDINATOR_NO_ACTION"
+    ANSWER_GIVEN = "ANSWER_GIVEN"
+    NOT_FOUND = "NOT_FOUND"
+    REQUEST_REFUSED = "REQUEST_REFUSED"
+
+
+class DecisionOutcome(StrEnum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    EDITED = "EDITED"
+    REJECTED = "REJECTED"
+    SUPERSEDED = "SUPERSEDED"
+    NOT_APPLICABLE = "NOT_APPLICABLE"  # informational decisions (no human action expected)
+
+
+class DraftStatus(StrEnum):
+    DRAFT = "DRAFT"  # created by an agent; a human decides it through the existing workflow
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class ReviewVerdict(StrEnum):
+    PASSED = "PASSED"
+    FLAGGED = "FLAGGED"
 
 
 class ToolCallStatus(StrEnum):

@@ -47,7 +47,7 @@ def main() -> None:
     engine = get_sync_engine()
 
     with Session(engine) as session:
-        orchestrator = WorkflowOrchestrator(session)
+        orchestrator = WorkflowOrchestrator(session, commit_per_stage=True)  # console sees progress (D-50)
         summary = orchestrator.run_nightly(run_date=target_date)
         session.commit()  # persist the run (and a FAILED status) — it was never committed before
 

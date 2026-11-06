@@ -12,7 +12,13 @@ import { DashboardPage } from "../pages/DashboardPage";
 import { GoodsReceiptPage } from "../pages/GoodsReceiptPage";
 import { InventoryPage } from "../pages/InventoryPage";
 import { LoginPage } from "../pages/LoginPage";
-import { MonitoringPage } from "../pages/MonitoringPage";
+import { AskPage } from "../pages/AskPage";
+import { AgentDecisionsPage } from "../pages/agents/AgentDecisionsPage";
+import { AgentDetailPage } from "../pages/agents/AgentDetailPage";
+import { AgentFlowPage } from "../pages/agents/AgentFlowPage";
+import { AgentLogsPage, AgentRunTracePage } from "../pages/agents/AgentLogsPage";
+import { AgentPipelinePage } from "../pages/agents/AgentPipelinePage";
+import { AgentsOverviewPage } from "../pages/agents/AgentsOverviewPage";
 import { PurchaseOrdersPage } from "../pages/PurchaseOrdersPage";
 import { RecommendationDetailPage } from "../pages/RecommendationDetailPage";
 import { RecommendationsPage } from "../pages/RecommendationsPage";
@@ -22,7 +28,7 @@ import { StoresPage } from "../pages/StoresPage";
 import { TransfersPage } from "../pages/TransfersPage";
 import { ApiProvider } from "./ApiContext";
 import { AuthProvider, useAuth } from "./AuthContext";
-import { canAccess, NAV_ITEMS } from "./nav";
+import { canAccess, NAV_ITEMS, navItemFor } from "./nav";
 import { ShellProvider } from "./ShellContext";
 
 interface TokenStore {
@@ -38,11 +44,7 @@ function ProtectedLayout() {
   return (
     <ShellProvider>
       <AppShell user={user} onSignOut={signOut}>
-        {canAccess(user.role, location.pathname) || !NAV_ITEMS.some((i) => i.path === location.pathname) ? (
-          <Outlet />
-        ) : (
-          <ForbiddenPage />
-        )}
+        {canAccess(user.role, location.pathname) || !navItemFor(location.pathname) ? <Outlet /> : <ForbiddenPage />}
       </AppShell>
     </ShellProvider>
   );
@@ -66,7 +68,12 @@ const BUILT_PAGES: Record<string, ReactNode> = {
   "/approvals": <ApprovalsPage />,
   "/goods-receipt": <GoodsReceiptPage />,
   "/analytics": <AnalyticsPage />,
-  "/monitoring": <MonitoringPage />,
+  "/ask": <AskPage />,
+  "/agents": <AgentsOverviewPage />,
+  "/agents/pipeline": <AgentPipelinePage />,
+  "/agents/flow": <AgentFlowPage />,
+  "/agents/logs": <AgentLogsPage />,
+  "/agents/decisions": <AgentDecisionsPage />,
   "/settings": <SettingsPage />,
 };
 
@@ -79,6 +86,10 @@ export function appRoutes(showDemoUsers: boolean): RouteObject[] {
       children: [
         ...NAV_ITEMS.map((item) => ({ path: item.path, element: BUILT_PAGES[item.path] ?? <Placeholder /> })),
         { path: "/recommendations/:recId", element: <RecommendationDetailPage /> },
+        { path: "/agents/logs/:runId", element: <AgentRunTracePage /> },
+        { path: "/agents/:agentKey", element: <AgentDetailPage /> },
+        // "System monitoring" was replaced by the agent console (docs/09)
+        { path: "/monitoring", element: <Navigate to="/agents/logs" replace /> },
         { path: "/components", element: <ComponentsPage /> },
         { path: "*", element: <NotFoundPage /> },
       ],

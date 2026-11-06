@@ -387,6 +387,16 @@ package "Observability" as O {
     +output_summary: str
     +error: str
     +step_count: int
+    +agent_key: str
+    +trigger_type: str
+    +mode: str
+    +config_version: int
+    +config_snapshot: JSONB
+    +triggered_by: UUID <<FK>>
+    +reason: str
+    +stop_reason: str
+    +retries: int
+    +cancel_requested: bool
     +created_at: datetime
     +updated_at: datetime
   }
@@ -419,6 +429,7 @@ package "Observability" as O {
     +input_tokens: int
     +output_tokens: int
     +est_cost: Decimal
+    +latency_ms: int
     +created_at: datetime
     +updated_at: datetime
   }
@@ -460,6 +471,124 @@ package "Extensions" as E {
   }
 }
 
+package "Other" as O {
+  class AgentConfig as "agent_config" {
+    +config_id: UUID <<PK>>
+    +agent_key: str <<FK>>
+    +enabled: bool
+    +previous_enabled: bool
+    +config_version: int
+    +updated_by: UUID <<FK>>
+    +reason: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class AgentDecision as "agent_decision" {
+    +decision_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +agent_key: str <<FK>>
+    +decision_type: str
+    +mode: str
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +rec_id: UUID <<FK>>
+    +transfer_id: UUID <<FK>>
+    +po_id: UUID <<FK>>
+    +draft_id: UUID <<FK>>
+    +summary: str
+    +evidence_ref: JSONB
+    +outcome: str
+    +outcome_reason: str
+    +outcome_by: UUID <<FK>>
+    +outcome_at: datetime
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class AgentDefinition as "agent_definition" {
+    +agent_key: str <<PK>>
+    +name: str
+    +agent_group: str
+    +kind: str
+    +pattern: str
+    +critical: bool
+    +depends_on: JSONB
+    +card_path: str
+    +sort_order: int
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class AgentDraft as "agent_draft" {
+    +draft_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +agent_key: str <<FK>>
+    +draft_type: str
+    +mode: str
+    +store_id: UUID <<FK>>
+    +product_id: UUID <<FK>>
+    +source_rec_id: UUID <<FK>>
+    +qty: int
+    +payload: JSONB
+    +status: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class AgentEvalResult as "agent_eval_result" {
+    +eval_id: UUID <<PK>>
+    +agent_key: str <<FK>>
+    +source: str
+    +variant: str
+    +cases: int
+    +correctness: Decimal
+    +groundedness: Decimal
+    +tool_use: Decimal
+    +failure_handling: Decimal
+    +latency_p50_ms: int
+    +latency_p95_ms: int
+    +tokens: int
+    +est_cost: Decimal
+    +human_agreement: Decimal
+    +details: JSONB
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class AgentPreviewOutput as "agent_preview_output" {
+    +preview_id: UUID <<PK>>
+    +run_id: UUID <<FK>>
+    +agent_key: str
+    +output_type: str
+    +payload: JSONB
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class PolicyDocument as "policy_document" {
+    +section_id: str <<PK>>
+    +doc_name: str
+    +title: str
+    +heading: str
+    +body: str
+    +search_tsv: TSVECTOR
+    +created_at: datetime
+    +updated_at: datetime
+  }
+  class RecommendationReview as "recommendation_review" {
+    +rec_id: UUID <<PK,FK>>
+    +run_id: UUID <<FK>>
+    +verdict: str
+    +issues: JSONB
+    +judged_by: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+AgentDefinition "1" -- "*" AgentConfig
+AgentDefinition "1" -- "*" AgentDecision
+AgentDefinition "1" -- "*" AgentDraft
+AgentDefinition "1" -- "*" AgentEvalResult
+AgentDraft "1" -- "*" AgentDecision
+AgentRun "1" -- "*" AgentDecision
+AgentRun "1" -- "*" AgentDraft
+AgentRun "1" -- "*" AgentPreviewOutput
 AgentRun "1" -- "*" AgentRun
 AgentRun "1" -- "*" AssociationRule
 AgentRun "1" -- "*" DecisionEvidence
@@ -469,8 +598,12 @@ AgentRun "1" -- "*" LlmUsage
 AgentRun "1" -- "*" LostSalesEstimate
 AgentRun "1" -- "*" PurchaseOrder
 AgentRun "1" -- "*" Recommendation
+AgentRun "1" -- "*" RecommendationReview
 AgentRun "1" -- "*" ReplenishmentNeed
 AgentRun "1" -- "*" ToolCall
+AppUser "1" -- "*" AgentConfig
+AppUser "1" -- "*" AgentDecision
+AppUser "1" -- "*" AgentRun
 AppUser "1" -- "*" Approval
 AppUser "1" -- "*" GoodsReceipt
 AppUser "1" -- "*" InventoryMovement
@@ -480,6 +613,8 @@ Batch "1" -- "*" InventoryMovement
 Batch "1" -- "*" TransferOrder
 GoodsReceipt "1" -- "*" GoodsReceiptLine
 PoLine "1" -- "*" GoodsReceiptLine
+Product "1" -- "*" AgentDecision
+Product "1" -- "*" AgentDraft
 Product "1" -- "*" AssociationRule
 Product "1" -- "*" Batch
 Product "1" -- "*" Forecast
@@ -496,14 +631,20 @@ Product "1" -- "*" StoreProduct
 Product "1" -- "*" SupplierProduct
 Product "1" -- "*" SupplierScheme
 Product "1" -- "*" TransferOrder
+PurchaseOrder "1" -- "*" AgentDecision
 PurchaseOrder "1" -- "*" GoodsReceipt
 PurchaseOrder "1" -- "*" PoLine
 PurchaseOrder "1" -- "*" PurchaseOrder
+Recommendation "1" -- "*" AgentDecision
+Recommendation "1" -- "*" AgentDraft
 Recommendation "1" -- "*" DecisionEvidence
 Recommendation "1" -- "*" PoLine
+Recommendation "1" -- "*" RecommendationReview
 Recommendation "1" -- "*" ReplenishmentNeed
 Recommendation "1" -- "*" TransferOrder
 SalesTransaction "1" -- "*" SalesLine
+Store "1" -- "*" AgentDecision
+Store "1" -- "*" AgentDraft
 Store "1" -- "*" AppUser
 Store "1" -- "*" Approval
 Store "1" -- "*" AssociationRule
@@ -534,4 +675,5 @@ Supplier "1" -- "*" SupplierProduct
 Supplier "1" -- "*" SupplierScheme
 Supplier "1" -- "*" SupplierStoreTerms
 SupplierScheme "1" -- "*" PoLine
+TransferOrder "1" -- "*" AgentDecision
 @enduml

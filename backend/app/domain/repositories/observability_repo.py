@@ -27,7 +27,10 @@ class AgentRunLogger:
         input_ref: dict[str, Any],
         run_id: UUID | None = None,
         run_date: date | None = None,
+        **fields: Any,
     ) -> UUID:
+        """`fields`: agent console columns (agent_key, trigger_type, mode, config_version, config_snapshot,
+        triggered_by, reason) — D-50."""
         if run_id is None:
             run_id = uuid.uuid4()
         now = datetime.now(UTC)
@@ -48,6 +51,7 @@ class AgentRunLogger:
             started_at=now,
             input_ref=input_ref,
             output_summary=None,
+            **fields,
         )
         self.session.add(run)
         self.session.flush()
@@ -102,6 +106,7 @@ class AgentRunLogger:
         input_tokens: int,
         output_tokens: int,
         est_cost: Decimal = Decimal(0),
+        latency_ms: int | None = None,
     ) -> None:
         # column names per the model (input_tokens / output_tokens / est_cost); the earlier keywords
         # prompt_tokens / completion_tokens raised TypeError, which the caller swallowed — nothing was logged
@@ -113,6 +118,7 @@ class AgentRunLogger:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             est_cost=est_cost,
+            latency_ms=latency_ms,
         )
         self.session.add(usage)
         self.session.flush()
@@ -123,6 +129,8 @@ class AgentRunLogger:
         status: str,
         output_summary: dict[str, Any] | None = None,
         error: str | None = None,
+        stop_reason: str | None = None,
+        retries: int | None = None,
     ) -> None:
         now = datetime.now(UTC)
         run = self.session.scalars(select(AgentRun).where(AgentRun.run_id == run_id)).one_or_none()
@@ -134,4 +142,8 @@ class AgentRunLogger:
                     json.dumps(output_summary) if isinstance(output_summary, dict) else str(output_summary)
                 )
             run.error = error
+            if stop_reason is not None:
+                run.stop_reason = stop_reason
+            if retries is not None:
+                run.retries = retries
             self.session.flush()

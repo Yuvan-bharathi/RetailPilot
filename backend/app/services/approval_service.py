@@ -28,6 +28,7 @@ from app.domain.models.purchasing import POLine, PurchaseOrder
 from app.domain.models.transfers import Approval, BusinessRule
 from app.domain.models.users import AppUser
 from app.domain.repositories.purchasing_repo import PurchasingRepo
+from app.services.agent_decision_service import update_outcome
 from app.services.cache_service import CacheService
 from app.tools.po_builder import POBuilder
 from app.tools.types import DraftPO, DraftPOLine
@@ -388,6 +389,12 @@ class ApprovalService:
                 .where(Recommendation.rec_id.in_(source_rec_ids))
                 .values(status=new_rec_status)
             )
+            await update_outcome(
+                session, action=req.decision, user_id=user.user_id, reason=req.reason, rec_ids=source_rec_ids
+            )
+        await update_outcome(
+            session, action=req.decision, user_id=user.user_id, reason=req.reason, po_id=po.po_id
+        )
 
         await session.commit()
 

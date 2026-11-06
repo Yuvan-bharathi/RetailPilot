@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.models.base import Base, Timestamps, rel, uuid_pk
-from app.domain.models.enums import AgentRunStatus, ToolCallStatus, check_in
+from app.domain.models.enums import AgentRunStatus, RunMode, ToolCallStatus, TriggerType, check_in
 
 NIGHTLY_AGENT = "nightly"
 
@@ -31,6 +31,11 @@ class AgentRun(Timestamps, Base):
         # GET /runs/latest and the monitoring list
         Index("ix_agent_run_agent_started", "agent_name", "started_at"),
         CheckConstraint(check_in("status", AgentRunStatus), name="status"),
+        CheckConstraint(check_in("trigger_type", TriggerType), name="trigger_type"),
+        CheckConstraint(check_in("mode", RunMode), name="mode"),
+        # agent console (D-50): runs of one registered agent, newest first; rate limit of live triggers
+        Index("ix_agent_run_agent_key_started", "agent_key", "started_at"),
+        Index("ix_agent_run_trigger_started", "trigger_type", "started_at"),
     )
 
     run_id: Mapped[uuid.UUID] = uuid_pk()
@@ -44,6 +49,18 @@ class AgentRun(Timestamps, Base):
     output_summary: Mapped[str | None] = mapped_column(Text)
     error: Mapped[str | None] = mapped_column(Text)
     step_count: Mapped[int] = mapped_column(server_default="0")
+    # agent console (D-50) ---------------------------------------------------------------------------------------
+    agent_key: Mapped[str | None] = mapped_column(Text)  # registry key; null for the nightly root
+    trigger_type: Mapped[str] = mapped_column(Text, server_default=TriggerType.NIGHTLY.value)
+    mode: Mapped[str] = mapped_column(Text, server_default=RunMode.LIVE.value)
+    config_version: Mapped[int | None]
+    #: enabled flags of every agent at run start; the run never re-reads the config (toggles apply next run)
+    config_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    triggered_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("app_user.user_id"), index=True)
+    reason: Mapped[str | None] = mapped_column(Text)
+    stop_reason: Mapped[str | None] = mapped_column(Text)
+    retries: Mapped[int] = mapped_column(server_default="0")
+    cancel_requested: Mapped[bool] = mapped_column(server_default=text("false"))
 
     tool_calls: Mapped[list["ToolCall"]] = rel(back_populates="run")
 
@@ -85,3 +102,4 @@ class LLMUsage(Timestamps, Base):
     output_tokens: Mapped[int]
     # provider cost estimate (USD); fractions of a cent, so not the 2-decimal ₹ money type
     est_cost: Mapped[Decimal] = mapped_column(Numeric(14, 6))
+    latency_ms: Mapped[int | None]

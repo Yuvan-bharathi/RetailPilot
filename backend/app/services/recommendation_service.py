@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Literal
 from uuid import UUID
 
 from pydantic import TypeAdapter
@@ -9,6 +10,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ConflictError, NotFound, PermissionDenied
+from app.domain.models.agents import RecommendationReview
 from app.domain.models.enums import RecStatus, Role
 from app.domain.models.master import Product, Store
 from app.domain.models.planning import Recommendation
@@ -20,8 +22,23 @@ from app.domain.schemas.dtos import (
     RecommendationDetailDTO,
     RecommendationDTO,
 )
+from app.services.agent_decision_service import update_outcome
 
 _evidence_adapter = TypeAdapter(Evidence)
+
+
+async def _review_map(session: AsyncSession, rec_ids: list[UUID]) -> dict[UUID, RecommendationReview]:
+    """Recommendation Reviewer verdicts (D-50); absent = not reviewed."""
+    if not rec_ids:
+        return {}
+    res = await session.execute(select(RecommendationReview).where(RecommendationReview.rec_id.in_(rec_ids)))
+    return {r.rec_id: r for r in res.scalars().all()}
+
+
+def _review_status(review: RecommendationReview | None) -> Literal["REVIEWED", "FLAGGED", "NOT_REVIEWED"]:
+    if review is None:
+        return "NOT_REVIEWED"
+    return "FLAGGED" if review.verdict == "FLAGGED" else "REVIEWED"
 
 
 class RecommendationService:
@@ -107,6 +124,8 @@ class RecommendationService:
             for s_rec_id, f_store_id, s_name, t_qty in t_res.all():
                 transfer_map[s_rec_id] = (f_store_id, s_name, t_qty)
 
+        reviews = await _review_map(session, rec_ids)
+
         items: list[RecommendationDTO] = []
         for rec, store, prod in rows:
             counterpart: Counterpart | None = None
@@ -136,6 +155,7 @@ class RecommendationService:
                     explanation=rec.explanation,
                     counterpart=counterpart,
                     created_at=rec.created_at,
+                    review_status=_review_status(reviews.get(rec.rec_id)),
                 )
             )
 
@@ -185,6 +205,8 @@ class RecommendationService:
 
             parsed_evidence = _evidence_adapter.validate_python(raw_ev)
 
+        review = (await _review_map(session, [rec_id])).get(rec_id)
+
         # Counterpart
         counterpart: Counterpart | None = None
         t_stmt = (
@@ -218,11 +240,15 @@ class RecommendationService:
             explanation=rec.explanation,
             counterpart=counterpart,
             created_at=rec.created_at,
+            review_status=_review_status(review),
         )
 
         return RecommendationDetailDTO(
             recommendation=dto,
             evidence=parsed_evidence,
+            review_issues=[
+                str(i.get("message", "")) for i in (review.issues if review else []) if i.get("message")
+            ],
         )
 
     async def action(
@@ -256,6 +282,9 @@ class RecommendationService:
                 rec.qty = qty
         else:
             raise ConflictError(f"Unknown recommendation action: {action}")
+        await update_outcome(
+            session, action=action, user_id=user.user_id, reason=reason, rec_ids=[rec.rec_id]
+        )
 
         await session.commit()
         await session.refresh(rec)

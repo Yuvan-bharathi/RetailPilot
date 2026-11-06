@@ -15,6 +15,7 @@ import type {
   StoreDTO,
   StoreRef,
 } from "../api/types";
+import { createAgentMockApi } from "./agentMocks";
 import { FIXTURES, MOCK_PASSWORD, type MockFixtures, type MockUser } from "./fixtures";
 
 const TOKEN_PREFIX = "mock-token:";
@@ -417,27 +418,7 @@ export function createMockClient(
         created_at: new Date().toISOString(),
       };
     },
-    async listAgentRuns() {
-      await wait();
-      return [];
-    },
-    async getAgentRun(runId) {
-      await wait();
-      return {
-        run_id: runId,
-        parent_run_id: null,
-        agent_name: "nightly_orchestrator",
-        run_date: new Date().toISOString().slice(0, 10),
-        status: "SUCCESS",
-        started_at: new Date().toISOString(),
-        finished_at: new Date().toISOString(),
-        input_ref: {},
-        output_summary: "Completed successfully",
-        error: null,
-        tool_calls: [],
-        llm_usages: [],
-      };
-    },
+    ...createAgentMockApi(data, currentUser, wait),
     async triggerNightlyRun() {
       await wait();
       return {

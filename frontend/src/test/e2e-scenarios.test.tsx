@@ -20,10 +20,9 @@ describe("E2E Demo Scenarios Suite (Spec §9.8)", () => {
     expect(screen.getByText(/^All Transfers/)).toBeTruthy();
   });
 
-  it("Scenario 4 & 5: System observability telemetry and agent execution trace", async () => {
-    renderApp("/monitoring", "admin");
-    expect(await screen.findByText("Agent Observability & System Monitoring")).toBeTruthy();
-    expect(screen.getByText("Live Telemetry")).toBeTruthy();
-    expect(screen.getByText("Trigger Nightly Pipeline")).toBeTruthy();
+  it("Scenario 4 & 5: agent console — pipeline runs and the nightly trigger (replaces System monitoring)", async () => {
+    renderApp("/agents/pipeline", "admin");
+    expect(await screen.findByRole("button", { name: "Run nightly pipeline" })).toBeTruthy();
+    expect(await screen.findByRole("table", { name: "Pipeline runs, newest first" })).toBeTruthy();
   });
 });

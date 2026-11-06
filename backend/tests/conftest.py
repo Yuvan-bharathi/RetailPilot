@@ -30,3 +30,15 @@ def deps_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 def client(deps_ok: None) -> Iterator[TestClient]:
     with TestClient(create_app()) as test_client:
         yield test_client
+
+
+@pytest.fixture(autouse=True)
+def _no_live_llm(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Tests never call a live model (docs/08 §7): explanations use templates, LLM agents their recorded or
+    deterministic paths. A test that needs a model injects a scripted one."""
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("LLM_PROVIDER", "template")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()

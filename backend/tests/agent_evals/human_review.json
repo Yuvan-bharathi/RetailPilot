@@ -1,0 +1,11 @@
+{
+  "_instructions": "A human reviewer labels sampled cases: key '<agent_key>/<case name>' → true (the agent's outcome is acceptable) or false. Leave null when not reviewed. scripts.run_agent_evals records agreement only over labelled cases. No labels have been entered yet.",
+  "labels": {
+    "ask_retailpilot/why_butter": null,
+    "ask_retailpilot/hallucinated_number": null,
+    "data_quality/classify_stale_and_mismatch": null,
+    "replenishment_action/transfer_case": null,
+    "run_coordinator/retry_critical_rejected": null,
+    "recommendation_reviewer/judge_flags_unsupported_claim": null
+  }
+}

@@ -591,232 +591,6 @@
         }
       }
     },
-    "/api/v1/agent-runs": {
-      "get": {
-        "tags": [
-          "runs"
-        ],
-        "summary": "List Agent Runs",
-        "description": "Returns recent agent runs for system observability.",
-        "operationId": "list_agent_runs",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AgentRunDetailDTO"
-                  },
-                  "title": "Response List Agent Runs"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Implemented"
-          }
-        }
-      }
-    },
-    "/api/v1/agent-runs/{run_id}": {
-      "get": {
-        "tags": [
-          "runs"
-        ],
-        "summary": "Get Agent Run",
-        "description": "Returns detailed trace of a specific agent run including its tool calls and LLM usage.",
-        "operationId": "get_agent_run",
-        "parameters": [
-          {
-            "name": "run_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Run Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AgentRunDetailDTO"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Implemented"
-          }
-        }
-      }
-    },
     "/api/v1/dashboard": {
       "get": {
         "tags": [
@@ -4645,6 +4419,2141 @@
           }
         }
       }
+    },
+    "/api/v1/agents": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Agents",
+        "operationId": "list_agents",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentListDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/agents/llm": {
+      "patch": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Toggle Llm Agents",
+        "description": "Global \"All LLM agents\" switch (cost and safety kill switch). Applies from the next run.",
+        "operationId": "toggle_llm_agents",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleLLMRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentListDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_key}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Agent",
+        "operationId": "get_agent",
+        "parameters": [
+          {
+            "name": "agent_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDetailDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Toggle Agent",
+        "description": "Turn an agent on or off (reason required, audited, versioned). Applies from the NEXT run.",
+        "operationId": "toggle_agent",
+        "parameters": [
+          {
+            "name": "agent_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDetailDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_key}/stats": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Agent Stats",
+        "operationId": "agent_stats",
+        "parameters": [
+          {
+            "name": "agent_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Key"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 14,
+              "title": "Days"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentStatsDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_key}/trigger-preview": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Trigger Preview",
+        "description": "What a \"Run now\" would do: upstream reuse / re-run, downstream re-runs, supersession, blocks.",
+        "operationId": "trigger_preview",
+        "parameters": [
+          {
+            "name": "agent_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Key"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "LIVE",
+                "DRY_RUN"
+              ],
+              "type": "string",
+              "default": "DRY_RUN",
+              "title": "Mode"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerPreviewDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_key}/runs": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Trigger Agent",
+        "description": "Run now. DRY_RUN (default) stores outputs in a preview set only; LIVE publishes like a nightly stage and\nneeds a reason and confirmation. Runs in the background; poll GET /agent-runs/{run_id}.",
+        "operationId": "trigger_agent",
+        "parameters": [
+          {
+            "name": "agent_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriggerAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerResultDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/agent-runs": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Agent Runs",
+        "description": "Agent runs, newest first (keyset paging).",
+        "operationId": "list_agent_runs",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "agent_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Key"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "RUNNING",
+                    "SUCCESS",
+                    "FAILED",
+                    "PARTIAL",
+                    "SKIPPED_DISABLED",
+                    "SKIPPED_DEPENDENCY",
+                    "PAUSED",
+                    "CANCELLED"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "trigger_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "NIGHTLY",
+                    "MANUAL_DRY_RUN",
+                    "MANUAL_LIVE",
+                    "ON_DEMAND"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trigger Type"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "roots_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Roots Only"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_AgentRunItemDTO_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/agent-runs/{run_id}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Agent Run",
+        "description": "Run trace: steps (tool calls, LLM calls, child runs, errors, stop reason), previews of a dry run.",
+        "operationId": "get_agent_run",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunTraceDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/agent-runs/{run_id}/cancel": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Cancel Agent Run",
+        "description": "Request cancellation of a RUNNING root run; it stops after the current step.",
+        "operationId": "cancel_agent_run",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunItemDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/agent-decisions": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Decisions",
+        "operationId": "list_decisions",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "agent_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Key"
+            }
+          },
+          {
+            "name": "decision_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Decision Type"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "PENDING",
+                    "ACCEPTED",
+                    "EDITED",
+                    "REJECTED",
+                    "SUPERSEDED",
+                    "NOT_APPLICABLE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "store_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Store Id"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "LIVE",
+                    "DRY_RUN"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mode"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_AgentDecisionDTO_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/agent-decisions/stats": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Decision Stats",
+        "description": "Acceptance per agent and decision type (live decisions only) — feeds the Objective III evaluation.",
+        "operationId": "decision_stats",
+        "parameters": [
+          {
+            "name": "agent_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DecisionStatDTO"
+                  },
+                  "title": "Response Decision Stats"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/pipeline/runs": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Pipeline Runs",
+        "description": "Root runs (nightly and manual triggers) with their stages in order.",
+        "operationId": "list_pipeline_runs",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "trigger_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "NIGHTLY",
+                    "MANUAL_DRY_RUN",
+                    "MANUAL_LIVE",
+                    "ON_DEMAND"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trigger Type"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "RUNNING",
+                    "SUCCESS",
+                    "FAILED",
+                    "PARTIAL",
+                    "SKIPPED_DISABLED",
+                    "SKIPPED_DEPENDENCY",
+                    "PAUSED",
+                    "CANCELLED"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_PipelineRunDTO_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/pipeline/runs/{run_id}/graph": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Pipeline Graph",
+        "description": "Visual flow of one run: agents, key tools and human approval gates (fixed layout).",
+        "operationId": "pipeline_graph",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "const": "latest",
+                  "type": "string"
+                }
+              ],
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunGraphDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/assistant/status": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Assistant Status",
+        "operationId": "assistant_status",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskStatusDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
+    "/api/v1/assistant/ask": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Ask",
+        "description": "Answer a question from recommendations, evidence, business rules and policies — with citations. The agent\nonly reads; asking it to approve, submit or change anything is refused (409 when the agent is disabled).",
+        "operationId": "ask",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskAnswerDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Implemented"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4683,7 +6592,366 @@
         ],
         "title": "AbcXyzCellDTO"
       },
-      "AgentRunDetailDTO": {
+      "AgentDecisionDTO": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Decision Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "agent_key": {
+            "type": "string",
+            "title": "Agent Key"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "decision_type": {
+            "type": "string",
+            "title": "Decision Type"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "LIVE",
+              "DRY_RUN"
+            ],
+            "title": "Mode"
+          },
+          "store": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoreRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "product": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProductRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "rec_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rec Id"
+          },
+          "transfer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transfer Id"
+          },
+          "po_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Po Id"
+          },
+          "draft_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Draft Id"
+          },
+          "evidence_ref": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Evidence Ref"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "ACCEPTED",
+              "EDITED",
+              "REJECTED",
+              "SUPERSEDED",
+              "NOT_APPLICABLE"
+            ],
+            "title": "Outcome"
+          },
+          "outcome_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Reason"
+          },
+          "outcome_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision_id",
+          "run_id",
+          "agent_key",
+          "agent_name",
+          "decision_type",
+          "mode",
+          "store",
+          "product",
+          "summary",
+          "rec_id",
+          "transfer_id",
+          "po_id",
+          "draft_id",
+          "evidence_ref",
+          "outcome",
+          "outcome_reason",
+          "outcome_at",
+          "created_at"
+        ],
+        "title": "AgentDecisionDTO"
+      },
+      "AgentDetailDTO": {
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentSummaryDTO"
+          },
+          "delegation": {
+            "type": "string",
+            "title": "Delegation"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "discernment": {
+            "type": "string",
+            "title": "Discernment"
+          },
+          "diligence": {
+            "type": "string",
+            "title": "Diligence"
+          },
+          "input_contract": {
+            "type": "string",
+            "title": "Input Contract"
+          },
+          "output_contract": {
+            "type": "string",
+            "title": "Output Contract"
+          },
+          "read_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Read Tools"
+          },
+          "draft_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Draft Tools"
+          },
+          "stopping": {
+            "$ref": "#/components/schemas/StoppingDTO"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version"
+          },
+          "prompt_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Text",
+            "description": "System instructions of the LLM agent (versioned file)"
+          },
+          "business_rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleValueDTO"
+            },
+            "type": "array",
+            "title": "Business Rules",
+            "description": "Parameters (edit in Settings → business rules)"
+          },
+          "disabled_effect": {
+            "type": "string",
+            "title": "Disabled Effect"
+          },
+          "human_in_the_loop": {
+            "type": "string",
+            "title": "Human In The Loop"
+          },
+          "decision_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Decision Types"
+          },
+          "card_markdown": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Markdown",
+            "description": "docs/agents/<key>.md"
+          },
+          "toggle_history": {
+            "items": {
+              "$ref": "#/components/schemas/ToggleEventDTO"
+            },
+            "type": "array",
+            "title": "Toggle History"
+          },
+          "evals": {
+            "items": {
+              "$ref": "#/components/schemas/EvalResultDTO"
+            },
+            "type": "array",
+            "title": "Evals"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent",
+          "delegation",
+          "description",
+          "discernment",
+          "diligence",
+          "input_contract",
+          "output_contract",
+          "read_tools",
+          "draft_tools",
+          "stopping",
+          "prompt_version",
+          "prompt_text",
+          "business_rules",
+          "disabled_effect",
+          "human_in_the_loop",
+          "decision_types",
+          "card_markdown",
+          "toggle_history",
+          "evals"
+        ],
+        "title": "AgentDetailDTO"
+      },
+      "AgentListDTO": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSummaryDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "llm_enabled": {
+            "type": "boolean",
+            "title": "Llm Enabled",
+            "description": "Global \"All LLM agents\" switch"
+          },
+          "config_version": {
+            "type": "integer",
+            "title": "Config Version"
+          },
+          "paused_banner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Banner",
+            "description": "\"Replenishment paused by <user>: <reason>\" when a critical pipeline agent is off"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "llm_enabled",
+          "config_version",
+          "paused_banner"
+        ],
+        "title": "AgentListDTO"
+      },
+      "AgentRunItemDTO": {
         "properties": {
           "run_id": {
             "type": "string",
@@ -4702,9 +6970,52 @@
             ],
             "title": "Parent Run Id"
           },
+          "agent_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Key"
+          },
           "agent_name": {
             "type": "string",
             "title": "Agent Name"
+          },
+          "trigger_type": {
+            "type": "string",
+            "enum": [
+              "NIGHTLY",
+              "MANUAL_DRY_RUN",
+              "MANUAL_LIVE",
+              "ON_DEMAND"
+            ],
+            "title": "Trigger Type"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "LIVE",
+              "DRY_RUN"
+            ],
+            "title": "Mode"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "SUCCESS",
+              "FAILED",
+              "PARTIAL",
+              "SKIPPED_DISABLED",
+              "SKIPPED_DEPENDENCY",
+              "PAUSED",
+              "CANCELLED"
+            ],
+            "title": "Status"
           },
           "run_date": {
             "anyOf": [
@@ -4717,10 +7028,6 @@
               }
             ],
             "title": "Run Date"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
           },
           "started_at": {
             "type": "string",
@@ -4739,12 +7046,39 @@
             ],
             "title": "Finished At"
           },
-          "input_ref": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Input Ref"
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
           },
-          "output_summary": {
+          "tool_calls": {
+            "type": "integer",
+            "title": "Tool Calls"
+          },
+          "llm_calls": {
+            "type": "integer",
+            "title": "Llm Calls"
+          },
+          "tokens": {
+            "type": "integer",
+            "title": "Tokens"
+          },
+          "est_cost_usd": {
+            "type": "string",
+            "title": "Est Cost Usd",
+            "description": "Estimated provider cost in USD, 6 decimals"
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries"
+          },
+          "stop_reason": {
             "anyOf": [
               {
                 "type": "string"
@@ -4753,7 +7087,7 @@
                 "type": "null"
               }
             ],
-            "title": "Output Summary"
+            "title": "Stop Reason"
           },
           "error": {
             "anyOf": [
@@ -4766,35 +7100,349 @@
             ],
             "title": "Error"
           },
-          "tool_calls": {
-            "items": {
-              "$ref": "#/components/schemas/ToolCallDTO"
-            },
-            "type": "array",
-            "title": "Tool Calls"
+          "triggered_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggered By"
           },
-          "llm_usages": {
-            "items": {
-              "$ref": "#/components/schemas/LLMUsageDTO"
-            },
-            "type": "array",
-            "title": "Llm Usages"
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "run_id",
           "parent_run_id",
+          "agent_key",
           "agent_name",
-          "run_date",
+          "trigger_type",
+          "mode",
           "status",
+          "run_date",
           "started_at",
           "finished_at",
+          "duration_ms",
+          "tool_calls",
+          "llm_calls",
+          "tokens",
+          "est_cost_usd",
+          "retries",
+          "stop_reason",
+          "error",
+          "triggered_by",
+          "reason"
+        ],
+        "title": "AgentRunItemDTO"
+      },
+      "AgentRunTraceDTO": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/AgentRunItemDTO"
+          },
+          "input_ref": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Ref"
+          },
+          "output_summary": {
+            "title": "Output Summary"
+          },
+          "config_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Version"
+          },
+          "config_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Snapshot"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRunItemDTO"
+            },
+            "type": "array",
+            "title": "Children"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/TraceStepDTO"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "previews": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewOutputDTO"
+            },
+            "type": "array",
+            "title": "Previews"
+          },
+          "decisions": {
+            "type": "integer",
+            "title": "Decisions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run",
           "input_ref",
           "output_summary",
-          "error"
+          "config_version",
+          "config_snapshot",
+          "children",
+          "steps",
+          "previews",
+          "decisions"
         ],
-        "title": "AgentRunDetailDTO"
+        "title": "AgentRunTraceDTO"
+      },
+      "AgentStatsDTO": {
+        "properties": {
+          "agent_key": {
+            "type": "string",
+            "title": "Agent Key"
+          },
+          "runs_by_day": {
+            "items": {
+              "$ref": "#/components/schemas/DailyRunCountDTO"
+            },
+            "type": "array",
+            "title": "Runs By Day"
+          },
+          "latency_p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P50 Ms"
+          },
+          "latency_p95_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P95 Ms"
+          },
+          "decisions_by_type": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionStatDTO"
+            },
+            "type": "array",
+            "title": "Decisions By Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_key",
+          "runs_by_day",
+          "latency_p50_ms",
+          "latency_p95_ms",
+          "decisions_by_type"
+        ],
+        "title": "AgentStatsDTO"
+      },
+      "AgentSummaryDTO": {
+        "properties": {
+          "agent_key": {
+            "type": "string",
+            "title": "Agent Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "PIPELINE",
+              "OBJECTIVE_III"
+            ],
+            "title": "Group"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "DETERMINISTIC",
+              "LLM"
+            ],
+            "title": "Kind"
+          },
+          "pattern": {
+            "type": "string",
+            "enum": [
+              "PIPELINE_STAGE",
+              "RETRIEVAL",
+              "VALIDATION",
+              "ACTION",
+              "COORDINATOR",
+              "REVIEWER"
+            ],
+            "title": "Pattern"
+          },
+          "critical": {
+            "type": "boolean",
+            "title": "Critical"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "The agent's own switch"
+          },
+          "effective_enabled": {
+            "type": "boolean",
+            "title": "Effective Enabled",
+            "description": "Own switch AND (not an LLM agent OR the global LLM switch is on)"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Depends On"
+          },
+          "optional_inputs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Optional Inputs"
+          },
+          "triggerable": {
+            "type": "boolean",
+            "title": "Triggerable"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastRunRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runs_7d": {
+            "type": "integer",
+            "title": "Runs 7D"
+          },
+          "success_rate_7d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success Rate 7D",
+            "description": "SUCCESS / finished runs of the last 7 days (0–1)"
+          },
+          "p95_latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Latency Ms"
+          },
+          "tokens_7d": {
+            "type": "integer",
+            "title": "Tokens 7D"
+          },
+          "est_cost_7d_usd": {
+            "type": "string",
+            "title": "Est Cost 7D Usd",
+            "description": "Estimated provider cost in USD, 6 decimals"
+          },
+          "recommendations_7d": {
+            "type": "integer",
+            "title": "Recommendations 7D",
+            "description": "Decisions linked to a recommendation in the last 7 days"
+          },
+          "acceptance_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acceptance Rate",
+            "description": "Accepted or edited / decided (all time, live decisions)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_key",
+          "name",
+          "group",
+          "kind",
+          "pattern",
+          "critical",
+          "purpose",
+          "enabled",
+          "effective_enabled",
+          "depends_on",
+          "optional_inputs",
+          "triggerable",
+          "last_run",
+          "runs_7d",
+          "success_rate_7d",
+          "p95_latency_ms",
+          "tokens_7d",
+          "est_cost_7d_usd",
+          "recommendations_7d",
+          "acceptance_rate"
+        ],
+        "title": "AgentSummaryDTO"
       },
       "AnalyticsDTO": {
         "properties": {
@@ -4972,6 +7620,104 @@
           "approval_id"
         ],
         "title": "ApprovalResult"
+      },
+      "AskAnswerDTO": {
+        "properties": {
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "found": {
+            "type": "boolean",
+            "title": "Found"
+          },
+          "refused": {
+            "type": "boolean",
+            "title": "Refused"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/CitationDTO"
+            },
+            "type": "array",
+            "title": "Citations"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "LLM",
+              "RETRIEVAL_ONLY"
+            ],
+            "title": "Mode",
+            "description": "RETRIEVAL_ONLY: no LLM (no key, or the global LLM switch is off) — sources listed, no prose"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "answer",
+          "found",
+          "refused",
+          "citations",
+          "run_id",
+          "latency_ms",
+          "mode"
+        ],
+        "title": "AskAnswerDTO"
+      },
+      "AskRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Question"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "AskRequest"
+      },
+      "AskStatusDTO": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "examples": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Examples"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enabled",
+          "examples"
+        ],
+        "title": "AskStatusDTO"
       },
       "AssortmentGapEvidence": {
         "properties": {
@@ -5288,6 +8034,38 @@
         ],
         "title": "CategoryValueDTO"
       },
+      "CitationDTO": {
+        "properties": {
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "RECOMMENDATION",
+              "EVIDENCE",
+              "BUSINESS_RULE",
+              "POLICY",
+              "TRANSFER",
+              "INVENTORY"
+            ],
+            "title": "Source Type"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_type",
+          "source_id",
+          "label"
+        ],
+        "title": "CitationDTO"
+      },
       "CloseShortRequest": {
         "properties": {
           "reason": {
@@ -5385,6 +8163,80 @@
         "title": "Counterpart",
         "description": "Another store as a Store Supervisor may see it: name + offered/requested quantity only."
       },
+      "CursorPage_AgentDecisionDTO_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentDecisionDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` to get the next page; null on the last page"
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "page_size"
+        ],
+        "title": "CursorPage[AgentDecisionDTO]"
+      },
+      "CursorPage_AgentRunItemDTO_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRunItemDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` to get the next page; null on the last page"
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "page_size"
+        ],
+        "title": "CursorPage[AgentRunItemDTO]"
+      },
       "CursorPage_InventoryMovementDTO_": {
         "properties": {
           "items": {
@@ -5421,6 +8273,73 @@
           "page_size"
         ],
         "title": "CursorPage[InventoryMovementDTO]"
+      },
+      "CursorPage_PipelineRunDTO_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineRunDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` to get the next page; null on the last page"
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "page_size"
+        ],
+        "title": "CursorPage[PipelineRunDTO]"
+      },
+      "DailyRunCountDTO": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "success": {
+            "type": "integer",
+            "title": "Success"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "other": {
+            "type": "integer",
+            "title": "Other"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "day",
+          "success",
+          "failed",
+          "other"
+        ],
+        "title": "DailyRunCountDTO"
       },
       "DashboardInsights": {
         "properties": {
@@ -5655,6 +8574,68 @@
         ],
         "title": "DashboardSummary"
       },
+      "DecisionStatDTO": {
+        "properties": {
+          "agent_key": {
+            "type": "string",
+            "title": "Agent Key"
+          },
+          "decision_type": {
+            "type": "string",
+            "title": "Decision Type"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          },
+          "edited": {
+            "type": "integer",
+            "title": "Edited"
+          },
+          "rejected": {
+            "type": "integer",
+            "title": "Rejected"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "superseded": {
+            "type": "integer",
+            "title": "Superseded"
+          },
+          "acceptance_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acceptance Rate",
+            "description": "(accepted + edited) / (accepted + edited + rejected)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_key",
+          "decision_type",
+          "total",
+          "accepted",
+          "edited",
+          "rejected",
+          "pending",
+          "superseded",
+          "acceptance_rate"
+        ],
+        "title": "DecisionStatDTO"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -5727,6 +8708,102 @@
           "error"
         ],
         "title": "ErrorResponse"
+      },
+      "EvalResultDTO": {
+        "properties": {
+          "agent_key": {
+            "type": "string",
+            "title": "Agent Key"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "RECORDED",
+              "LIVE"
+            ],
+            "title": "Source"
+          },
+          "variant": {
+            "type": "string",
+            "enum": [
+              "AGENT",
+              "BASELINE"
+            ],
+            "title": "Variant"
+          },
+          "cases": {
+            "type": "integer",
+            "title": "Cases"
+          },
+          "correctness": {
+            "type": "number",
+            "title": "Correctness"
+          },
+          "groundedness": {
+            "type": "number",
+            "title": "Groundedness"
+          },
+          "tool_use": {
+            "type": "number",
+            "title": "Tool Use"
+          },
+          "failure_handling": {
+            "type": "number",
+            "title": "Failure Handling"
+          },
+          "latency_p50_ms": {
+            "type": "integer",
+            "title": "Latency P50 Ms"
+          },
+          "latency_p95_ms": {
+            "type": "integer",
+            "title": "Latency P95 Ms"
+          },
+          "tokens": {
+            "type": "integer",
+            "title": "Tokens"
+          },
+          "est_cost_usd": {
+            "type": "string",
+            "title": "Est Cost Usd",
+            "description": "Estimated provider cost in USD, 6 decimals"
+          },
+          "human_agreement": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Human Agreement"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_key",
+          "source",
+          "variant",
+          "cases",
+          "correctness",
+          "groundedness",
+          "tool_use",
+          "failure_handling",
+          "latency_p50_ms",
+          "latency_p95_ms",
+          "tokens",
+          "est_cost_usd",
+          "human_agreement",
+          "created_at"
+        ],
+        "title": "EvalResultDTO"
       },
       "ExpiryDayDTO": {
         "properties": {
@@ -5853,6 +8930,155 @@
           "lines"
         ],
         "title": "GoodsReceiptRequest"
+      },
+      "GraphEdgeDTO": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "DATA",
+              "REVIEW",
+              "EXCEPTION",
+              "APPROVAL"
+            ],
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "label",
+          "kind"
+        ],
+        "title": "GraphEdgeDTO"
+      },
+      "GraphNodeDTO": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "node_type": {
+            "type": "string",
+            "enum": [
+              "AGENT",
+              "TOOL",
+              "GATE",
+              "DATA"
+            ],
+            "title": "Node Type"
+          },
+          "agent_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Key"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "RUNNING",
+                  "SUCCESS",
+                  "FAILED",
+                  "PARTIAL",
+                  "SKIPPED_DISABLED",
+                  "SKIPPED_DEPENDENCY",
+                  "PAUSED",
+                  "CANCELLED"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "NOT_RUN",
+                  "WAITING",
+                  "DONE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "x": {
+            "type": "integer",
+            "title": "X"
+          },
+          "y": {
+            "type": "integer",
+            "title": "Y"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "node_type",
+          "agent_key",
+          "status",
+          "run_id",
+          "x",
+          "y",
+          "detail"
+        ],
+        "title": "GraphNodeDTO"
       },
       "HealthChecks": {
         "properties": {
@@ -6121,45 +9347,54 @@
         ],
         "title": "InventorySummary"
       },
-      "LLMUsageDTO": {
+      "LastRunRef": {
         "properties": {
-          "usage_id": {
+          "run_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Usage Id"
+            "title": "Run Id"
           },
-          "provider": {
+          "status": {
             "type": "string",
-            "title": "Provider"
+            "enum": [
+              "RUNNING",
+              "SUCCESS",
+              "FAILED",
+              "PARTIAL",
+              "SKIPPED_DISABLED",
+              "SKIPPED_DEPENDENCY",
+              "PAUSED",
+              "CANCELLED"
+            ],
+            "title": "Status"
           },
-          "model": {
-            "type": "string",
-            "title": "Model"
-          },
-          "input_tokens": {
-            "type": "integer",
-            "title": "Input Tokens"
-          },
-          "output_tokens": {
-            "type": "integer",
-            "title": "Output Tokens"
-          },
-          "created_at": {
+          "started_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
-          "usage_id",
-          "provider",
-          "model",
-          "input_tokens",
-          "output_tokens",
-          "created_at"
+          "run_id",
+          "status",
+          "started_at",
+          "finished_at"
         ],
-        "title": "LLMUsageDTO"
+        "title": "LastRunRef"
       },
       "LoginRequest": {
         "properties": {
@@ -6647,6 +9882,300 @@
         ],
         "title": "Page[TransferOrderDTO]"
       },
+      "PipelineRunDTO": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "run_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Date"
+          },
+          "agent_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Key",
+            "description": "Target agent of a manual trigger; null for nightly"
+          },
+          "trigger_type": {
+            "type": "string",
+            "enum": [
+              "NIGHTLY",
+              "MANUAL_DRY_RUN",
+              "MANUAL_LIVE",
+              "ON_DEMAND"
+            ],
+            "title": "Trigger Type"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "LIVE",
+              "DRY_RUN"
+            ],
+            "title": "Mode"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "SUCCESS",
+              "FAILED",
+              "PARTIAL",
+              "SKIPPED_DISABLED",
+              "SKIPPED_DEPENDENCY",
+              "PAUSED",
+              "CANCELLED"
+            ],
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "config_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Version"
+          },
+          "triggered_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggered By"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineStageDTO"
+            },
+            "type": "array",
+            "title": "Stages"
+          },
+          "escalations": {
+            "type": "integer",
+            "title": "Escalations"
+          },
+          "has_partial": {
+            "type": "boolean",
+            "title": "Has Partial"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "run_date",
+          "agent_key",
+          "trigger_type",
+          "mode",
+          "status",
+          "started_at",
+          "finished_at",
+          "duration_ms",
+          "config_version",
+          "triggered_by",
+          "reason",
+          "stop_reason",
+          "stages",
+          "escalations",
+          "has_partial"
+        ],
+        "title": "PipelineRunDTO"
+      },
+      "PipelineStageDTO": {
+        "properties": {
+          "agent_key": {
+            "type": "string",
+            "title": "Agent Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "RUNNING",
+                  "SUCCESS",
+                  "FAILED",
+                  "PARTIAL",
+                  "SKIPPED_DISABLED",
+                  "SKIPPED_DEPENDENCY",
+                  "PAUSED",
+                  "CANCELLED"
+                ]
+              },
+              {
+                "type": "string",
+                "const": "NOT_RUN"
+              }
+            ],
+            "title": "Status"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_key",
+          "name",
+          "status",
+          "run_id",
+          "duration_ms",
+          "retries",
+          "outputs",
+          "error"
+        ],
+        "title": "PipelineStageDTO"
+      },
+      "PreviewOutputDTO": {
+        "properties": {
+          "agent_key": {
+            "type": "string",
+            "title": "Agent Key"
+          },
+          "output_type": {
+            "type": "string",
+            "title": "Output Type"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_key",
+          "output_type",
+          "payload"
+        ],
+        "title": "PreviewOutputDTO"
+      },
       "ProductRef": {
         "properties": {
           "product_id": {
@@ -6977,6 +10506,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "review_status": {
+            "type": "string",
+            "enum": [
+              "REVIEWED",
+              "FLAGGED",
+              "NOT_REVIEWED"
+            ],
+            "title": "Review Status",
+            "description": "Recommendation Reviewer verdict (D-50); NOT_REVIEWED when the reviewer is off",
+            "default": "NOT_REVIEWED"
           }
         },
         "additionalProperties": false,
@@ -7039,6 +10579,14 @@
               }
             ],
             "title": "Evidence"
+          },
+          "review_issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Review Issues",
+            "description": "Reviewer flags (D-50)"
           }
         },
         "additionalProperties": false,
@@ -7194,6 +10742,75 @@
         ],
         "title": "ResolvePORequest"
       },
+      "RuleValueDTO": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "RuleValueDTO"
+      },
+      "RunGraphDTO": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "SUCCESS",
+              "FAILED",
+              "PARTIAL",
+              "SKIPPED_DISABLED",
+              "SKIPPED_DEPENDENCY",
+              "PAUSED",
+              "CANCELLED"
+            ],
+            "title": "Status"
+          },
+          "in_progress": {
+            "type": "boolean",
+            "title": "In Progress"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNodeDTO"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdgeDTO"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "status",
+          "in_progress",
+          "nodes",
+          "edges"
+        ],
+        "title": "RunGraphDTO"
+      },
       "RunInfoDTO": {
         "properties": {
           "run_id": {
@@ -7288,6 +10905,59 @@
         ],
         "title": "StockHealthDTO",
         "description": "Listed store-SKUs by stock-out risk (D-46): days of cover vs lead time and lead + review."
+      },
+      "StoppingDTO": {
+        "properties": {
+          "max_tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Calls"
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          },
+          "timeout_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout S"
+          },
+          "other": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Other"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "max_tool_calls",
+          "max_tokens",
+          "timeout_s",
+          "other"
+        ],
+        "title": "StoppingDTO"
       },
       "StoreDTO": {
         "properties": {
@@ -7440,6 +11110,122 @@
         ],
         "title": "SupplierRef"
       },
+      "ToggleAgentRequest": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason"
+          },
+          "confirm_critical": {
+            "type": "boolean",
+            "title": "Confirm Critical",
+            "description": "Second confirmation, required to turn OFF a critical agent (pauses replenishment)",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enabled",
+          "reason"
+        ],
+        "title": "ToggleAgentRequest"
+      },
+      "ToggleEventDTO": {
+        "properties": {
+          "config_version": {
+            "type": "integer",
+            "title": "Config Version"
+          },
+          "agent_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Key",
+            "description": "null = the global LLM switch"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "previous_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Enabled"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By",
+            "description": "Name of the user; null for the seeded initial version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "config_version",
+          "agent_key",
+          "enabled",
+          "previous_enabled",
+          "reason",
+          "updated_by",
+          "created_at"
+        ],
+        "title": "ToggleEventDTO"
+      },
+      "ToggleLLMRequest": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enabled",
+          "reason"
+        ],
+        "title": "ToggleLLMRequest"
+      },
       "TokenResponse": {
         "properties": {
           "access_token": {
@@ -7465,46 +11251,132 @@
         ],
         "title": "TokenResponse"
       },
-      "ToolCallDTO": {
+      "TraceStepDTO": {
         "properties": {
-          "tool_call_id": {
+          "kind": {
             "type": "string",
-            "format": "uuid",
-            "title": "Tool Call Id"
+            "enum": [
+              "TOOL",
+              "LLM",
+              "CHILD_RUN",
+              "ERROR",
+              "STOP"
+            ],
+            "title": "Kind"
           },
-          "tool_name": {
+          "at": {
             "type": "string",
-            "title": "Tool Name"
+            "format": "date-time",
+            "title": "At"
           },
-          "args": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Args"
-          },
-          "duration_ms": {
-            "type": "integer",
-            "title": "Duration Ms"
+          "name": {
+            "type": "string",
+            "title": "Name"
           },
           "status": {
             "type": "string",
             "title": "Status"
           },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "args_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Args Summary"
+          },
+          "result_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Summary"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "est_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Estimated provider cost in USD, 6 decimals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Est Cost Usd"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
-          "tool_call_id",
-          "tool_name",
-          "args",
-          "duration_ms",
-          "status",
-          "created_at"
+          "kind",
+          "at",
+          "name",
+          "status"
         ],
-        "title": "ToolCallDTO"
+        "title": "TraceStepDTO"
       },
       "TransferEvidence": {
         "properties": {
@@ -7728,6 +11600,166 @@
         ],
         "title": "TransferOrderDTO"
       },
+      "TriggerAgentRequest": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "LIVE",
+              "DRY_RUN"
+            ],
+            "title": "Mode",
+            "default": "DRY_RUN"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Required for LIVE"
+          },
+          "confirm": {
+            "type": "boolean",
+            "title": "Confirm",
+            "description": "LIVE: the user confirmed the consequences",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TriggerAgentRequest"
+      },
+      "TriggerPreviewDTO": {
+        "properties": {
+          "agent_key": {
+            "type": "string",
+            "title": "Agent Key"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "LIVE",
+              "DRY_RUN"
+            ],
+            "title": "Mode"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "upstream": {
+            "items": {
+              "$ref": "#/components/schemas/UpstreamStatusDTO"
+            },
+            "type": "array",
+            "title": "Upstream"
+          },
+          "downstream": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Downstream",
+            "description": "Dependants re-run in LIVE mode (skipped in a dry run)"
+          },
+          "recommendations_to_supersede": {
+            "type": "integer",
+            "title": "Recommendations To Supersede",
+            "description": "LIVE: PENDING recommendations of the re-run agents"
+          },
+          "live_triggers_last_hour": {
+            "type": "integer",
+            "title": "Live Triggers Last Hour"
+          },
+          "live_trigger_limit": {
+            "type": "integer",
+            "title": "Live Trigger Limit"
+          },
+          "consequences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Consequences"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_key",
+          "mode",
+          "allowed",
+          "blocked_reason",
+          "upstream",
+          "downstream",
+          "recommendations_to_supersede",
+          "live_triggers_last_hour",
+          "live_trigger_limit",
+          "consequences"
+        ],
+        "title": "TriggerPreviewDTO"
+      },
+      "TriggerResultDTO": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "LIVE",
+              "DRY_RUN"
+            ],
+            "title": "Mode"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "SUCCESS",
+              "FAILED",
+              "PARTIAL",
+              "SKIPPED_DISABLED",
+              "SKIPPED_DEPENDENCY",
+              "PAUSED",
+              "CANCELLED"
+            ],
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "mode",
+          "status",
+          "message"
+        ],
+        "title": "TriggerResultDTO"
+      },
       "TriggerRunRequest": {
         "properties": {
           "run_date": {
@@ -7782,6 +11814,35 @@
           "message"
         ],
         "title": "TriggerRunResponse"
+      },
+      "UpstreamStatusDTO": {
+        "properties": {
+          "agent_key": {
+            "type": "string",
+            "title": "Agent Key"
+          },
+          "fresh": {
+            "type": "boolean",
+            "title": "Fresh"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "REUSE",
+              "RERUN",
+              "SKIP_DISABLED"
+            ],
+            "title": "Action"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_key",
+          "fresh",
+          "action"
+        ],
+        "title": "UpstreamStatusDTO"
       }
     }
   }

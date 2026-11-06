@@ -115,46 +115,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/agent-runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Agent Runs
-         * @description Returns recent agent runs for system observability.
-         */
-        get: operations["list_agent_runs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agent-runs/{run_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Agent Run
-         * @description Returns detailed trace of a specific agent run including its tool calls and LLM usage.
-         */
-        get: operations["get_agent_run"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/dashboard": {
         parameters: {
             query?: never;
@@ -695,6 +655,297 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agents */
+        get: operations["list_agents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/llm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Toggle Llm Agents
+         * @description Global "All LLM agents" switch (cost and safety kill switch). Applies from the next run.
+         */
+        patch: operations["toggle_llm_agents"];
+        trace?: never;
+    };
+    "/api/v1/agents/{agent_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent */
+        get: operations["get_agent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Toggle Agent
+         * @description Turn an agent on or off (reason required, audited, versioned). Applies from the NEXT run.
+         */
+        patch: operations["toggle_agent"];
+        trace?: never;
+    };
+    "/api/v1/agents/{agent_key}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent Stats */
+        get: operations["agent_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{agent_key}/trigger-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trigger Preview
+         * @description What a "Run now" would do: upstream reuse / re-run, downstream re-runs, supersession, blocks.
+         */
+        get: operations["trigger_preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{agent_key}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger Agent
+         * @description Run now. DRY_RUN (default) stores outputs in a preview set only; LIVE publishes like a nightly stage and
+         *     needs a reason and confirmation. Runs in the background; poll GET /agent-runs/{run_id}.
+         */
+        post: operations["trigger_agent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Agent Runs
+         * @description Agent runs, newest first (keyset paging).
+         */
+        get: operations["list_agent_runs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agent Run
+         * @description Run trace: steps (tool calls, LLM calls, child runs, errors, stop reason), previews of a dry run.
+         */
+        get: operations["get_agent_run"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-runs/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Agent Run
+         * @description Request cancellation of a RUNNING root run; it stops after the current step.
+         */
+        post: operations["cancel_agent_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Decisions */
+        get: operations["list_decisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-decisions/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Decision Stats
+         * @description Acceptance per agent and decision type (live decisions only) — feeds the Objective III evaluation.
+         */
+        get: operations["decision_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pipeline/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pipeline Runs
+         * @description Root runs (nightly and manual triggers) with their stages in order.
+         */
+        get: operations["list_pipeline_runs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pipeline/runs/{run_id}/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pipeline Graph
+         * @description Visual flow of one run: agents, key tools and human approval gates (fixed layout).
+         */
+        get: operations["pipeline_graph"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assistant Status */
+        get: operations["assistant_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask
+         * @description Answer a question from recommendations, evidence, business rules and policies — with citations. The agent
+         *     only reads; asking it to approve, submit or change anything is refused (409 when the agent is disabled).
+         */
+        post: operations["ask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -714,8 +965,127 @@ export interface components {
             /** Skus */
             skus: number;
         };
-        /** AgentRunDetailDTO */
-        AgentRunDetailDTO: {
+        /** AgentDecisionDTO */
+        AgentDecisionDTO: {
+            /**
+             * Decision Id
+             * Format: uuid
+             */
+            decision_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Agent Key */
+            agent_key: string;
+            /** Agent Name */
+            agent_name: string;
+            /** Decision Type */
+            decision_type: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "LIVE" | "DRY_RUN";
+            store: components["schemas"]["StoreRef"] | null;
+            product: components["schemas"]["ProductRef"] | null;
+            /** Summary */
+            summary: string;
+            /** Rec Id */
+            rec_id: string | null;
+            /** Transfer Id */
+            transfer_id: string | null;
+            /** Po Id */
+            po_id: string | null;
+            /** Draft Id */
+            draft_id: string | null;
+            /** Evidence Ref */
+            evidence_ref: {
+                [key: string]: unknown;
+            };
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "PENDING" | "ACCEPTED" | "EDITED" | "REJECTED" | "SUPERSEDED" | "NOT_APPLICABLE";
+            /** Outcome Reason */
+            outcome_reason: string | null;
+            /** Outcome At */
+            outcome_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AgentDetailDTO */
+        AgentDetailDTO: {
+            agent: components["schemas"]["AgentSummaryDTO"];
+            /** Delegation */
+            delegation: string;
+            /** Description */
+            description: string;
+            /** Discernment */
+            discernment: string;
+            /** Diligence */
+            diligence: string;
+            /** Input Contract */
+            input_contract: string;
+            /** Output Contract */
+            output_contract: string;
+            /** Read Tools */
+            read_tools: string[];
+            /** Draft Tools */
+            draft_tools: string[];
+            stopping: components["schemas"]["StoppingDTO"];
+            /** Prompt Version */
+            prompt_version: string | null;
+            /**
+             * Prompt Text
+             * @description System instructions of the LLM agent (versioned file)
+             */
+            prompt_text: string | null;
+            /**
+             * Business Rules
+             * @description Parameters (edit in Settings → business rules)
+             */
+            business_rules: components["schemas"]["RuleValueDTO"][];
+            /** Disabled Effect */
+            disabled_effect: string;
+            /** Human In The Loop */
+            human_in_the_loop: string;
+            /** Decision Types */
+            decision_types: string[];
+            /**
+             * Card Markdown
+             * @description docs/agents/<key>.md
+             */
+            card_markdown: string | null;
+            /** Toggle History */
+            toggle_history: components["schemas"]["ToggleEventDTO"][];
+            /** Evals */
+            evals: components["schemas"]["EvalResultDTO"][];
+        };
+        /** AgentListDTO */
+        AgentListDTO: {
+            /** Items */
+            items: components["schemas"]["AgentSummaryDTO"][];
+            /**
+             * Llm Enabled
+             * @description Global "All LLM agents" switch
+             */
+            llm_enabled: boolean;
+            /** Config Version */
+            config_version: number;
+            /**
+             * Paused Banner
+             * @description "Replenishment paused by <user>: <reason>" when a critical pipeline agent is off
+             */
+            paused_banner: string | null;
+        };
+        /** AgentRunItemDTO */
+        AgentRunItemDTO: {
             /**
              * Run Id
              * Format: uuid
@@ -723,12 +1093,27 @@ export interface components {
             run_id: string;
             /** Parent Run Id */
             parent_run_id: string | null;
+            /** Agent Key */
+            agent_key: string | null;
             /** Agent Name */
             agent_name: string;
+            /**
+             * Trigger Type
+             * @enum {string}
+             */
+            trigger_type: "NIGHTLY" | "MANUAL_DRY_RUN" | "MANUAL_LIVE" | "ON_DEMAND";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "LIVE" | "DRY_RUN";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "RUNNING" | "SUCCESS" | "FAILED" | "PARTIAL" | "SKIPPED_DISABLED" | "SKIPPED_DEPENDENCY" | "PAUSED" | "CANCELLED";
             /** Run Date */
             run_date: string | null;
-            /** Status */
-            status: string;
             /**
              * Started At
              * Format: date-time
@@ -736,18 +1121,135 @@ export interface components {
             started_at: string;
             /** Finished At */
             finished_at: string | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Tool Calls */
+            tool_calls: number;
+            /** Llm Calls */
+            llm_calls: number;
+            /** Tokens */
+            tokens: number;
+            /**
+             * Est Cost Usd
+             * @description Estimated provider cost in USD, 6 decimals
+             */
+            est_cost_usd: string;
+            /** Retries */
+            retries: number;
+            /** Stop Reason */
+            stop_reason: string | null;
+            /** Error */
+            error: string | null;
+            /** Triggered By */
+            triggered_by: string | null;
+            /** Reason */
+            reason: string | null;
+        };
+        /** AgentRunTraceDTO */
+        AgentRunTraceDTO: {
+            run: components["schemas"]["AgentRunItemDTO"];
             /** Input Ref */
             input_ref: {
                 [key: string]: unknown;
             };
             /** Output Summary */
-            output_summary: string | null;
-            /** Error */
-            error: string | null;
-            /** Tool Calls */
-            tool_calls?: components["schemas"]["ToolCallDTO"][];
-            /** Llm Usages */
-            llm_usages?: components["schemas"]["LLMUsageDTO"][];
+            output_summary: unknown;
+            /** Config Version */
+            config_version: number | null;
+            /** Config Snapshot */
+            config_snapshot: {
+                [key: string]: unknown;
+            } | null;
+            /** Children */
+            children: components["schemas"]["AgentRunItemDTO"][];
+            /** Steps */
+            steps: components["schemas"]["TraceStepDTO"][];
+            /** Previews */
+            previews: components["schemas"]["PreviewOutputDTO"][];
+            /** Decisions */
+            decisions: number;
+        };
+        /** AgentStatsDTO */
+        AgentStatsDTO: {
+            /** Agent Key */
+            agent_key: string;
+            /** Runs By Day */
+            runs_by_day: components["schemas"]["DailyRunCountDTO"][];
+            /** Latency P50 Ms */
+            latency_p50_ms: number | null;
+            /** Latency P95 Ms */
+            latency_p95_ms: number | null;
+            /** Decisions By Type */
+            decisions_by_type: components["schemas"]["DecisionStatDTO"][];
+        };
+        /** AgentSummaryDTO */
+        AgentSummaryDTO: {
+            /** Agent Key */
+            agent_key: string;
+            /** Name */
+            name: string;
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "PIPELINE" | "OBJECTIVE_III";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "DETERMINISTIC" | "LLM";
+            /**
+             * Pattern
+             * @enum {string}
+             */
+            pattern: "PIPELINE_STAGE" | "RETRIEVAL" | "VALIDATION" | "ACTION" | "COORDINATOR" | "REVIEWER";
+            /** Critical */
+            critical: boolean;
+            /** Purpose */
+            purpose: string;
+            /**
+             * Enabled
+             * @description The agent's own switch
+             */
+            enabled: boolean;
+            /**
+             * Effective Enabled
+             * @description Own switch AND (not an LLM agent OR the global LLM switch is on)
+             */
+            effective_enabled: boolean;
+            /** Depends On */
+            depends_on: string[];
+            /** Optional Inputs */
+            optional_inputs: string[];
+            /** Triggerable */
+            triggerable: boolean;
+            last_run: components["schemas"]["LastRunRef"] | null;
+            /** Runs 7D */
+            runs_7d: number;
+            /**
+             * Success Rate 7D
+             * @description SUCCESS / finished runs of the last 7 days (0–1)
+             */
+            success_rate_7d: number | null;
+            /** P95 Latency Ms */
+            p95_latency_ms: number | null;
+            /** Tokens 7D */
+            tokens_7d: number;
+            /**
+             * Est Cost 7D Usd
+             * @description Estimated provider cost in USD, 6 decimals
+             */
+            est_cost_7d_usd: string;
+            /**
+             * Recommendations 7D
+             * @description Decisions linked to a recommendation in the last 7 days
+             */
+            recommendations_7d: number;
+            /**
+             * Acceptance Rate
+             * @description Accepted or edited / decided (all time, live decisions)
+             */
+            acceptance_rate: number | null;
         };
         /**
          * AnalyticsDTO
@@ -812,6 +1314,39 @@ export interface components {
              * Format: uuid
              */
             approval_id: string;
+        };
+        /** AskAnswerDTO */
+        AskAnswerDTO: {
+            /** Answer */
+            answer: string;
+            /** Found */
+            found: boolean;
+            /** Refused */
+            refused: boolean;
+            /** Citations */
+            citations: components["schemas"]["CitationDTO"][];
+            /** Run Id */
+            run_id: string | null;
+            /** Latency Ms */
+            latency_ms: number;
+            /**
+             * Mode
+             * @description RETRIEVAL_ONLY: no LLM (no key, or the global LLM switch is off) — sources listed, no prose
+             * @enum {string}
+             */
+            mode: "LLM" | "RETRIEVAL_ONLY";
+        };
+        /** AskRequest */
+        AskRequest: {
+            /** Question */
+            question: string;
+        };
+        /** AskStatusDTO */
+        AskStatusDTO: {
+            /** Enabled */
+            enabled: boolean;
+            /** Examples */
+            examples: string[];
         };
         /**
          * AssortmentGapEvidence
@@ -944,6 +1479,18 @@ export interface components {
              */
             value: string;
         };
+        /** CitationDTO */
+        CitationDTO: {
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "RECOMMENDATION" | "EVIDENCE" | "BUSINESS_RULE" | "POLICY" | "TRANSFER" | "INVENTORY";
+            /** Source Id */
+            source_id: string;
+            /** Label */
+            label: string;
+        };
         /** CloseShortRequest */
         CloseShortRequest: {
             /** Reason */
@@ -990,6 +1537,30 @@ export interface components {
             /** Qty */
             qty: number;
         };
+        /** CursorPage[AgentDecisionDTO] */
+        CursorPage_AgentDecisionDTO_: {
+            /** Items */
+            items: components["schemas"]["AgentDecisionDTO"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` to get the next page; null on the last page
+             */
+            next_cursor: string | null;
+            /** Page Size */
+            page_size: number;
+        };
+        /** CursorPage[AgentRunItemDTO] */
+        CursorPage_AgentRunItemDTO_: {
+            /** Items */
+            items: components["schemas"]["AgentRunItemDTO"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` to get the next page; null on the last page
+             */
+            next_cursor: string | null;
+            /** Page Size */
+            page_size: number;
+        };
         /** CursorPage[InventoryMovementDTO] */
         CursorPage_InventoryMovementDTO_: {
             /** Items */
@@ -1001,6 +1572,32 @@ export interface components {
             next_cursor: string | null;
             /** Page Size */
             page_size: number;
+        };
+        /** CursorPage[PipelineRunDTO] */
+        CursorPage_PipelineRunDTO_: {
+            /** Items */
+            items: components["schemas"]["PipelineRunDTO"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` to get the next page; null on the last page
+             */
+            next_cursor: string | null;
+            /** Page Size */
+            page_size: number;
+        };
+        /** DailyRunCountDTO */
+        DailyRunCountDTO: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Success */
+            success: number;
+            /** Failed */
+            failed: number;
+            /** Other */
+            other: number;
         };
         /**
          * DashboardInsights
@@ -1103,6 +1700,30 @@ export interface components {
             /** Slow Movers */
             slow_movers: components["schemas"]["MoverDTO"][];
         };
+        /** DecisionStatDTO */
+        DecisionStatDTO: {
+            /** Agent Key */
+            agent_key: string;
+            /** Decision Type */
+            decision_type: string;
+            /** Total */
+            total: number;
+            /** Accepted */
+            accepted: number;
+            /** Edited */
+            edited: number;
+            /** Rejected */
+            rejected: number;
+            /** Pending */
+            pending: number;
+            /** Superseded */
+            superseded: number;
+            /**
+             * Acceptance Rate
+             * @description (accepted + edited) / (accepted + edited + rejected)
+             */
+            acceptance_rate: number | null;
+        };
         /** ErrorBody */
         ErrorBody: {
             code: components["schemas"]["ErrorCode"];
@@ -1126,6 +1747,49 @@ export interface components {
         /** ErrorResponse */
         ErrorResponse: {
             error: components["schemas"]["ErrorBody"];
+        };
+        /** EvalResultDTO */
+        EvalResultDTO: {
+            /** Agent Key */
+            agent_key: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "RECORDED" | "LIVE";
+            /**
+             * Variant
+             * @enum {string}
+             */
+            variant: "AGENT" | "BASELINE";
+            /** Cases */
+            cases: number;
+            /** Correctness */
+            correctness: number;
+            /** Groundedness */
+            groundedness: number;
+            /** Tool Use */
+            tool_use: number;
+            /** Failure Handling */
+            failure_handling: number;
+            /** Latency P50 Ms */
+            latency_p50_ms: number;
+            /** Latency P95 Ms */
+            latency_p95_ms: number;
+            /** Tokens */
+            tokens: number;
+            /**
+             * Est Cost Usd
+             * @description Estimated provider cost in USD, 6 decimals
+             */
+            est_cost_usd: string;
+            /** Human Agreement */
+            human_agreement: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ExpiryDayDTO */
         ExpiryDayDTO: {
@@ -1184,6 +1848,44 @@ export interface components {
             lines: components["schemas"]["ReceiptLineRequest"][];
             /** Note */
             note?: string | null;
+        };
+        /** GraphEdgeDTO */
+        GraphEdgeDTO: {
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+            /** Label */
+            label: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "DATA" | "REVIEW" | "EXCEPTION" | "APPROVAL";
+        };
+        /** GraphNodeDTO */
+        GraphNodeDTO: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Node Type
+             * @enum {string}
+             */
+            node_type: "AGENT" | "TOOL" | "GATE" | "DATA";
+            /** Agent Key */
+            agent_key: string | null;
+            /** Status */
+            status: ("RUNNING" | "SUCCESS" | "FAILED" | "PARTIAL" | "SKIPPED_DISABLED" | "SKIPPED_DEPENDENCY" | "PAUSED" | "CANCELLED") | ("NOT_RUN" | "WAITING" | "DONE") | null;
+            /** Run Id */
+            run_id: string | null;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Detail */
+            detail: string | null;
         };
         /** HealthChecks */
         HealthChecks: {
@@ -1305,26 +2007,25 @@ export interface components {
             /** Shortage Products */
             shortage_products: number;
         };
-        /** LLMUsageDTO */
-        LLMUsageDTO: {
+        /** LastRunRef */
+        LastRunRef: {
             /**
-             * Usage Id
+             * Run Id
              * Format: uuid
              */
-            usage_id: string;
-            /** Provider */
-            provider: string;
-            /** Model */
-            model: string;
-            /** Input Tokens */
-            input_tokens: number;
-            /** Output Tokens */
-            output_tokens: number;
+            run_id: string;
             /**
-             * Created At
+             * Status
+             * @enum {string}
+             */
+            status: "RUNNING" | "SUCCESS" | "FAILED" | "PARTIAL" | "SKIPPED_DISABLED" | "SKIPPED_DEPENDENCY" | "PAUSED" | "CANCELLED";
+            /**
+             * Started At
              * Format: date-time
              */
-            created_at: string;
+            started_at: string;
+            /** Finished At */
+            finished_at: string | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1534,6 +2235,89 @@ export interface components {
             /** Page Size */
             page_size: number;
         };
+        /** PipelineRunDTO */
+        PipelineRunDTO: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Run Date */
+            run_date: string | null;
+            /**
+             * Agent Key
+             * @description Target agent of a manual trigger; null for nightly
+             */
+            agent_key: string | null;
+            /**
+             * Trigger Type
+             * @enum {string}
+             */
+            trigger_type: "NIGHTLY" | "MANUAL_DRY_RUN" | "MANUAL_LIVE" | "ON_DEMAND";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "LIVE" | "DRY_RUN";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "RUNNING" | "SUCCESS" | "FAILED" | "PARTIAL" | "SKIPPED_DISABLED" | "SKIPPED_DEPENDENCY" | "PAUSED" | "CANCELLED";
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Config Version */
+            config_version: number | null;
+            /** Triggered By */
+            triggered_by: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Stop Reason */
+            stop_reason: string | null;
+            /** Stages */
+            stages: components["schemas"]["PipelineStageDTO"][];
+            /** Escalations */
+            escalations: number;
+            /** Has Partial */
+            has_partial: boolean;
+        };
+        /** PipelineStageDTO */
+        PipelineStageDTO: {
+            /** Agent Key */
+            agent_key: string;
+            /** Name */
+            name: string;
+            /** Status */
+            status: ("RUNNING" | "SUCCESS" | "FAILED" | "PARTIAL" | "SKIPPED_DISABLED" | "SKIPPED_DEPENDENCY" | "PAUSED" | "CANCELLED") | "NOT_RUN";
+            /** Run Id */
+            run_id: string | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Retries */
+            retries: number;
+            /** Outputs */
+            outputs: number | null;
+            /** Error */
+            error: string | null;
+        };
+        /** PreviewOutputDTO */
+        PreviewOutputDTO: {
+            /** Agent Key */
+            agent_key: string;
+            /** Output Type */
+            output_type: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+        };
         /** ProductRef */
         ProductRef: {
             /**
@@ -1666,12 +2450,24 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Review Status
+             * @description Recommendation Reviewer verdict (D-50); NOT_REVIEWED when the reviewer is off
+             * @default NOT_REVIEWED
+             * @enum {string}
+             */
+            review_status: "REVIEWED" | "FLAGGED" | "NOT_REVIEWED";
         };
         /** RecommendationDetailDTO */
         RecommendationDetailDTO: {
             recommendation: components["schemas"]["RecommendationDTO"];
             /** Evidence */
             evidence: (components["schemas"]["TransferEvidence"] | components["schemas"]["ReorderEvidence"] | components["schemas"]["CoReplenishEvidence"] | components["schemas"]["ExpiryEvidence"] | components["schemas"]["AssortmentGapEvidence"] | components["schemas"]["NeedsReviewEvidence"]) | null;
+            /**
+             * Review Issues
+             * @description Reviewer flags (D-50)
+             */
+            review_issues?: string[];
         };
         /** RejectTransferRequest */
         RejectTransferRequest: {
@@ -1732,6 +2528,32 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** RuleValueDTO */
+        RuleValueDTO: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: unknown;
+        };
+        /** RunGraphDTO */
+        RunGraphDTO: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "RUNNING" | "SUCCESS" | "FAILED" | "PARTIAL" | "SKIPPED_DISABLED" | "SKIPPED_DEPENDENCY" | "PAUSED" | "CANCELLED";
+            /** In Progress */
+            in_progress: boolean;
+            /** Nodes */
+            nodes: components["schemas"]["GraphNodeDTO"][];
+            /** Edges */
+            edges: components["schemas"]["GraphEdgeDTO"][];
+        };
         /**
          * RunInfoDTO
          * @description Latest successful nightly run — the 'Data as of last run' in the header.
@@ -1789,6 +2611,17 @@ export interface components {
              * @description Listed store-SKUs with nothing on hand
              */
             out_of_stock: number;
+        };
+        /** StoppingDTO */
+        StoppingDTO: {
+            /** Max Tool Calls */
+            max_tool_calls: number | null;
+            /** Max Tokens */
+            max_tokens: number | null;
+            /** Timeout S */
+            timeout_s: number | null;
+            /** Other */
+            other: string[];
         };
         /** StoreDTO */
         StoreDTO: {
@@ -1858,6 +2691,52 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** ToggleAgentRequest */
+        ToggleAgentRequest: {
+            /** Enabled */
+            enabled: boolean;
+            /** Reason */
+            reason: string;
+            /**
+             * Confirm Critical
+             * @description Second confirmation, required to turn OFF a critical agent (pauses replenishment)
+             * @default false
+             */
+            confirm_critical: boolean;
+        };
+        /** ToggleEventDTO */
+        ToggleEventDTO: {
+            /** Config Version */
+            config_version: number;
+            /**
+             * Agent Key
+             * @description null = the global LLM switch
+             */
+            agent_key: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Previous Enabled */
+            previous_enabled: boolean | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Updated By
+             * @description Name of the user; null for the seeded initial version
+             */
+            updated_by: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ToggleLLMRequest */
+        ToggleLLMRequest: {
+            /** Enabled */
+            enabled: boolean;
+            /** Reason */
+            reason: string;
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -1871,28 +2750,38 @@ export interface components {
             /** Expires In */
             expires_in: number;
         };
-        /** ToolCallDTO */
-        ToolCallDTO: {
+        /** TraceStepDTO */
+        TraceStepDTO: {
             /**
-             * Tool Call Id
-             * Format: uuid
+             * Kind
+             * @enum {string}
              */
-            tool_call_id: string;
-            /** Tool Name */
-            tool_name: string;
-            /** Args */
-            args: {
-                [key: string]: unknown;
-            };
-            /** Duration Ms */
-            duration_ms: number;
-            /** Status */
-            status: string;
+            kind: "TOOL" | "LLM" | "CHILD_RUN" | "ERROR" | "STOP";
             /**
-             * Created At
+             * At
              * Format: date-time
              */
-            created_at: string;
+            at: string;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Args Summary */
+            args_summary?: string | null;
+            /** Result Summary */
+            result_summary?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Input Tokens */
+            input_tokens?: number | null;
+            /** Output Tokens */
+            output_tokens?: number | null;
+            /** Est Cost Usd */
+            est_cost_usd?: string | null;
+            /** Run Id */
+            run_id?: string | null;
         };
         /**
          * TransferEvidence
@@ -1979,6 +2868,78 @@ export interface components {
             /** Received Qty */
             received_qty?: number | null;
         };
+        /** TriggerAgentRequest */
+        TriggerAgentRequest: {
+            /**
+             * Mode
+             * @default DRY_RUN
+             * @enum {string}
+             */
+            mode: "LIVE" | "DRY_RUN";
+            /**
+             * Reason
+             * @description Required for LIVE
+             */
+            reason?: string | null;
+            /**
+             * Confirm
+             * @description LIVE: the user confirmed the consequences
+             * @default false
+             */
+            confirm: boolean;
+        };
+        /** TriggerPreviewDTO */
+        TriggerPreviewDTO: {
+            /** Agent Key */
+            agent_key: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "LIVE" | "DRY_RUN";
+            /** Allowed */
+            allowed: boolean;
+            /** Blocked Reason */
+            blocked_reason: string | null;
+            /** Upstream */
+            upstream: components["schemas"]["UpstreamStatusDTO"][];
+            /**
+             * Downstream
+             * @description Dependants re-run in LIVE mode (skipped in a dry run)
+             */
+            downstream: string[];
+            /**
+             * Recommendations To Supersede
+             * @description LIVE: PENDING recommendations of the re-run agents
+             */
+            recommendations_to_supersede: number;
+            /** Live Triggers Last Hour */
+            live_triggers_last_hour: number;
+            /** Live Trigger Limit */
+            live_trigger_limit: number;
+            /** Consequences */
+            consequences: string[];
+        };
+        /** TriggerResultDTO */
+        TriggerResultDTO: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "LIVE" | "DRY_RUN";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "RUNNING" | "SUCCESS" | "FAILED" | "PARTIAL" | "SKIPPED_DISABLED" | "SKIPPED_DEPENDENCY" | "PAUSED" | "CANCELLED";
+            /** Message */
+            message: string;
+        };
         /** TriggerRunRequest */
         TriggerRunRequest: {
             /**
@@ -1995,6 +2956,18 @@ export interface components {
             run_id?: string | null;
             /** Run Date */
             run_date?: string | null;
+        };
+        /** UpstreamStatusDTO */
+        UpstreamStatusDTO: {
+            /** Agent Key */
+            agent_key: string;
+            /** Fresh */
+            fresh: boolean;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "REUSE" | "RERUN" | "SKIP_DISABLED";
         };
     };
     responses: never;
@@ -2407,162 +3380,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TriggerRunResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Implemented */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    list_agent_runs: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AgentRunDetailDTO"][];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Implemented */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    get_agent_run: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                run_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AgentRunDetailDTO"];
                 };
             };
             /** @description Unauthorized */
@@ -4749,6 +5566,1284 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BusinessRuleDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_agents: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentListDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    toggle_llm_agents: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToggleLLMRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentListDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_agent: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                agent_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDetailDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    toggle_agent: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                agent_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToggleAgentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDetailDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    agent_stats: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                agent_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentStatsDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    trigger_preview: {
+        parameters: {
+            query?: {
+                mode?: "LIVE" | "DRY_RUN";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                agent_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerPreviewDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    trigger_agent: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                agent_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerAgentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerResultDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_agent_runs: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                page_size?: number;
+                agent_key?: string | null;
+                status?: ("RUNNING" | "SUCCESS" | "FAILED" | "PARTIAL" | "SKIPPED_DISABLED" | "SKIPPED_DEPENDENCY" | "PAUSED" | "CANCELLED") | null;
+                trigger_type?: ("NIGHTLY" | "MANUAL_DRY_RUN" | "MANUAL_LIVE" | "ON_DEMAND") | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                roots_only?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_AgentRunItemDTO_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_agent_run: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentRunTraceDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_agent_run: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentRunItemDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_decisions: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                page_size?: number;
+                agent_key?: string | null;
+                decision_type?: string | null;
+                outcome?: ("PENDING" | "ACCEPTED" | "EDITED" | "REJECTED" | "SUPERSEDED" | "NOT_APPLICABLE") | null;
+                store_id?: string | null;
+                mode?: ("LIVE" | "DRY_RUN") | null;
+                run_id?: string | null;
+                q?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_AgentDecisionDTO_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    decision_stats: {
+        parameters: {
+            query?: {
+                agent_key?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionStatDTO"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_pipeline_runs: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                page_size?: number;
+                trigger_type?: ("NIGHTLY" | "MANUAL_DRY_RUN" | "MANUAL_LIVE" | "ON_DEMAND") | null;
+                status?: ("RUNNING" | "SUCCESS" | "FAILED" | "PARTIAL" | "SKIPPED_DISABLED" | "SKIPPED_DEPENDENCY" | "PAUSED" | "CANCELLED") | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_PipelineRunDTO_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    pipeline_graph: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                run_id: string | "latest";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunGraphDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    assistant_status: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskStatusDTO"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ask: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskAnswerDTO"];
                 };
             };
             /** @description Unauthorized */

@@ -1,5 +1,24 @@
 import type {
-  AgentRunDetailDTO,
+  AgentDecisionDTO,
+  AgentDetailDTO,
+  AgentListDTO,
+  AgentRunItemDTO,
+  AgentRunQuery,
+  AgentRunTraceDTO,
+  AgentStatsDTO,
+  AskAnswerDTO,
+  AskStatusDTO,
+  DecisionQuery,
+  DecisionStatDTO,
+  PipelineQuery,
+  PipelineRunDTO,
+  RunGraphDTO,
+  RunMode,
+  ToggleAgentRequest,
+  ToggleLLMRequest,
+  TriggerAgentRequest,
+  TriggerPreviewDTO,
+  TriggerResultDTO,
   ApprovalRequest,
   ApprovalResult,
   BatchDTO,
@@ -70,8 +89,24 @@ export interface ApiClient {
   closeShortPurchaseOrder(poId: string, body: CloseShortRequest): Promise<PurchaseOrderDTO>;
   listNotifications(unreadOnly?: boolean): Promise<NotificationDTO[]>;
   markNotificationRead(id: string): Promise<NotificationDTO>;
-  listAgentRuns(limit?: number): Promise<AgentRunDetailDTO[]>;
-  getAgentRun(runId: string): Promise<AgentRunDetailDTO>;
+  // agent console (docs/09, D-50) — Super Admin only
+  listAgents(): Promise<AgentListDTO>;
+  getAgent(agentKey: string): Promise<AgentDetailDTO>;
+  toggleAgent(agentKey: string, body: ToggleAgentRequest): Promise<AgentDetailDTO>;
+  toggleLlmAgents(body: ToggleLLMRequest): Promise<AgentListDTO>;
+  getAgentStats(agentKey: string): Promise<AgentStatsDTO>;
+  getTriggerPreview(agentKey: string, mode: RunMode): Promise<TriggerPreviewDTO>;
+  triggerAgent(agentKey: string, body: TriggerAgentRequest): Promise<TriggerResultDTO>;
+  listAgentRuns(query: AgentRunQuery): Promise<CursorPage<AgentRunItemDTO>>;
+  getAgentRun(runId: string): Promise<AgentRunTraceDTO>;
+  cancelAgentRun(runId: string): Promise<AgentRunItemDTO>;
+  listDecisions(query: DecisionQuery): Promise<CursorPage<AgentDecisionDTO>>;
+  getDecisionStats(agentKey?: string): Promise<DecisionStatDTO[]>;
+  listPipelineRuns(query: PipelineQuery): Promise<CursorPage<PipelineRunDTO>>;
+  getRunGraph(runId: string): Promise<RunGraphDTO>;
+  // Ask RetailPilot — any signed-in user, scoped to their store
+  getAssistantStatus(): Promise<AskStatusDTO>;
+  ask(question: string): Promise<AskAnswerDTO>;
   triggerNightlyRun(body?: TriggerRunRequest): Promise<{ message: string; run_id?: string; run_date: string }>;
 }
 
@@ -99,7 +134,7 @@ export function toQueryString(query: Record<string, QueryValue> | undefined): st
 
 /** Real backend client (FastAPI, /api/v1, JWT bearer). */
 export function createHttpClient(getToken: () => string | null, baseUrl = "/api/v1"): ApiClient {
-  async function request<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: "GET" | "POST" | "PUT" | "PATCH", path: string, body?: unknown): Promise<T> {
     const token = getToken();
     const response = await fetch(`${baseUrl}${path}`, {
       method,
@@ -162,8 +197,23 @@ export function createHttpClient(getToken: () => string | null, baseUrl = "/api/
     listNotifications: (unreadOnly) =>
       request("GET", `/notifications${toQueryString(unreadOnly ? { unread: true } : undefined)}`),
     markNotificationRead: (id) => request("POST", `/notifications/${encodeURIComponent(id)}/read`),
-    listAgentRuns: (limit) => request("GET", `/agent-runs${toQueryString(limit ? { limit } : undefined)}`),
+    listAgents: () => request("GET", "/agents"),
+    getAgent: (key) => request("GET", `/agents/${encodeURIComponent(key)}`),
+    toggleAgent: (key, body) => request("PATCH", `/agents/${encodeURIComponent(key)}`, body),
+    toggleLlmAgents: (body) => request("PATCH", "/agents/llm", body),
+    getAgentStats: (key) => request("GET", `/agents/${encodeURIComponent(key)}/stats`),
+    getTriggerPreview: (key, mode) =>
+      request("GET", `/agents/${encodeURIComponent(key)}/trigger-preview${toQueryString({ mode })}`),
+    triggerAgent: (key, body) => request("POST", `/agents/${encodeURIComponent(key)}/runs`, body),
+    listAgentRuns: (query) => request("GET", `/agent-runs${toQueryString(query)}`),
     getAgentRun: (runId) => request("GET", `/agent-runs/${encodeURIComponent(runId)}`),
+    cancelAgentRun: (runId) => request("POST", `/agent-runs/${encodeURIComponent(runId)}/cancel`),
+    listDecisions: (query) => request("GET", `/agent-decisions${toQueryString(query)}`),
+    getDecisionStats: (key) => request("GET", `/agent-decisions/stats${toQueryString({ agent_key: key })}`),
+    listPipelineRuns: (query) => request("GET", `/pipeline/runs${toQueryString(query)}`),
+    getRunGraph: (runId) => request("GET", `/pipeline/runs/${encodeURIComponent(runId)}/graph`),
+    getAssistantStatus: () => request("GET", "/assistant/status"),
+    ask: (question) => request("POST", "/assistant/ask", { question }),
     triggerNightlyRun: (body) => request("POST", "/admin/runs", body ?? {}),
   };
 }

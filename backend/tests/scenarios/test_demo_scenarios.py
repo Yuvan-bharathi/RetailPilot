@@ -316,10 +316,15 @@ def test_api_analytics_is_computed_and_scoped(run: dict[str, Any], api: Any) -> 
     revenue = [float(c["revenue"]) for c in admin["categories"]]
     assert revenue == sorted(revenue, reverse=True) and revenue[0] > 0
     for c in admin["categories"]:
-        assert c["margin_pct"] == pytest.approx(float(c["gross_profit"]) / float(c["revenue"]) * 100, abs=0.01)
+        assert c["margin_pct"] == pytest.approx(
+            float(c["gross_profit"]) / float(c["revenue"]) * 100, abs=0.01
+        )
     lost = [float(x["lost_revenue"]) for x in admin["top_lost_sales"]]
     assert lost == sorted(lost, reverse=True)
     store_c = client.get("/api/v1/analytics", headers=as_user("sup.c")).json()
     assert store_c["store"]["name"].startswith("Store C")
     assert all(x["store"]["name"].startswith("Store C") for x in store_c["top_lost_sales"])
-    assert client.get(f"/api/v1/analytics?store_id={_store(run, 'A')}", headers=as_user("sup.c")).status_code == 403
+    assert (
+        client.get(f"/api/v1/analytics?store_id={_store(run, 'A')}", headers=as_user("sup.c")).status_code
+        == 403
+    )

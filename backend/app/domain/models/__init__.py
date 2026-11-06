@@ -1,5 +1,15 @@
 """SQLAlchemy models (CD-1, CD-2, spec §10). Every model module is imported here so Alembic sees all tables."""
 
+from app.domain.models.agents import (
+    AgentConfig,
+    AgentDecision,
+    AgentDefinition,
+    AgentDraft,
+    AgentEvalResult,
+    AgentPreviewOutput,
+    PolicyDocument,
+    RecommendationReview,
+)
 from app.domain.models.base import Base
 from app.domain.models.extensions import ShelfLocation, StoreLayout, SupplierScheme
 from app.domain.models.inventory import Batch, InventoryDailySnapshot, InventoryMovement, InventoryPosition
@@ -30,6 +40,12 @@ from app.domain.models.users import AppUser, Notification
 __all__ = [
     "MATERIALIZED_VIEWS",
     "PARTITIONED_TABLES",
+    "AgentConfig",
+    "AgentDecision",
+    "AgentDefinition",
+    "AgentDraft",
+    "AgentEvalResult",
+    "AgentPreviewOutput",
     "AgentRun",
     "AppUser",
     "Approval",
@@ -50,9 +66,11 @@ __all__ = [
     "LostSalesEstimate",
     "Notification",
     "POLine",
+    "PolicyDocument",
     "Product",
     "PurchaseOrder",
     "Recommendation",
+    "RecommendationReview",
     "ReplenishmentNeed",
     "SalesLine",
     "SalesTransaction",

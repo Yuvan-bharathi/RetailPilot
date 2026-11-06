@@ -3,17 +3,22 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { useApi } from "../app/ApiContext";
 import type {
+  AgentRunQuery,
   BatchQuery,
   DashboardQuery,
+  DecisionQuery,
   ExpiringQuery,
   InventoryQuery,
   MovementQuery,
+  PipelineQuery,
   PurchaseOrderQuery,
   RecommendationQuery,
+  RunMode,
   TransferQuery,
 } from "./types";
 
 const FIVE_MINUTES = 300_000; // spec §9 React Query staleTime
+const POLL_MS = 5_000; // agent console: poll while a run is in progress (docs/09 §3.4)
 
 export function useLatestRun(enabled = true) {
   const api = useApi();
@@ -154,12 +159,39 @@ export function useNotifications(unreadOnly = false) {
   });
 }
 
-export function useAgentRuns(limit = 20) {
+export function useAgents() {
+  const api = useApi();
+  return useQuery({ queryKey: ["agents"], queryFn: () => api.listAgents(), staleTime: 15_000 });
+}
+
+export function useAgent(agentKey: string) {
+  const api = useApi();
+  return useQuery({ queryKey: ["agent", agentKey], queryFn: () => api.getAgent(agentKey) });
+}
+
+export function useAgentStats(agentKey: string) {
+  const api = useApi();
+  return useQuery({ queryKey: ["agent-stats", agentKey], queryFn: () => api.getAgentStats(agentKey) });
+}
+
+export function useTriggerPreview(agentKey: string, mode: RunMode, enabled = true) {
   const api = useApi();
   return useQuery({
-    queryKey: ["agent-runs", limit],
-    queryFn: () => api.listAgentRuns(limit),
-    staleTime: 10_000,
+    queryKey: ["trigger-preview", agentKey, mode],
+    queryFn: () => api.getTriggerPreview(agentKey, mode),
+    enabled,
+    staleTime: 0,
+  });
+}
+
+/** Runs list; polls every 5 s while a listed run is RUNNING (docs/09 §3.4). */
+export function useAgentRuns(query: AgentRunQuery) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["agent-runs", query],
+    queryFn: () => api.listAgentRuns(query),
+    placeholderData: keepPreviousData,
+    refetchInterval: (q) => (q.state.data?.items.some((r) => r.status === "RUNNING") ? POLL_MS : false),
   });
 }
 
@@ -169,5 +201,46 @@ export function useAgentRun(runId: string | null) {
     queryKey: ["agent-run", runId],
     queryFn: () => api.getAgentRun(runId as string),
     enabled: runId !== null,
+    refetchInterval: (q) => (q.state.data?.run.status === "RUNNING" ? POLL_MS : false),
   });
+}
+
+export function useDecisions(query: DecisionQuery) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["agent-decisions", query],
+    queryFn: () => api.listDecisions(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useDecisionStats(agentKey?: string) {
+  const api = useApi();
+  return useQuery({ queryKey: ["decision-stats", agentKey ?? null], queryFn: () => api.getDecisionStats(agentKey) });
+}
+
+export function usePipelineRuns(query: PipelineQuery) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["pipeline-runs", query],
+    queryFn: () => api.listPipelineRuns(query),
+    placeholderData: keepPreviousData,
+    refetchInterval: (q) => (q.state.data?.items.some((r) => r.status === "RUNNING") ? POLL_MS : false),
+  });
+}
+
+/** Visual flow graph; polls every 5 s while the run is in progress (docs/09 §3.4). */
+export function useRunGraph(runId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["run-graph", runId],
+    queryFn: () => api.getRunGraph(runId as string),
+    enabled: runId !== null,
+    refetchInterval: (q) => (q.state.data?.in_progress ? POLL_MS : false),
+  });
+}
+
+export function useAssistantStatus() {
+  const api = useApi();
+  return useQuery({ queryKey: ["assistant-status"], queryFn: () => api.getAssistantStatus() });
 }
